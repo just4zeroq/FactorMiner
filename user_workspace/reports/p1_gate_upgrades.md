@@ -108,8 +108,8 @@
 
 ## 6. 测试
 
-- `tests/test_portfolio_eval.py`：11 项（新增时序策略相关未单列，覆盖在同文件）
+- `tests/test_portfolio_eval.py`：15 项（多空组合 11 + 时序择时 4）
 - `tests/test_evaluator_verdict.py`：11 项（DSR 口径、时序判决、成本口径分离）
 - `tests/test_experiment_trace.py`：16 项（+5 项 FdrLedger）
 - `tests/test_director_gating.py`：11 项（+1 项累积 FDR）
-- **全量：178 passed**（排除 `test_factor_analytics.py`，其依赖 `httpx2` 在本机缺失）
+- **全量：182 passed**（排除 `test_factor_analytics.py`，其依赖 `httpx2` 在本机缺失）

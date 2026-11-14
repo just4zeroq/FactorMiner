@@ -7,6 +7,7 @@ from core.evaluation.portfolio_eval import (
     DEFAULT_LS_CFG,
     long_short_returns,
     ls_t_stat,
+    timing_returns,
 )
 
 
@@ -123,3 +124,46 @@ class LsTStatTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TimingReturnsTest(unittest.TestCase):
+    def _persistent(self, T=600, phi=0.97, seed=31, edge=0.08):
+        rng = np.random.default_rng(seed)
+        s = np.zeros(T)
+        for t in range(1, T):
+            s[t] = phi * s[t - 1] + rng.standard_normal()
+        idx = pd.date_range("2018-01-01", periods=T, freq="D")
+        f = pd.Series(s, index=idx)
+        r = pd.Series(edge * s + 0.6 * rng.standard_normal(T), index=idx)
+        return f, r
+
+    def test_persistent_signal_is_profitable(self):
+        f, r = self._persistent()
+        res = timing_returns(f, r, orientation=1.0, cost_rate=0.0018)
+        self.assertGreater(res["n_obs"], 100)
+        self.assertGreater(res["mean_return"], 0.0)
+        self.assertGreater(res["cost_adj_return"], 0.0)
+        self.assertGreater(res["ls_t"], 2.0)
+        self.assertGreater(res["exposure"], 0.0)
+
+    def test_noise_is_not_profitable_on_average(self):
+        rng = np.random.default_rng(32)
+        idx = pd.date_range("2018-01-01", periods=600, freq="D")
+        f = pd.Series(rng.standard_normal(600), index=idx)
+        r = pd.Series(rng.standard_normal(600), index=idx)
+        res = timing_returns(f, r, orientation=1.0, cost_rate=0.0018)
+        # no real edge: the t-stat must stay in the noise band
+        self.assertLess(abs(res["ls_t"]), 3.0)
+
+    def test_rebalance_holding_reduces_turnover(self):
+        f, r = self._persistent()
+        fast = timing_returns(f, r, rebalance_bars=1, cost_rate=0.0018)
+        slow = timing_returns(f, r, rebalance_bars=5, cost_rate=0.0018)
+        self.assertGreater(fast["turnover"], slow["turnover"])
+
+    def test_short_series_returns_zeros(self):
+        idx = pd.date_range("2020-01-01", periods=10, freq="D")
+        s = pd.Series(np.arange(10.0), index=idx)
+        res = timing_returns(s, s)
+        self.assertEqual(res["n_obs"], 0)
+        self.assertEqual(res["cost_adj_return"], 0.0)
