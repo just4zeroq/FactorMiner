@@ -33,8 +33,8 @@ class BatchConfig:
 class SmartBatchDownloader(DataDownloader):
     """智能分批下载器"""
     
-    def __init__(self):
-        super().__init__()
+    def __init__(self, data_root: str = "data"):
+        super().__init__(data_root=data_root)
         self.logger = logging.getLogger(__name__)
         
         # 为不同时间框架配置分批策略
@@ -309,7 +309,7 @@ class SmartBatchDownloader(DataDownloader):
             filename = data_filename(symbol, timeframe, self.trade_type)
             print(f"完成构建文件名: {filename}")
 
-            save_path = data_path("data", self.exchange_id, symbol, timeframe, self.trade_type)
+            save_path = data_path(self.data_root, self.exchange_id, symbol, timeframe, self.trade_type)
             print(f"生成保存路径: {save_path}")
             
             # 检查现有文件并合并

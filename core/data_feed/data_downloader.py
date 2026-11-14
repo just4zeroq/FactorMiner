@@ -22,12 +22,15 @@ from .naming import data_filename, data_path, parse_data_filename
 class DataDownloader:
     """数据下载器"""
 
-    def __init__(self):
+    def __init__(self, data_root: str = "data"):
         """初始化数据下载器"""
         self.logger = logging.getLogger(__name__)
         # 落盘目录必须与数据源一致；SmartBatchDownloader 会在
         # download_ohlcv_batch 里按入参覆盖此值。
         self.exchange_id = "binance"
+        # Root of the local library. Defaults to the production directory; the
+        # unattended updater passes its own root so a probe cannot touch it.
+        self.data_root = data_root
 
     def get_exchange_instance(self, config_id: int = None, exchange_id: str = None, trade_type: str = None) -> Optional[ccxt.Exchange]:
         """
@@ -234,7 +237,7 @@ class DataDownloader:
             print(f"最终验证通过，准备保存: {len(df_save)} 条数据")
 
             filename = data_filename(symbol, timeframe, self.trade_type)
-            save_path = data_path("data", self.exchange_id, symbol, timeframe, self.trade_type)
+            save_path = data_path(self.data_root, self.exchange_id, symbol, timeframe, self.trade_type)
 
             # 检查现有文件以确定目标时区
             target_tz = None
@@ -383,7 +386,7 @@ class DataDownloader:
             合并后的数据
         """
         try:
-            save_path = data_path("data", self.exchange_id, symbol, timeframe, self.trade_type)
+            save_path = data_path(self.data_root, self.exchange_id, symbol, timeframe, self.trade_type)
 
             # 检查是否存在现有文件
             if not save_path.exists():
