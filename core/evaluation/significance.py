@@ -227,6 +227,37 @@ def expected_max_sr(n_trials: int, sr_0: float = 0.0, sigma: float = 1.0) -> flo
     return float(sr_0 + sigma * math.sqrt(2.0 * math.log(n_trials)))
 
 
+def multiple_testing_bar(
+    n_obs: int,
+    n_trials: int,
+    annualisation: int = 252,
+) -> Dict[str, float]:
+    """The Sharpe a strategy must beat given how many ideas were already tried.
+
+    DSR compares a candidate against ``E[max SR]`` for ``n_trials`` null
+    strategies. That number is not a property of the factor — it rises with the
+    search budget. Surfacing it turns "why did nothing pass?" into an actionable
+    answer: at 787 trials and 610 observations the bar is ~2.35 annualised, so a
+    strategy with a true annual Sharpe of 1.5 cannot pass no matter how clean
+    its IC is.
+    """
+    if n_obs < 2:
+        return {
+            "n_trials": int(n_trials),
+            "n_obs": int(n_obs),
+            "bar_per_period_sharpe": float("nan"),
+            "bar_annualised_sharpe": float("nan"),
+        }
+    sigma = 1.0 / math.sqrt(max(n_obs - 1, 1))
+    bar = expected_max_sr(max(1, int(n_trials)), sigma=sigma)
+    return {
+        "n_trials": int(n_trials),
+        "n_obs": int(n_obs),
+        "bar_per_period_sharpe": bar,
+        "bar_annualised_sharpe": bar * math.sqrt(annualisation),
+    }
+
+
 def deflated_sharpe_ratio(
     sharpe: float,
     n_obs: int,

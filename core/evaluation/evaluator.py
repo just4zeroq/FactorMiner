@@ -84,6 +84,18 @@ class ParallelEvaluator:
             raise ValueError(
                 "evaluation.max_workers must be an integer between 1 and 64"
             )
+        # Per-candidate wall-clock budget. A pathological factor (infinite loop in
+        # the sandbox, a pandas op that explodes on a sparse panel) used to hang
+        # the whole round. Set to 0 to wait forever (legacy behaviour).
+        configured_timeout = self.config.get("evaluation", {}).get("timeout_seconds", 120)
+        try:
+            self.timeout_per_candidate = float(configured_timeout or 0)
+        except (TypeError, ValueError):
+            self.timeout_per_candidate = 120.0
+        if self.timeout_per_candidate < 0:
+            self.timeout_per_candidate = 0.0
+        # Number of candidates that blew the budget this run (surfaced in reports).
+        self.timed_out = 0
         self.gate_rebalance_bars = self._resolve_gate_rebalance_bars()
 
     def _resolve_gate_rebalance_bars(self) -> int:
@@ -222,11 +234,51 @@ class ParallelEvaluator:
                 )
 
         worker_count = min(self.max_workers, len(candidates))
-        with concurrent.futures.ThreadPoolExecutor(
+        executor = concurrent.futures.ThreadPoolExecutor(
             max_workers=worker_count,
             thread_name_prefix="factor-evaluator",
-        ) as executor:
-            results = list(executor.map(safe_compute, candidates))
+        )
+        futures = {executor.submit(safe_compute, cand): cand for cand in candidates}
+        results_by_id: Dict[int, CandidateEvaluation] = {}
+        budget = self.timeout_per_candidate * len(candidates) if self.timeout_per_candidate else None
+        try:
+            for future in concurrent.futures.as_completed(futures, timeout=budget):
+                candidate = futures[future]
+                try:
+                    results_by_id[id(candidate)] = future.result()
+                except Exception as exc:  # cancelled or executor failure
+                    results_by_id[id(candidate)] = CandidateEvaluation(
+                        candidate=candidate,
+                        status="error",
+                        error_type=type(exc).__name__,
+                        error_message=str(exc),
+                    )
+        except (TimeoutError, concurrent.futures.TimeoutError):
+            logger.warning(
+                "Evaluation budget of %.1fs exhausted after %d/%d candidates; "
+                "the rest are recorded as timeouts and the round continues.",
+                budget, len(results_by_id), len(candidates),
+            )
+        finally:
+            # Never block the miner on a stuck worker. Running threads keep
+            # burning until they finish, but the round moves on.
+            executor.shutdown(wait=False, cancel_futures=True)
+
+        results: List[CandidateEvaluation] = []
+        for candidate in candidates:
+            result = results_by_id.get(id(candidate))
+            if result is None:
+                self.timed_out += 1
+                result = CandidateEvaluation(
+                    candidate=candidate,
+                    status="timeout",
+                    error_type="EvaluationTimeout",
+                    error_message=(
+                        f"No result within the {self.timeout_per_candidate:.0f}s "
+                        f"per-candidate budget"
+                    ),
+                )
+            results.append(result)
 
         feedback.results.extend(results)
         # Phase P1 (cumulative FDR): keep the raw p-value of every candidate we

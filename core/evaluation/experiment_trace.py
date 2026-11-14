@@ -344,6 +344,35 @@ class FdrLedger:
     def num_tests(self) -> int:
         return len(self.cumulative())
 
+    def budget_report(
+        self,
+        n_obs: Optional[int] = None,
+        budget: Optional[int] = None,
+        annualisation: int = 252,
+    ) -> Dict[str, Any]:
+        """How much of the hypothesis budget is spent, and what bar it implies.
+
+        The DSR benchmark grows with ``n_trials``: mining more ideas makes every
+        individual idea harder to promote. That trade-off used to be invisible —
+        the gate simply got stricter with no signal to the researcher. This
+        report makes it explicit so a run can be planned (or stopped) knowingly.
+        """
+        from core.evaluation.significance import multiple_testing_bar
+
+        with self._lock:
+            runs = len(self._entries)
+        tests = self.num_tests
+        report: Dict[str, Any] = {
+            "runs": runs,
+            "cumulative_tests": tests,
+            "budget": int(budget) if budget else None,
+            "utilization": (tests / budget) if budget else None,
+            "ledger_path": self.path,
+        }
+        if n_obs:
+            report.update(multiple_testing_bar(n_obs, max(1, tests), annualisation))
+        return report
+
     def reset(self) -> None:
         with self._lock:
             self._entries = []

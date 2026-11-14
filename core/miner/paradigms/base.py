@@ -12,16 +12,120 @@ from core.miner.entities import EvaluationFeedback, MinerState
 
 logger = logging.getLogger(__name__)
 
+def factor_signature(values: Any) -> Optional[np.ndarray]:
+    """Flatten a factor panel into a comparable signature.
+
+    Cross-sectional panels are ranked per timestamp first, so the signature
+    measures *ordering* rather than scale — two factors that rank assets
+    identically are redundant even if one is 100x the other. Returns ``None``
+    when the factor has no usable values.
+    """
+    if values is None:
+        return None
+    try:
+        if isinstance(values, pd.DataFrame):
+            if values.empty:
+                return None
+            ranked = values.rank(axis=1)
+            return ranked.to_numpy(dtype=float, na_value=np.nan).reshape(-1)
+        if isinstance(values, pd.Series):
+            if values.empty:
+                return None
+            return values.to_numpy(dtype=float).reshape(-1)
+        array = np.asarray(values, dtype=float)
+        return array.reshape(-1) if array.size else None
+    except Exception:
+        return None
+
+
+def signature_correlation(a: np.ndarray, b: np.ndarray) -> Optional[float]:
+    """Pearson correlation over the jointly-finite part of two signatures."""
+    if a is None or b is None or a.shape != b.shape:
+        return None
+    mask = np.isfinite(a) & np.isfinite(b)
+    if mask.sum() < 50:
+        return None
+    aa = a[mask]
+    bb = b[mask]
+    aa = aa - aa.mean()
+    bb = bb - bb.mean()
+    denom = float(np.sqrt((aa**2).sum() * (bb**2).sum()))
+    if denom <= 0:
+        return None
+    return float((aa * bb).sum() / denom)
+
+
 class DiversityFilter:
-    """因子正交性与多样性过滤器"""
-    def __init__(self, correlation_threshold: float = 0.7, initial_hashes: set = None):
+    """因子正交性与多样性过滤器
+
+    两级去重：
+
+    1. **硬去重**（始终开启）—— 按源码 MD5 拦截完全相同的表达式。
+    2. **软去重**（``value_threshold > 0`` 时开启）—— 把候选的因子面值按截面
+       rank 展平做相关，``|corr| > value_threshold`` 视为同一个信号（反向只是
+       符号翻转，同样冗余）。这一层拦的是"同一信号的不同写法"：源码 MD5 对它们
+       完全无效，而它们会白白消耗试验预算、抬高 DSR 的分母。
+
+    软去重只对通过硬去重的候选计算面值，且 archive 有容量上限，避免 O(K²) 失控。
+    """
+
+    def __init__(
+        self,
+        correlation_threshold: float = 0.7,
+        initial_hashes: set = None,
+        value_threshold: float = 0.0,
+        value_archive_limit: int = 60,
+    ):
         self.threshold = correlation_threshold
         self.archive_hashes = initial_hashes or set()
+        self.value_threshold = float(value_threshold or 0.0)
+        self.value_archive_limit = max(1, int(value_archive_limit or 60))
+        self._value_signatures: List[np.ndarray] = []
+        self._signature_cache: Dict[int, Optional[np.ndarray]] = {}
+        self.value_rejected = 0
+        self.max_observed_corr = 0.0
+
+    # ---- soft dedup ----------------------------------------------------- #
+    def _signature(self, candidate: FactorExpression, data: Any) -> Optional[np.ndarray]:
+        key = id(candidate)
+        if key in self._signature_cache:
+            return self._signature_cache[key]
+        signature = None
+        try:
+            signature = factor_signature(candidate.compute(data))
+        except Exception as exc:
+            logger.debug("Value dedup skipped for a candidate: %s", exc)
+        if len(self._signature_cache) > 4096:
+            self._signature_cache.clear()
+        self._signature_cache[key] = signature
+        return signature
+
+    def _max_abs_corr(self, signature: Optional[np.ndarray]) -> float:
+        if signature is None or not self._value_signatures:
+            return 0.0
+        best = 0.0
+        for other in self._value_signatures:
+            corr = signature_correlation(signature, other)
+            if corr is not None:
+                best = max(best, abs(corr))
+        return best
+
+    def _remember(self, signature: Optional[np.ndarray]) -> None:
+        if signature is None or self.value_threshold <= 0:
+            return
+        if len(self._value_signatures) >= self.value_archive_limit:
+            return
+        self._value_signatures.append(signature)
 
     def filter_redundant(self, candidates: List[FactorExpression], data: Any, preserved_candidates: List[FactorExpression] = None) -> List[FactorExpression]:
         unique_candidates = []
         preserved_set = set(preserved_candidates) if preserved_candidates else set()
-        
+
+        # Elites bypass both layers, but their values still define what counts as
+        # redundant for the candidates generated this epoch.
+        for elite in preserved_set:
+            self._remember(self._signature(elite, data))
+
         for cand in candidates:
             # 1. 优先保留上一代保留下来的精英父代个体，不过滤
             if cand in preserved_set:
@@ -33,12 +137,34 @@ class DiversityFilter:
             expr_hash = hashlib.md5(source_str.encode()).hexdigest()
             if expr_hash in self.archive_hashes:
                 continue
-                
+
+            # 3. 面值软去重：同一信号的不同写法
+            if self.value_threshold > 0:
+                signature = self._signature(cand, data)
+                corr = self._max_abs_corr(signature)
+                self.max_observed_corr = max(self.max_observed_corr, corr)
+                if corr > self.value_threshold:
+                    self.value_rejected += 1
+                    logger.debug(
+                        "Soft dedup rejected %s (|corr|=%.3f > %.3f)",
+                        expr_hash[:8], corr, self.value_threshold,
+                    )
+                    continue
+                self._remember(signature)
+
             self.archive_hashes.add(expr_hash)
             cand.logic_hash = expr_hash
             unique_candidates.append(cand)
             
         return unique_candidates
+
+    def summary(self) -> Dict[str, Any]:
+        return {
+            "value_threshold": self.value_threshold,
+            "archive_size": len(self._value_signatures),
+            "value_rejected": self.value_rejected,
+            "max_observed_corr": round(self.max_observed_corr, 4),
+        }
 
 class BaseFactorMiner(ABC):
     """
@@ -108,6 +234,18 @@ class BaseFactorMiner(ABC):
         """
         pass
 
+    def _factor_panel(self) -> Any:
+        """The panel factors are computed on (the client wraps it behind get_data)."""
+        data = self.data
+        getter = getattr(data, "get_data", None)
+        if callable(getter):
+            try:
+                return getter()
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("Value dedup unavailable (panel load failed): %s", exc)
+                return None
+        return data
+
     def mine(self, n_iterations: int | None, progress_callback=None) -> List[FactorExpression]:
         """
         5. 标准的主循环引擎 (Main Loop) - 集成去重拦截器
@@ -125,9 +263,19 @@ class BaseFactorMiner(ABC):
             except Exception as e:
                 logger.warning(f"Failed to load global hashes: {e}")
                 
-        div_filter = DiversityFilter(self.config.get('max_corr', 0.7), initial_hashes=initial_hashes)
+        div_filter = DiversityFilter(
+            self.config.get('max_corr', 0.7),
+            initial_hashes=initial_hashes,
+            # Soft dedup is ON by default: expression-level MD5 cannot see that
+            # `rank(close)` and `zscore(close)` are the same signal. Set
+            # `dedup_value_threshold` to 0 to disable it.
+            value_threshold=float(self.config.get('dedup_value_threshold', 0.99)),
+            value_archive_limit=int(self.config.get('dedup_value_archive', 40) or 40),
+        )
 
         
+        dedup_panel = self._factor_panel() if float(self.config.get('dedup_value_threshold', 0.99)) > 0 else None
+
         for epoch in range(n_iterations):
             self.current_epoch = epoch
             # 1. 提案
@@ -135,7 +283,11 @@ class BaseFactorMiner(ABC):
             
             # 1.5 拦截过滤：不过滤上一代保留的种群精英，只去重全新生成的表达式
             preserved = getattr(self.state, "population", None)
-            candidates = div_filter.filter_redundant(raw_candidates, self.data, preserved_candidates=preserved)
+            candidates = div_filter.filter_redundant(
+                raw_candidates,
+                dedup_panel if dedup_panel is not None else self.data,
+                preserved_candidates=preserved,
+            )
             if not candidates:
                 logger.warning(f"Epoch {epoch}: All candidates filtered out as redundant.")
                 if progress_callback:
@@ -164,6 +316,18 @@ class BaseFactorMiner(ABC):
                 best_factor = self._get_best_factors()[0] if self._get_best_factors() else None
                 progress_callback(epoch + 1, n_iterations, best_factor)
             
+        dedup_report = div_filter.summary()
+        if dedup_report["value_rejected"] or dedup_report["value_threshold"] > 0:
+            logger.info(
+                "Diversity filter summary: threshold=%.3f, archive=%d, "
+                "rejected_by_value=%d, max_observed_corr=%.3f",
+                dedup_report["value_threshold"],
+                dedup_report["archive_size"],
+                dedup_report["value_rejected"],
+                dedup_report["max_observed_corr"],
+            )
+        self.dedup_summary = dedup_report
+
         candidates = self._get_best_factors()
         return self._finalize(candidates)
 
