@@ -46,6 +46,10 @@ yfinance
 mcp
 dashscope
 requests
+# Async HTTP client for the high-concurrency LLM mining paradigm
+# (core/miner/paradigms/llm_api_manager.py imports it optionally; declaring it
+# keeps that paradigm working out-of-the-box on a fresh `pip install`).
+aiohttp>=3.8.0
 
 
 # sqlite3

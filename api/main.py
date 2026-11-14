@@ -1,4 +1,12 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException
+from fastapi import (
+    FastAPI,
+    WebSocket,
+    WebSocketDisconnect,
+    BackgroundTasks,
+    HTTPException,
+    Request,
+    Depends,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from api.ws_manager import manager
@@ -10,9 +18,52 @@ import os
 import datetime
 import traceback
 import dataclasses
+import logging
 from pathlib import Path
 
-app = FastAPI(title="FactorMiner V4 API")
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Optional API authentication (review T6).
+#
+# When ``FACTORMINER_API_TOKEN`` is set, every HTTP endpoint requires it via the
+# ``Authorization: Bearer <token>`` (or ``X-API-Token``) header. With no token
+# configured the API runs open (dev mode) so existing local workflows keep
+# working. The health endpoint is always public.
+# ---------------------------------------------------------------------------
+API_TOKEN = os.environ.get("FACTORMINER_API_TOKEN")
+
+
+async def require_auth(request: Request) -> None:
+    if not API_TOKEN:
+        return
+    if request.url.path == "/api/health":
+        return
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[len("Bearer "):]
+    else:
+        token = request.headers.get("X-API-Token", "")
+    if token and token == API_TOKEN:
+        return
+    raise HTTPException(status_code=401, detail="Invalid or missing API token")
+
+
+# ---------------------------------------------------------------------------
+# CORS (review T6). ``allow_credentials=True`` is incompatible with a wildcard
+# origin per the CORS spec — browsers reject the combination, so a dev server
+# configured that way silently failed credentialed requests. Resolve by deriving
+# the credentials flag from the origin set: explicit origins keep credentials on,
+# the wildcard disables them. Origins are configurable via FACTORMINER_CORS_ORIGINS.
+# ---------------------------------------------------------------------------
+_CORS_ORIGINS_RAW = os.environ.get("FACTORMINER_CORS_ORIGINS", "*")
+CORS_ORIGINS = [o.strip() for o in _CORS_ORIGINS_RAW.split(",") if o.strip()]
+_ALLOW_CREDENTIALS = CORS_ORIGINS != ["*"]
+
+app = FastAPI(
+    title="FactorMiner V4 API",
+    dependencies=[Depends(require_auth)],
+)
 
 
 class TaskManager:
@@ -80,11 +131,13 @@ class BacktestRequest(BaseModel):
 
 LIFECYCLE_STATUSES = {"DISCOVERED", "INSPECTED", "PAPER_TRADING", "LIVE", "RETIRED"}
 
-# Configure CORS for React frontend
+# Configure CORS for the React frontend. Origins and the credentials flag are
+# derived above from FACTORMINER_CORS_ORIGINS so the wildcard never pairs with
+# credentials (an invalid, browser-rejected combination).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=_ALLOW_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -206,7 +259,11 @@ async def get_stats():
     storage = get_global_storage()
     try:
         total_factors = len(storage.get_all_logic_hashes())
-    except:
+    except Exception as exc:
+        # Never let a storage backend hiccup silently zero out the global metric
+        # (and never use bare `except:` — it also swallows KeyboardInterrupt /
+        # SystemExit). Log the real cause so the operator can act on it.
+        logger.warning("Could not read factor count from storage: %s", exc)
         total_factors = 0
         
     completed_tasks = sum(1 for t in tasks if t["status"] == "completed")
@@ -854,8 +911,51 @@ async def get_data_freshness():
 async def get_hypothesis_budget(n_obs: int | None = None, budget: int | None = None):
     """Cumulative multiple-testing budget and the Sharpe bar it implies."""
     from core.evaluation.experiment_trace import FdrLedger
+    from core.experiment import budget as budget_sync
 
-    return FdrLedger().budget_report(n_obs=n_obs, budget=budget)
+    report = FdrLedger().budget_report(n_obs=n_obs, budget=budget)
+    snapshot = budget_sync.status()
+    report["portable_snapshot"] = snapshot
+    report["cumulative_tests"] = max(
+        int(report.get("cumulative_tests", 0) or 0), int(snapshot["n_trials"])
+    )
+    return report
+
+@app.get("/api/gates/holdout")
+async def get_holdout_status():
+    """One-time holdout ledger, guard mode and the pre-registered fresh window.
+
+    P2: the guard used to exist only in the CLI/director, so a Web user could
+    not see which windows had already been burned. This endpoint makes the
+    discipline a product capability rather than a hidden CLI constraint.
+    """
+    from core.evaluation.experiment_trace import HoldoutLedger
+    from core.evaluation.holdout_guard import (
+        default_ledger_path,
+        load_window_spec,
+        resolve_mode,
+    )
+
+    ledger = HoldoutLedger(default_ledger_path())
+    revealed = ledger.snapshot()
+    spec = load_window_spec()
+    try:
+        from core.experiment.windows import plan_windows
+
+        rolling = plan_windows(spec, revealed=revealed)
+    except Exception as exc:  # a bad spec must not take the endpoint down
+        rolling = {"error": str(exc), "rolling": bool(spec.get("rolling"))}
+    return {
+        "mode": resolve_mode(),
+        "ledger_path": default_ledger_path(),
+        "revealed": revealed,
+        "n_revealed": len(revealed),
+        "pre_registered_window": spec,
+        "rolling": rolling,
+        "hint": "Any window overlapping a revealed window is blocked in strict mode. "
+                "Rolling windows are read-only plans; reveal via "
+                "holdout_guard(purpose='final').",
+    }
 
 @app.websocket("/ws/monitor")
 async def websocket_endpoint(websocket: WebSocket):

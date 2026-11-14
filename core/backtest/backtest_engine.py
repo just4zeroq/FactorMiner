@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Iterable, Mapping, Optional, Sequence
+from typing import Dict, Iterable, Mapping, Optional, Sequence
 
 import pandas as pd
 import polars as pl
@@ -40,7 +40,7 @@ from ml4t.backtest.config import (
     SlippageType,
 )
 
-from core.data_feed.naming import data_filename, data_path
+from core.data_feed.naming import data_filename, data_path, safe_symbol
 from core.storage.factor_storage import LocalFactorStorage
 
 logger = logging.getLogger(__name__)
@@ -337,13 +337,94 @@ def load_prices(
     return prices.sort_values(["timestamp", "asset"]).reset_index(drop=True)
 
 
-def build_funding(prices: pd.DataFrame, rate: float = 0.0001) -> pd.DataFrame:
-    """Perpetual-funding grid aligned to the traded timestamps/assets."""
+_FUNDING_FREQ = {
+    "1d": "1D", "4h": "4h", "1h": "1h",
+    "15m": "15min", "5m": "5min", "1m": "1min",
+}
+
+
+def load_funding_series(
+    data_root: str,
+    exchange: str,
+    trade_type: str,
+    timeframe: str,
+    assets: Iterable[str],
+) -> dict:
+    """Real 8h perpetual-funding settlements aggregated onto price bars.
+
+    The ``crypto_streams`` files store one row per 8h settlement. Resampling to
+    the traded bar frequency (sum, ``min_count=1``) yields the funding actually
+    payable while holding through that bar; missing bars stay NaN so the caller
+    can fall back to the configured constant instead of silently charging zero.
+    """
+    from pathlib import Path
+
+    base = Path(data_root) / exchange / trade_type / "crypto_streams"
+    freq = _FUNDING_FREQ.get(str(timeframe).lower(), "1D")
+    out: dict = {}
+    failed: list = []
+    for asset in assets:
+        path = base / f"{safe_symbol(asset)}-{timeframe}-funding_rate.feather"
+        if not path.exists():
+            continue
+        try:
+            raw = pd.read_feather(path)
+            if "date" not in raw.columns or "funding_rate" not in raw.columns:
+                continue
+            series = pd.Series(
+                pd.to_numeric(raw["funding_rate"], errors="coerce").to_numpy(),
+                index=pd.to_datetime(raw["date"]),
+            )
+            out[asset] = series.resample(freq).sum(min_count=1).dropna()
+        except Exception as exc:  # pragma: no cover - one unreadable file
+            # Surface the per-asset failure (never swallow silently — a corrupted
+            # funding file must not masquerade as "no funding" and bias the P&L).
+            logger.warning("Funding stream unreadable for %s: %s", asset, exc)
+            failed.append(asset)
+    if failed and len(assets) and len(failed) / max(len(assets), 1) >= 0.25:
+        # A quarter or more of the requested assets failed to load: that pattern
+        # almost always means data corruption / a broken snapshot, not bad luck
+        # on one file. Escalate so an operator investigates instead of trusting
+        # a silently truncated funding set.
+        logger.error(
+            "FUNDING DATA INTEGRITY ALERT: %d/%d assets unreadable (%s ...) — "
+            "possible snapshot corruption; funding P&L may be understated.",
+            len(failed), len(assets), ", ".join(failed[:5]),
+        )
+    return out
+
+
+def build_funding(
+    prices: pd.DataFrame,
+    rate: float = 0.0001,
+    funding_series: Optional[Mapping[str, pd.Series]] = None,
+) -> pd.DataFrame:
+    """Perpetual-funding grid aligned to the traded timestamps/assets.
+
+    P4: pass ``funding_series`` from :func:`load_funding_series` to charge the
+    *real* 8h funding history. Without it the historical constant grid is kept
+    (backward compatible); ``funding_source`` in ``attrs`` makes the choice
+    auditable in the run report.
+    """
     grid = pd.MultiIndex.from_product(
         [prices["timestamp"].drop_duplicates(), prices["asset"].drop_duplicates()],
         names=["timestamp", "asset"],
     ).to_frame(index=False)
-    grid["rate"] = rate
+    grid["rate"] = float(rate)
+    matched = 0
+    if funding_series:
+        for asset, series in funding_series.items():
+            mask = grid["asset"] == asset
+            if not mask.any() or len(series) == 0:
+                continue
+            values = grid.loc[mask, "timestamp"].map(series)
+            if values.notna().any():
+                grid.loc[mask, "rate"] = values.fillna(float(rate)).astype(float)
+                matched += 1
+    grid.attrs["funding_source"] = (
+        f"crypto_streams ({matched} assets)" if matched else "constant"
+    )
+    grid.attrs["funding_assets_matched"] = matched
     return grid
 
 
@@ -372,6 +453,33 @@ def build_backtest_config(
     )
 
 
+def adapt_book_to_universe(
+    available_assets: int,
+    n_long: int,
+    n_short: int,
+    min_assets: Optional[int] = None,
+) -> Dict[str, int]:
+    """Scale a long-short book to the assets actually present in the signal.
+
+    A 5-long/5-short book needs 10 assets. A reserved universe holdout of 6
+    assets would otherwise fail the strategy's ``min_assets`` gate at every
+    rebalance and produce a *silently empty* backtest (0 trades, 0% return)
+    that looks like a valid result. For the normal 20-asset case
+    ``k = min(5, 5, 20 // 3) = 5``, so behaviour is unchanged.
+    """
+    if available_assets < 2:
+        raise ValueError(
+            f"cross-sectional backtest needs >= 2 assets, got {available_assets}"
+        )
+    k = min(int(n_long), int(n_short), max(1, int(available_assets) // 3))
+    return {
+        "n_long": k,
+        "n_short": k,
+        "min_assets": int(min_assets) if min_assets is not None else 2 * k,
+        "available_assets": int(available_assets),
+    }
+
+
 def run_backtest(
     factor_ids: Sequence[str],
     *,
@@ -392,6 +500,7 @@ def run_backtest(
     rebalance_every: int = 5,
     min_assets: Optional[int] = None,
     weights: Optional[Mapping[str, float] | Sequence[float]] = None,
+    use_real_funding: bool = False,
 ) -> dict:
     """Run a full cross-sectional factor backtest.
 
@@ -434,9 +543,30 @@ def run_backtest(
             f"(signals: {len(signals)}, prices: {len(prices)})"
         )
 
-    funding = build_funding(prices, funding_rate)
-    if min_assets is None:
-        min_assets = n_long + n_short
+    funding_series = (
+        load_funding_series(
+            data_root, exchange, trade_type, timeframe, signals["asset"].unique()
+        )
+        if use_real_funding else {}
+    )
+    funding = build_funding(prices, funding_rate, funding_series=funding_series or None)
+    # A reserved universe holdout is often much smaller than the mining
+    # universe. The default 5-long/5-short book silently produces ZERO trades
+    # when only 6 assets exist (the strategy's min_assets gate rejects every
+    # rebalance). Scale the book to the assets actually present, while keeping
+    # the 20-asset case byte-for-byte identical (k = min(5, 5, 20//3) = 5).
+    adapted = adapt_book_to_universe(
+        int(signals["asset"].nunique()), n_long, n_short, min_assets
+    )
+    n_long, n_short, min_assets = (
+        adapted["n_long"], adapted["n_short"], adapted["min_assets"]
+    )
+    if n_long < 5:
+        logger.info(
+            "Small universe (%d assets): book adapted to %d long / %d short, "
+            "min_assets=%d",
+            adapted["available_assets"], n_long, n_short, min_assets,
+        )
 
     config = build_backtest_config(
         initial_cash=initial_cash,
@@ -477,10 +607,15 @@ def run_backtest(
         "total_costs": m.get("total_costs"),
         "avg_turnover": m.get("avg_turnover"),
         "avg_open_positions": m.get("avg_open_positions"),
+        "n_long": n_long,
+        "n_short": n_short,
+        "min_assets": min_assets,
         "rebalance_every_bars": rebalance_every,
         "commission_rate": commission_rate,
         "slippage_rate": slippage_rate,
         "daily_funding_rate": funding_rate,
+        "funding_source": funding.attrs.get("funding_source", "constant"),
+        "funding_assets_matched": int(funding.attrs.get("funding_assets_matched", 0)),
         "effective_weights": effective_weights,
         "expanded_combinations": expanded,
         "weighting": "explicit" if weights is not None or expanded else "equal",

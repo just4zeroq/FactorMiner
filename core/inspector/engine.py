@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Union
 from core.data_feed.real_client import RealDataClient
 from core.evaluation.targets import ForwardReturnTarget
 from core.inspector.metrics import InspectorMetricEngine
+from core.evaluation.annualisation import infer_annualisation
 from core.inspector.reporter import InspectorReporter
 from core.inspector.resolver import FactorResolver
 
@@ -76,6 +77,9 @@ class FactorInspectorEngine:
         target_tf = timeframe or df_cfg.get("timeframe", "5m")
         target_exchange = exchange or df_cfg.get("exchange", "binance")
         target_inst = instrument_type or df_cfg.get("instrument_type", "futures")
+        # 7x24 crypto: the IR annualisation must follow the bar frequency, not
+        # the equity 252-day convention.
+        ann = infer_annualisation(target_tf)
 
         results_by_pair: Dict[str, Dict[str, Any]] = {}
 
@@ -121,6 +125,7 @@ class FactorInspectorEngine:
                     close_prices=data.get("close"),
                     price_data=data,
                     target_spec=target_spec,
+                    annualisation=ann,
                 )
                 metrics["target"] = target_spec.as_dict()
                 metrics["forward_return_definition"] = target_spec.definition()
@@ -167,6 +172,7 @@ class FactorInspectorEngine:
                     close_prices=close_prices,
                     price_data=data,
                     target_spec=target_spec,
+                    annualisation=ann,
                 )
                 metrics["target"] = target_spec.as_dict()
                 metrics["forward_return_definition"] = target_spec.definition()

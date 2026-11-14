@@ -1,0 +1,148 @@
+{
+  "_comment": "P7-2 universe holdout 机制验证配置：从 20 币中预留 6 币，只用其余 14 币挖掘；验证段因子值在预留 6 币上重算。注意：这 6 币的历史在之前的挖掘中已被读取过，clean=False，本配置只验证管线正确性，不构成独立 OOS 证据。真正的干净 universe holdout 需要先用 scripts/download_universe_holdout.py 下载与原标的池完全不重叠的新币，把 universe_holdout 换成那些币，并把 universe_holdout_mode 改回 strict。",
+  "population_size": 40,
+  "max_iterations": 3,
+  "survival_count": 20,
+  "gp": {
+    "max_depth": 4,
+    "crossover_prob": 0.75,
+    "mutation_prob": 0.3,
+    "elite_count": 6
+  },
+  "search_space": {
+    "allowed_operators": [
+      "add",
+      "sub",
+      "mul",
+      "div",
+      "ts_mean",
+      "ts_std",
+      "ts_zscore",
+      "ts_rank",
+      "ts_delta",
+      "ts_momentum",
+      "ts_min",
+      "ts_max",
+      "ts_decay_linear",
+      "ts_ema",
+      "ts_sum",
+      "ts_var",
+      "ts_median",
+      "ts_skew",
+      "ts_realized_vol",
+      "ts_rsi",
+      "ts_ma_ratio",
+      "ts_corr",
+      "ts_cov",
+      "ts_regression",
+      "cs_rank",
+      "cs_zscore",
+      "cs_neutralize",
+      "cs_mad",
+      "abs",
+      "sign",
+      "log1p_abs",
+      "signed_power",
+      "tanh"
+    ]
+  },
+  "fitness": {
+    "gate_cost_rate": 0.0018,
+    "turnover_penalty": 0.0,
+    "coverage_floor": 0.2
+  },
+  "target": {
+    "type": "forward_return",
+    "horizon_bars": 1
+  },
+  "storage": {
+    "db_root": "factor_db"
+  },
+  "evaluation": {
+    "max_workers": 8,
+    "gates": {
+      "holdout_mode": "strict",
+      "hac_t_min": 2.0,
+      "fdr_max": 0.05,
+      "dsr_min": 0.9,
+      "require_oos_consistent": true,
+      "require_cost_adj_positive": true,
+      "require_oos_strength": true,
+      "oos_rankic_min": 0.02,
+      "null_n_perm": 60,
+      "empirical_p_max": 0.05
+    }
+  },
+  "data_feeds": {
+    "required_streams": [
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "exchange": "binance",
+    "instrument_type": "futures",
+    "timeframe": "1d",
+    "pairs": [
+      "BTC/USDT:USDT",
+      "ETH/USDT:USDT",
+      "SOL/USDT:USDT",
+      "BNB/USDT:USDT",
+      "XRP/USDT:USDT",
+      "DOGE/USDT:USDT",
+      "ADA/USDT:USDT",
+      "AVAX/USDT:USDT",
+      "LINK/USDT:USDT",
+      "DOT/USDT:USDT",
+      "LTC/USDT:USDT",
+      "TRX/USDT:USDT",
+      "ATOM/USDT:USDT",
+      "NEAR/USDT:USDT",
+      "APT/USDT:USDT",
+      "ARB/USDT:USDT",
+      "OP/USDT:USDT",
+      "INJ/USDT:USDT",
+      "FIL/USDT:USDT",
+      "ETC/USDT:USDT"
+    ],
+    "universe_holdout": [
+      "LINK/USDT:USDT",
+      "DOT/USDT:USDT",
+      "LTC/USDT:USDT",
+      "TRX/USDT:USDT",
+      "FIL/USDT:USDT",
+      "ETC/USDT:USDT"
+    ],
+    "universe_holdout_mode": "audit",
+    "universe_holdout_require_fresh": false,
+    "mine_period": [
+      [
+        "2023-04-01",
+        "2024-12-31"
+      ]
+    ],
+    "test_period": [
+      [
+        "2025-01-01",
+        "2025-06-30"
+      ]
+    ],
+    "mining_mode": "cross_asset"
+  },
+  "backtest": {
+    "commission_rate": 0.0004,
+    "slippage_rate": 0.0005
+  },
+  "experiment": {
+    "seed": 20261114,
+    "user_dir": "user_workspace",
+    "walk_forward": {
+      "n_folds": 5,
+      "embargo_bars": 5,
+      "min_train_frac": 0.4,
+      "ridge_alpha": 5.0,
+      "cost_rate": 0.0018
+    }
+  }
+}

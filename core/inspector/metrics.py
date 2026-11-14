@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from core.evaluation.targets import ForwardReturnTarget
+from core.evaluation.annualisation import DEFAULT_ANNUALISATION
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +25,15 @@ class InspectorMetricEngine:
         n_quantiles: int = 5,
         price_data: Any = None,
         target_spec: ForwardReturnTarget | Dict[str, Any] | None = None,
+        annualisation: float | None = None,
     ) -> Dict[str, Any]:
         """
         计算全套审查指标字典。
+
+        ``annualisation`` only scales the reported IR; pass a value derived
+        from the run's timeframe for 7x24 crypto bars (365 / 2190 / 8760).
         """
+        ann = float(annualisation) if annualisation and annualisation > 0 else DEFAULT_ANNUALISATION
         result = {
             "pearson": {},
             "spearman": {},
@@ -45,7 +51,9 @@ class InspectorMetricEngine:
 
         # 兼容性整理
         if isinstance(factor_values, pd.DataFrame) and isinstance(returns, pd.DataFrame):
-            return InspectorMetricEngine._evaluate_cross_asset(factor_values, returns, lags, n_quantiles)
+            return InspectorMetricEngine._evaluate_cross_asset(
+                factor_values, returns, lags, n_quantiles, ann
+            )
         
         if not isinstance(factor_values, pd.Series):
             factor_values = pd.Series(factor_values)
@@ -89,7 +97,7 @@ class InspectorMetricEngine:
                 std_v = float(series.std())
 
             n = len(series) if not series.empty else 1
-            ir = (mean_v / std_v * math.sqrt(252)) if std_v > 1e-9 else 0.0
+            ir = (mean_v / std_v * math.sqrt(ann)) if std_v > 1e-9 else 0.0
             t_stat = (mean_v / (std_v / math.sqrt(n))) if std_v > 1e-9 and n > 1 else 0.0
             pos_ratio = (series > 0).mean() if not series.empty else (1.0 if overall_val > 0 else 0.0)
 
@@ -253,6 +261,7 @@ class InspectorMetricEngine:
         returns: pd.DataFrame,
         lags: List[int],
         n_quantiles: int,
+        annualisation: float = DEFAULT_ANNUALISATION,
     ) -> Dict[str, Any]:
         """Cross-Asset 截面评估逻辑"""
         valid_mask = ~factor_values.isna() & ~returns.isna()
@@ -270,7 +279,7 @@ class InspectorMetricEngine:
             mean_v = float(series.mean())
             std_v = float(series.std())
             n = len(series)
-            ir = (mean_v / std_v * math.sqrt(252)) if std_v > 1e-9 else 0.0
+            ir = (mean_v / std_v * math.sqrt(annualisation)) if std_v > 1e-9 else 0.0
             t_stat = (mean_v / (std_v / math.sqrt(n))) if std_v > 1e-9 and n > 1 else 0.0
             pos_r = float((series > 0).mean())
             return {

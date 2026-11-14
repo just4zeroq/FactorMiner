@@ -28,9 +28,33 @@ import os
 import threading
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, date
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from core.evaluation.annualisation import DEFAULT_ANNUALISATION
+
 logger = logging.getLogger(__name__)
+
+
+def default_workspace_path(filename: str) -> str:
+    """Absolute path under the project's ``user_workspace``, cwd-independent.
+
+    P0-b: a holdout ledger is only a holdout if *every* entry point reads the
+    same file. Relative paths silently fork the ledger when a CLI is launched
+    from another directory (which is exactly how the old ``_p0`` ledger was
+    orphaned), so the default is pinned to the project root.
+
+    When ``FACTORMINER_HOLDOUT_LEDGER_PATH`` is set it overrides *only* the
+    holdout ledger path (kept separate from the other workspace files). This is
+    what lets the test suite redirect the ledger to a temp dir without forking
+    the canonical ``experiment_window.json`` — see ``tests/conftest.py``.
+    """
+    if filename == ".holdout_ledger.json":
+        override = os.environ.get("FACTORMINER_HOLDOUT_LEDGER_PATH")
+        if override:
+            return override
+    root = Path(__file__).resolve().parents[2]
+    return str(root / "user_workspace" / filename)
 
 
 class HoldoutReuseError(RuntimeError):
@@ -60,9 +84,7 @@ class HoldoutLedger:
     """
 
     def __init__(self, path: Optional[str] = None):
-        self.path = path or os.path.join(
-            "user_workspace", ".holdout_ledger.json"
-        )
+        self.path = path or default_workspace_path(".holdout_ledger.json")
         self._lock = threading.RLock()
         self._reveals: List[_Reveal] = []
         self._load()
@@ -348,7 +370,7 @@ class FdrLedger:
         self,
         n_obs: Optional[int] = None,
         budget: Optional[int] = None,
-        annualisation: int = 252,
+        annualisation: float = DEFAULT_ANNUALISATION,
     ) -> Dict[str, Any]:
         """How much of the hypothesis budget is spent, and what bar it implies.
 

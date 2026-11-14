@@ -1,9 +1,14 @@
 """Hypothesis-budget accounting.
 
 The DSR benchmark is a function of how many ideas were tried, so the bar has to
-be visible: at 787 trials over 610 observations it sits near 2.35 annualised,
-which is why single-factor promotion stopped happening after the gate was
-tightened. These tests pin the arithmetic and the reporting surface.
+be visible: at 787 trials over 610 observations it sits near 2.35 on the old
+252-day (equity) convention, ~2.83 on the 7x24 crypto convention that is now
+the default. That is why single-factor promotion stopped happening after the
+gate was tightened. These tests pin the arithmetic and the reporting surface.
+
+P0-a: annualisation is data-driven. The historical 2.35 figure is preserved by
+passing ``annualisation=252`` explicitly; the per-period bar (which is what
+DSR actually uses) is unaffected by the convention.
 """
 
 import math
@@ -28,14 +33,25 @@ class MultipleTestingBarTests(unittest.TestCase):
 
     def test_known_magnitude_for_the_holdout_run(self):
         # 787 trials x 610 obs was the P0 configuration; the annualised bar was
-        # reported as ~2.35 in the gate audit.
-        report = multiple_testing_bar(n_obs=610, n_trials=787)
+        # reported as ~2.35 in the gate audit under the OLD 252-day convention.
+        # Pin it explicitly so the published number stays reproducible.
+        report = multiple_testing_bar(n_obs=610, n_trials=787, annualisation=252)
         self.assertAlmostEqual(report["bar_annualised_sharpe"], 2.35, delta=0.05)
 
     def test_annualisation_is_applied(self):
         daily = multiple_testing_bar(n_obs=610, n_trials=100, annualisation=252)
         ratio = daily["bar_annualised_sharpe"] / daily["bar_per_period_sharpe"]
         self.assertAlmostEqual(ratio, math.sqrt(252), places=6)
+
+    def test_default_annualisation_is_crypto_calendar(self):
+        from core.evaluation.annualisation import DEFAULT_ANNUALISATION
+
+        report = multiple_testing_bar(n_obs=610, n_trials=100)
+        ratio = report["bar_annualised_sharpe"] / report["bar_per_period_sharpe"]
+        self.assertAlmostEqual(ratio, math.sqrt(DEFAULT_ANNUALISATION), places=6)
+        self.assertEqual(DEFAULT_ANNUALISATION, 365.0)
+        crypto = multiple_testing_bar(n_obs=610, n_trials=787)
+        self.assertAlmostEqual(crypto["bar_annualised_sharpe"], 2.83, delta=0.05)
 
     def test_degenerate_inputs(self):
         report = multiple_testing_bar(n_obs=1, n_trials=5)

@@ -175,15 +175,31 @@ def experiment_progress(
     spec: Optional[dict],
     items: Iterable[Dict[str, Any]],
     today: Optional[datetime.date] = None,
+    data_root: str = "data",
 ) -> Optional[Dict[str, Any]]:
     """Progress toward a pre-registered window that has never been revealed.
 
     ``spec`` comes from config: ``{label, start, min_bars, timeframe}``. The
     count is taken from the freshest covered file at that timeframe — the window
     only becomes usable once *every* asset has the bars, so the minimum wins.
+
+    When ``rolling: true`` is set, this delegates to
+    :func:`core.experiment.windows.plan_windows`, which anchors on the day
+    after the last revealed holdout and counts **actual bars** (intersection of
+    all asset timelines) instead of calendar days. The legacy single-batch
+    path is kept verbatim for configs that have not opted in.
     """
     if not spec:
         return None
+    if spec.get("rolling"):
+        from core.experiment.windows import plan_windows
+
+        plan = plan_windows(spec, data_root=data_root, items=items, today=today)
+        current = dict(plan["current"])
+        current["rolling_windows"] = plan["windows"]
+        current["next_ready_unrevealed"] = plan["next_ready_unrevealed"]
+        current["anchor"] = plan["anchor"]
+        return current
     timeframe = spec.get("timeframe", "1d")
     start = pd.Timestamp(spec["start"])
     min_bars = int(spec.get("min_bars", 90))
@@ -281,5 +297,6 @@ def freshness_report(
             },
         },
         "items": sorted(items, key=lambda item: (item["timeframe"], item["symbol"])),
-        "experiment": experiment_progress(experiment_spec, items),
+        "experiment": experiment_progress(experiment_spec, items,
+                                          data_root=data_root),
     }

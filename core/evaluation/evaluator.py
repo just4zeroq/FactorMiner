@@ -22,6 +22,8 @@ from core.evaluation.significance import (
     deflated_sharpe_ratio,
     pvalue_from_t,
 )
+from core.evaluation.annualisation import resolve_annualisation
+from core.config.defaults import DEFAULT_COST_RATE
 from core.evaluation.portfolio_eval import (
     DEFAULT_LS_CFG,
     long_short_returns,
@@ -43,8 +45,9 @@ DEFAULT_FITNESS_CFG = {
     "coverage_floor": 0.20,       # coverage below this is squared-penalized
     # Round-trip cost charged per unit of portfolio turnover by the
     # return-denominated gate (Phase P0.5). 18 bp ≈ 4 bp commission +
-    # 5 bp slippage per side.
-    "gate_cost_rate": 0.0018,
+    # 5 bp slippage per side. Sourced from core.config.defaults so it can never
+    # drift from the backtest / walk-forward cost (review A2 / F2).
+    "gate_cost_rate": DEFAULT_COST_RATE,
     "gate_ls_quantile": 0.2,      # top/bottom fraction of the long-short book
     "gate_rebalance_bars": 1,     # book is re-formed every N bars (trading horizon)
 }
@@ -564,7 +567,9 @@ class ParallelEvaluator:
                 ),
                 orientation=float(orientation),
                 cost_rate=float(cfg.get("gate_cost_rate", 0.0)),
-                annualisation=float(cfg.get("annualisation", 252.0)),
+                annualisation=resolve_annualisation(
+                    self.config, index=factor_values.index
+                ),
                 rebalance_bars=int(
                     cfg.get("gate_rebalance_bars") or self.gate_rebalance_bars
                 ),
@@ -653,7 +658,9 @@ class ParallelEvaluator:
             ),
             orientation=orientation,
             cost_rate=float(cfg.get("gate_cost_rate", 0.0)),
-            annualisation=float(cfg.get("annualisation", 252.0)),
+            annualisation=resolve_annualisation(
+                self.config, index=factor_values.index
+            ),
             rebalance_bars=int(
                 cfg.get("gate_rebalance_bars") or self.gate_rebalance_bars
             ),

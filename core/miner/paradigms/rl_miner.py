@@ -67,6 +67,16 @@ class RLFactorMiner(BaseFactorMiner):
         )
         if not self.terminals:
             self.terminals = list(TERMINALS_DEFAULT)
+        # P4: GP already promoted crypto-native streams to first-class terminals.
+        # RL used to stay on the 5 OHLCV columns, so its action space could not
+        # express funding / basis / OI factors at all. Best-effort: when no
+        # crypto stream is loaded the list is unchanged.
+        from core.miner.crypto_features import crypto_terminals
+        try:
+            panel = self.data.get_data() if hasattr(self.data, "get_data") else self.data
+        except Exception:
+            panel = None
+        self.terminals = crypto_terminals(self.terminals, panel)
         gp = self.config.get("gp", {})
         self.windows = [int(w) for w in gp.get("windows", [5, 10, 20, 60])]
         self.powers = [float(p) for p in gp.get("powers", [1.0, 2.0, 3.0])]

@@ -40,10 +40,18 @@ import numpy as np
 import pandas as pd
 
 
+from core.evaluation.annualisation import DEFAULT_ANNUALISATION
+from core.config.defaults import DEFAULT_COST_RATE
+
+
 DEFAULT_LS_CFG: Dict[str, Any] = {
     "quantile": 0.2,          # top/bottom 20% of the cross-section
-    "cost_rate": 0.0018,      # round-trip cost per unit of turnover (18 bp)
-    "annualisation": 252.0,   # periods per year, only used for the Sharpe
+    # round-trip cost per unit of turnover (18 bp). Single source: any change to
+    # the cost basis must propagate to the gate and backtest too (review A2 / F2).
+    "cost_rate": DEFAULT_COST_RATE,
+    # 7x24 crypto daily bars. Only scales the reported Sharpe; the gate uses
+    # the per-period Sharpe, so this never changes a pass/fail verdict.
+    "annualisation": DEFAULT_ANNUALISATION,
     "rebalance_bars": 1,      # hold the book this many bars between rebalances
     "temporal_lookback": 252, # trailing window for the single-asset percentile
 }
@@ -61,7 +69,7 @@ def long_short_returns(
     quantile: float = 0.2,
     orientation: float = 1.0,
     cost_rate: float = 0.0,
-    annualisation: float = 252.0,
+    annualisation: float = DEFAULT_ANNUALISATION,
     rebalance_bars: int = 1,
 ) -> Dict[str, float]:
     """Build the quantile long-short book and summarise its net performance.
@@ -192,7 +200,7 @@ def timing_returns(
     quantile: float = 0.3,
     orientation: float = 1.0,
     cost_rate: float = 0.0,
-    annualisation: float = 252.0,
+    annualisation: float = DEFAULT_ANNUALISATION,
     rebalance_bars: int = 1,
 ) -> Dict[str, float]:
     """Evaluate a single-asset factor as a long/short *timing* strategy.

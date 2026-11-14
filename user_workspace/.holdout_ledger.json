@@ -1,0 +1,9 @@
+[
+  {
+    "period_key": "holdout_2025H2_2026",
+    "start": "2025-07-01",
+    "end": "2026-11-13",
+    "at": "2026-11-14T10:06:07",
+    "note": "strict holdout final verification (merged from .holdout_ledger_p0.json during P0-b bootstrap)"
+  }
+]

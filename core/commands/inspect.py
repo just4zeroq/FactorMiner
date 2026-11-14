@@ -6,6 +6,7 @@ import sys
 
 from core.inspector.engine import FactorInspectorEngine
 from core.utils.dynamic_loader import load_user_modules
+from core.evaluation import holdout_guard
 
 logger = logging.getLogger("FactorInspectorCLI")
 
@@ -21,6 +22,16 @@ def parse_args():
     parser.add_argument("--end", type=str, default=None, help="End date (YYYY-MM-DD)")
     parser.add_argument("--timeframe", type=str, default=None, help="Timeframe (e.g. 5m, 1h, 1d)")
     parser.add_argument("--user-dir", type=str, default="user_workspace", help="Path to user workspace directory")
+    parser.add_argument(
+        "--allow-holdout-reuse",
+        action="store_true",
+        help="Permit inspecting an already-revealed holdout window (audited).",
+    )
+    parser.add_argument(
+        "--holdout-mode", type=str, default=None,
+        choices=list(holdout_guard.VALID_MODES),
+        help="Override the holdout guard mode (default: strict)",
+    )
     return parser.parse_args()
 
 
@@ -43,6 +54,18 @@ def run_inspector(args):
     # 2. 解析 CLI 命令行参数覆盖
     pairs_list = [p.strip() for p in args.pairs.split(",")] if args.pairs else None
     periods = [[args.start, args.end]] if (args.start and args.end) else None
+
+    # P0-b: the inspector reads realised returns too, so it must not be a
+    # back door around the one-time holdout ledger.
+    holdout_guard.guard_periods(
+        periods,
+        purpose="explore",
+        config=base_config,
+        mode=getattr(args, "holdout_mode", None),
+        allow_reuse=getattr(args, "allow_holdout_reuse", False),
+        source="cli:inspect",
+        note=f"factor={args.factor or args.ast or args.code or 'inline'}",
+    )
 
     # 3. 运行引擎
     engine = FactorInspectorEngine(base_config=base_config)

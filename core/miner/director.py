@@ -4,6 +4,7 @@ from typing import Dict, Any, List
 from core.miner.entities import FactorMetadata, EvaluationFeedback
 from core.storage.factor_storage import get_global_storage
 from core.evaluation.evaluator import ParallelEvaluator
+from core.evaluation.annualisation import resolve_annualisation
 from core.evaluation.significance import apply_promotion_gates
 from core.evaluation.experiment_trace import (
     ExperimentTrace,
@@ -57,6 +58,15 @@ class FactorMinerDirector:
         # Filled in by _save_excellent_factors; surfaced by /api/gates/budget.
         self.hypothesis_budget: Dict[str, Any] = {}
 
+        # P1 reproducibility: the pipeline injects a built run manifest and an
+        # explicit seed. Legacy callers (CLI mine / API launch) stay untouched
+        # because both are optional and default to the previous behaviour.
+        exp_cfg = self.config.get("experiment", {}) or {}
+        self.manifest = exp_cfg.get("manifest")
+        if exp_cfg.get("seed") is not None:
+            from core.experiment.manifest import seed_everything
+            seed_everything(exp_cfg["seed"])
+
     def _instantiate_miner(self, paradigm: str, config: Dict, data: Any) -> BaseFactorMiner:
         from core.miner.registry import MinerRegistry
         
@@ -84,6 +94,11 @@ class FactorMinerDirector:
             raise ValueError(f"Unknown paradigm: {paradigm}. Did you forget to register it?")
 
     def run(self, max_iterations: int = 10, progress_callback=None) -> List[Any]:
+        # P0-b: fail fast, BEFORE the miner reads a single holdout return.
+        # Registering a final reveal up front is conservative on purpose: if the
+        # run crashes, the window is still burned — better to waste a window
+        # than to allow a second peek.
+        self._enforce_holdout()
         logger.info(f"Starting FactorMiner loop for paradigm: {self.config.get('paradigm')}")
         
         # 委托给底层的通用范式引擎去跑 (它自带去重和生命周期)
@@ -91,10 +106,57 @@ class FactorMinerDirector:
         
         self._save_excellent_factors(best_candidates)
         self._print_results_table(best_candidates)
-        self._enforce_holdout()  # Phase 1: one-time strict-holdout guard
 
         logger.info("FactorMiner loop completed.")
         return best_candidates
+
+    def _build_null_tstats(self, candidates, gate_cfg):
+        """Per-candidate target-permutation |t| nulls for the P2 empirical gate.
+
+        Returns ``None`` when the feature is off, so every existing run keeps
+        its verdicts. Panels are nan-to-num'd on both sides so the null and the
+        observed HAC t are computed under the same convention.
+        """
+        cfg = gate_cfg or {}
+        n_perm = int(cfg.get("null_n_perm", 0) or 0)
+        if n_perm <= 0 or cfg.get("empirical_p_max") is None:
+            return None
+        try:
+            import numpy as np
+            from core.evaluation.significance import target_permutation_tstats
+
+            def _array(obj):
+                if hasattr(obj, "to_numpy"):
+                    arr = obj.to_numpy(dtype=float, na_value=np.nan)
+                else:
+                    arr = np.asarray(obj, dtype=float)
+                arr = np.asarray(arr, dtype=float)
+                if arr.ndim == 1:
+                    arr = arr.reshape(-1, 1)
+                return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
+
+            returns = _array(self.data_client.get_returns())
+            data = self.data_client.get_data()
+            seed = int((self.config.get("experiment") or {}).get("seed") or 0)
+            out = []
+            for cand in candidates:
+                try:
+                    panel = _array(cand.compute(data))
+                    if panel.shape != returns.shape:
+                        out.append([])
+                        continue
+                    out.append(
+                        target_permutation_tstats(
+                            panel, returns, n_perm=n_perm, seed=seed
+                        ).tolist()
+                    )
+                except Exception as exc:  # pragma: no cover - one bad factor
+                    logger.debug("Null distribution skipped for a candidate: %s", exc)
+                    out.append([])
+            return out
+        except Exception as exc:
+            logger.warning("Target-permutation null unavailable: %s", exc)
+            return None
 
     def _save_excellent_factors(self, candidates):
         import uuid
@@ -118,21 +180,32 @@ class FactorMinerDirector:
         )
         if run_trials <= 0:
             run_trials = len(candidates)
-        n_trials = int(self.trace.num_trials) + run_trials
-        # Cumulative FDR: the family is every candidate this run handed to the
-        # evaluator (including the ones that never made the shortlist) plus
-        # every candidate from previous runs. BH inside a 2-6 factor shortlist
-        # is close to no correction at all.
+        # P2: the portable budget snapshot keeps the multiple-testing denominator
+        # honest across machines/clones even though the high-volume ledgers are
+        # gitignored. It is monotonic, so a stale local ledger cannot reset it.
+        from core.experiment import budget as budget_sync
+
         run_p_values = list(getattr(evaluator, "run_p_values", []) or [])
-        family = self.fdr_ledger.cumulative() + run_p_values
-        # Honour threshold overrides from config (evaluation.gates.*); without
-        # this the gate always ran on DEFAULT_GATE_CFG.
+        base_trials, family, self.budget_snapshot = budget_sync.resolve(
+            int(self.trace.num_trials),
+            self.fdr_ledger.cumulative(),
+            run_p_values,
+        )
+        n_trials = base_trials + run_trials
+        # Every candidate handed to the evaluator reads the OOS/validation split.
+        # This is the count AlphaMaster never recorded; surfacing it makes val
+        # reuse a governed quantity instead of an invisible one.
+        self.val_read_count = int(run_trials)
         gate_cfg = self.config.get("evaluation", {}).get("gates")
+        # P2: turn the target-permutation null from a library helper into an
+        # actual promotion gate (off unless null_n_perm + empirical_p_max are set).
+        null_tstats = self._build_null_tstats(candidates, gate_cfg)
         gates = apply_promotion_gates(
             metrics_list,
             cfg=gate_cfg,
             n_trials=n_trials,
             family_p_values=family or None,
+            null_tstats=null_tstats,
         )
         # Persist this run's hypotheses once; the ledger is idempotent per run.
         run_id = getattr(self, "_fdr_run_id", None)
@@ -144,6 +217,10 @@ class FactorMinerDirector:
             run_id=run_id,
             meta={"n_candidates": len(candidates), "n_trials": n_trials},
         )
+        try:
+            budget_sync.sync(n_trials, run_p_values, increment_runs=True)
+        except Exception as exc:  # pragma: no cover - reporting must not break a run
+            logger.debug("Hypothesis budget snapshot skipped: %s", exc)
         if evaluator is not None and hasattr(evaluator, "run_p_values"):
             evaluator.run_p_values.clear()
 
@@ -158,6 +235,7 @@ class FactorMinerDirector:
             self.hypothesis_budget = self.fdr_ledger.budget_report(
                 n_obs=int(statistics.median(obs)) if obs else None,
                 budget=budget_cfg,
+                annualisation=resolve_annualisation(self.config),
             )
             logger.info(
                 "Hypothesis budget: %d cumulative test(s) across %d run(s)%s; "
@@ -204,6 +282,13 @@ class FactorMinerDirector:
             cand.metrics["p_adj"] = g["p_adj"]
             cand.metrics["dsr"] = g["dsr"]
             cand.metrics["n_trials"] = n_trials
+            # P2: make the empirical-null verdict auditable. Without this the
+            # gate ran but its result was invisible in factor_db / run reports.
+            cand.metrics["empirical_p"] = g.get("empirical_p")
+            cand.metrics["gate_pass"] = bool(g["gate"]["pass"])
+            cand.metrics["gate_checks"] = {
+                k: v for k, v in g["gate"].items() if k != "pass"
+            }
             metadata = FactorMetadata(
                 factor_id=factor_id,
                 miner_type=self.config.get("paradigm"),
@@ -308,26 +393,37 @@ class FactorMinerDirector:
             logger.debug("trial record skipped: %s", exc)
 
     def _enforce_holdout(self) -> None:
-        """Phase 1: enforce the one-time strict-holdout ledger (fail loud).
+        """P0-b: route every mining run through the single holdout guard.
 
-        Only active when ``evaluation.gates.strict_holdout`` is configured. A
-        second reveal of the same (or overlapping) strict holdout raises
-        :class:`HoldoutReuseError` — this is what stops a 'validated' factor from
-        quietly peeking at the test window again.
+        Previously this silently returned unless ``strict_holdout`` was
+        configured, so re-mining on an already-burned ``test_period`` was
+        completely unchecked. Now:
+
+        * explicit ``strict_holdout`` -> one-time ``final`` reveal;
+        * otherwise -> every ``data_feeds.test_period`` window is checked as
+          ``explore`` (no reveal registered, but a burned window still raises).
+
+        ``ledger_path`` honours an explicitly configured ledger so isolated
+        self-check tools keep their own sandbox; the default is the one
+        canonical project ledger.
         """
-        cfg = (
-            self.config.get("evaluation", {})
-            .get("gates", {})
-            .get("strict_holdout")
+        from core.evaluation import holdout_guard
+
+        common = dict(
+            config=self.config,
+            ledger_path=self.holdout.path,
+            source="director:mine",
         )
-        if not cfg:
+        gates = self.config.get("evaluation", {}).get("gates", {}) or {}
+        strict = gates.get("strict_holdout")
+        if isinstance(strict, dict):
+            holdout_guard.guard(
+                strict.get("start"), strict.get("end"),
+                purpose="final", **common
+            )
             return
-        self.holdout.reveal(
-            cfg["period_key"],
-            cfg["start"],
-            cfg["end"],
-            note="strict holdout final verification",
-        )
+        periods = self.config.get("data_feeds", {}).get("test_period") or []
+        holdout_guard.guard_periods(periods, purpose="explore", **common)
 
     def _snapshot_lineage(
         self,
@@ -358,7 +454,7 @@ class FactorMinerDirector:
                 if callable(definition_getter)
                 else "close[t+1] / close[t] - 1"
             )
-        return {
+        lineage = {
             "source": self.data_client.__class__.__name__,
             "exchange": feeds.get("exchange"),
             "instrument_type": feeds.get("instrument_type"),
@@ -373,6 +469,13 @@ class FactorMinerDirector:
             "target": target_payload,
             "forward_return_definition": definition,
         }
+        # P1: stamp the reproducible identity into every persisted factor so a
+        # reaudit can tell whether cached values were produced by this code/data.
+        if self.manifest:
+            from core.experiment.manifest import manifest_summary
+            lineage["run_id"] = self.manifest.get("run_id")
+            lineage["run_manifest"] = manifest_summary(self.manifest)
+        return lineage
 
     def _save_factor_snapshot(self, factor_id: str, candidate: Any) -> None:
         """Persist the exact values and labels used for Phase II analysis."""

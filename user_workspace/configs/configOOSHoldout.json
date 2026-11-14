@@ -67,7 +67,8 @@
         "start": "2025-07-01",
         "end": "2026-11-13"
       },
-      "holdout_path": "user_workspace/.holdout_ledger_p0.json",
+      "holdout_path": "user_workspace/.holdout_ledger.json",
+      "holdout_mode": "strict",
       "trace_path": "user_workspace/.experiment_trace_p0.jsonl",
       "hac_t_min": 2.0,
       "fdr_max": 0.05,

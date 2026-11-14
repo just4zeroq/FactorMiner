@@ -115,6 +115,11 @@ user_workspace/reports/**/portfolio_state.csv
 user_workspace/reports/**/trades.csv
 # Backtest runs are local artifacts (equity/trades per run)
 user_workspace/reports/backtest_runs/
+# Experiment run bundles (manifests + parquet factor values) are regenerable
+# from the run config; keep them local. NOTE: the three cross-machine ledgers
+# (.holdout_ledger.json / .hypothesis_budget.json / .universe_ledger.json) are
+# deliberately NOT ignored — they must be committed (see system_code_review.md T2).
+user_workspace/runs/
 user_workspace/reports/**/spec.yaml
 user_workspace/reports/**/config.yaml
 web/node_modules/
@@ -134,7 +139,20 @@ implementation_plan.md
 # Agent workspace notes (local only)
 .workbuddy/
 
-# Cumulative FDR ledger (grows with every run; local state)
+# Cumulative FDR / trial ledgers (grow with every run; local state)
 user_workspace/.fdr_ledger*.jsonl
 user_workspace/.experiment_trace.jsonl
-user_workspace/.holdout_ledger.json
+# NOTE: user_workspace/.hypothesis_budget.json is deliberately NOT ignored.
+# It is the compact, committable snapshot of cumulative trials + raw p-values;
+# without it a fresh clone starts from num_trials=0 and DSR/BH under-correct.
+# High-volume access trace of the holdout guard (local state).
+user_workspace/reports/holdout_access.jsonl
+# NOTE: user_workspace/.holdout_ledger.json is deliberately NOT ignored.
+# It is the one-time reveal ledger that P0-b's guard reads; a fresh clone with
+# an empty ledger would silently allow re-peeking at burned holdout windows.
+# Override records (reports/holdout_overrides.jsonl) are likewise kept visible
+# in git status so every deliberate reuse has to be reviewed.
+# NOTE: user_workspace/.universe_ledger.json is deliberately NOT ignored either.
+# It records which cross-sectional (asset) holdout splits have been revealed;
+# a fresh clone with an empty ledger would allow silently re-peeking at the
+# same reserved symbols and turn a universe holdout into in-sample data.

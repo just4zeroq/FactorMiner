@@ -28,6 +28,8 @@ from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import numpy as np
 
+from core.evaluation.annualisation import DEFAULT_ANNUALISATION
+
 
 # --------------------------------------------------------------------------- #
 # IC time-series helpers
@@ -204,7 +206,17 @@ def random_formula_null(
 
 
 def empirical_p(value: float, null_samples: Sequence[float]) -> float:
-    """One-sided empirical p-value of ``value`` against a null distribution."""
+    """One-sided empirical p-value of ``value`` against a null distribution.
+
+    Returns the fraction of null samples that are at least as extreme as
+    ``value``. A non-finite ``value`` (e.g. a NaN Newey-West t-statistic when a
+    factor panel collapses) cannot reject the null, so it returns ``1.0`` rather
+    than a spurious low p-value. This is what stops a ``hac_t=NaN`` candidate
+    from **falsely passing** the empirical-null gate (see
+    ``docs/reviews/system_code_review.md``, finding F5/C1).
+    """
+    if not np.isfinite(value):
+        return 1.0
     null = np.asarray(null_samples, float)
     if null.size == 0:
         return 1.0
@@ -230,16 +242,20 @@ def expected_max_sr(n_trials: int, sr_0: float = 0.0, sigma: float = 1.0) -> flo
 def multiple_testing_bar(
     n_obs: int,
     n_trials: int,
-    annualisation: int = 252,
+    annualisation: float = DEFAULT_ANNUALISATION,
 ) -> Dict[str, float]:
     """The Sharpe a strategy must beat given how many ideas were already tried.
 
     DSR compares a candidate against ``E[max SR]`` for ``n_trials`` null
     strategies. That number is not a property of the factor — it rises with the
     search budget. Surfacing it turns "why did nothing pass?" into an actionable
-    answer: at 787 trials and 610 observations the bar is ~2.35 annualised, so a
-    strategy with a true annual Sharpe of 1.5 cannot pass no matter how clean
-    its IC is.
+    answer: at 787 trials and 610 observations the bar is 2.35 on the old
+    252-day convention, or ~2.83 on the 7x24 (365-period) convention that
+    crypto daily bars actually use. A strategy with a true annual Sharpe of 1.5
+    cannot pass either way.
+
+    ``annualisation`` is reporting-only: the DSR verdict itself compares
+    per-period Sharpes and is unaffected by this parameter.
     """
     if n_obs < 2:
         return {
@@ -316,6 +332,13 @@ DEFAULT_GATE_CFG = {
     # the level are enforced; raise to ~1.5 for a stricter production run).
     "cost_adj_return_min": 0.0,
     "ls_t_min": 0.0,
+    # P2: empirical null gate. Until now target_permutation_tstats /
+    # random_formula_null / empirical_p existed as library functions with unit
+    # tests but were never called by any gate. Set ``empirical_p_max`` (e.g.
+    # 0.05) together with ``evaluation.gates.null_n_perm`` to activate: a
+    # candidate must beat the |t| distribution obtained by permuting its own
+    # targets. None = disabled (backward compatible).
+    "empirical_p_max": None,
 }
 
 
@@ -342,6 +365,7 @@ def apply_promotion_gates(
     cfg: Optional[Dict[str, Any]] = None,
     n_trials: Optional[int] = None,
     family_p_values: Optional[Sequence[float]] = None,
+    null_tstats: Optional[Sequence[Sequence[float]]] = None,
 ) -> List[Dict[str, Any]]:
     """Run the full promotion gate across a *batch* of candidate metrics.
 
@@ -368,7 +392,14 @@ def apply_promotion_gates(
     the short list — typically 2–6 factors out of a thousand evaluated — barely
     corrects anything, which is why this argument exists.
 
-    Returns one dict per candidate: ``{"p_adj", "dsr", "gate", "status"}``.
+    ``null_tstats`` carries, per candidate, the empirical |t| samples obtained
+    by target permutation (see :func:`target_permutation_tstats`). Supplying it
+    computes ``empirical_p`` and enables the ``empirical_p_max`` gate; omitting
+    it leaves the gate silent. This is the P2 wiring that turns the null
+    functions from untested-in-production helpers into an actual defence.
+
+    Returns one dict per candidate: ``{"p_adj", "dsr", "gate", "status",
+    "empirical_p"}``.
     """
     pvals = [float(m.get("p_value", 1.0)) for m in metrics_list]
     if family_p_values:
@@ -386,7 +417,12 @@ def apply_promotion_gates(
     else:
         padj = list(bh_fdr(pvals))
     out: List[Dict[str, Any]] = []
-    for m, p in zip(metrics_list, padj):
+    for i, (m, p) in enumerate(zip(metrics_list, padj)):
+        emp_p: Optional[float] = None
+        if null_tstats is not None and i < len(null_tstats):
+            samples = null_tstats[i]
+            if samples is not None and len(samples):
+                emp_p = empirical_p(abs(float(m.get("hac_t", 0.0))), samples)
         dsr = float(m.get("dsr", 0.0))
         if n_trials is not None and int(n_trials) > 1:
             # Deflate the strategy Sharpe when available; fall back to the IC
@@ -411,10 +447,17 @@ def apply_promotion_gates(
             "ls_t": float(m.get("ls_t", 0.0)),
             "RankIC_oos": float(m.get("RankIC_oos", 0.0)),
             "oos_enabled": bool(m.get("oos_enabled", False)),
+            "empirical_p": emp_p,
         }
         gate = promotion_gates(gate_input, cfg)
         status = "INSPECTED" if gate["pass"] else "DISCOVERED_UNVERIFIED"
-        out.append({"p_adj": float(p), "dsr": float(dsr), "gate": gate, "status": status})
+        out.append({
+            "p_adj": float(p),
+            "dsr": float(dsr),
+            "gate": gate,
+            "status": status,
+            "empirical_p": emp_p,
+        })
     return out
 
 
@@ -466,6 +509,16 @@ def promotion_gates(
         "oos_strength": (
             abs(float(metrics.get("RankIC_oos", 0.0))) >= cfg["oos_rankic_min"]
             if (cfg["require_oos_strength"] and oos_eval)
+            else True
+        ),
+        # P2: empirical "luck" baseline. Silent when the null was not computed
+        # (no panels available / feature disabled), so existing runs keep their
+        # verdicts. When active, the observed |t| must sit in the tail of the
+        # target-permutation distribution for this very factor shape.
+        "empirical_null_pass": (
+            float(metrics.get("empirical_p", 1.0)) <= float(cfg["empirical_p_max"])
+            if (cfg.get("empirical_p_max") is not None
+                and metrics.get("empirical_p") is not None)
             else True
         ),
     }

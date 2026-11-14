@@ -26,6 +26,7 @@ import os
 import pandas as pd
 
 from core.backtest.backtest_engine import run_backtest
+from core.evaluation import holdout_guard
 
 # Default is resolved at runtime from factor_db (any factor with a stored value
 # snapshot). The old hard-coded six ids were downgraded to DISCOVERED_UNVERIFIED
@@ -135,6 +136,7 @@ def parse_args():
     parser.add_argument("--commission", type=float, default=0.0004, help="Taker commission (fraction of trade value)")
     parser.add_argument("--slippage", type=float, default=0.0005, help="Slippage (fraction of price)")
     parser.add_argument("--funding", type=float, default=0.0001, help="Daily perpetual funding rate (fraction)")
+    parser.add_argument("--real-funding", action="store_true", help="Charge the real 8h funding history from crypto_streams instead of a constant grid")
     parser.add_argument("--rebalance", type=int, default=5, help="Bars between rebalances")
     parser.add_argument("--n-long", type=int, default=5, help="Number of long positions")
     parser.add_argument("--n-short", type=int, default=5, help="Number of short positions")
@@ -144,6 +146,20 @@ def parse_args():
         type=str,
         default=os.path.join("user_workspace", "reports", "backtest_run"),
         help="Directory to write the result parquet + summary CSV",
+    )
+    parser.add_argument(
+        "--allow-holdout-reuse",
+        action="store_true",
+        help="Permit evaluating an already-revealed holdout window (recompute a "
+             "published result only). An audit line is always written to "
+             "user_workspace/reports/holdout_overrides.jsonl.",
+    )
+    parser.add_argument(
+        "--holdout-mode",
+        type=str,
+        default=None,
+        choices=list(holdout_guard.VALID_MODES),
+        help="Override the holdout guard mode (default: strict)",
     )
     return parser.parse_args()
 
@@ -172,6 +188,20 @@ def run_backtest_cmd(args):
 
     weights = _parse_weights(args.weights, factor_ids)
 
+    # P0-b: ANY entry point that reads holdout returns must pass the single
+    # ledger guard *before* computing anything. --orientation-db-root marks a
+    # strict-OOS run, i.e. a one-time final reveal.
+    holdout_guard.guard(
+        start=args.start,
+        end=args.end,
+        purpose="final" if args.orientation_db_root else "explore",
+        config=overrides,
+        mode=getattr(args, "holdout_mode", None),
+        allow_reuse=getattr(args, "allow_holdout_reuse", False),
+        source="cli:backtest",
+        note=f"factors={len(factor_ids)} db_root={args.db_root}",
+    )
+
     out = run_backtest(
         factor_ids,
         db_root=args.db_root,
@@ -190,6 +220,7 @@ def run_backtest_cmd(args):
         n_short=overrides.get("n_short", args.n_short),
         rebalance_every=overrides.get("rebalance_every", args.rebalance),
         weights=weights,
+        use_real_funding=bool(getattr(args, "real_funding", False)),
     )
     summary = out["summary"]
     result = out["result"]

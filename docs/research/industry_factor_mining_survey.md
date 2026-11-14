@@ -97,6 +97,10 @@
 
 > **下载方式说明**：`git clone` 走本机代理（`127.0.0.1:59047`）时 `github.com` 的 CONNECT 隧道会间歇 502；前 8 个仓库用 `git clone --depth 1` 成功，后 10 个改用 GitHub API tarball（`https://api.github.com/repos/{owner}/{repo}/tarball`）下载解压，源码完整但**不含 `.git`**，故标为 tarball 而非 commit。
 
+> **后续增量（2026-11-14 当晚）**：新增第 19 个竞品 `AlphaMaster`（MT5 因子挖掘 + 回测 + Web 训练控制台，`main` @ `3727daf2d2cb`，tarball 下载至 `D:\code\github\AlphaMaster`），因定位与本文 18 个框架差异较大，单独成篇 → **[AlphaMaster 竞品源码层研究报告（增量）](alphamaster_competitor_review.md)**。该报告沿用本文口径，新增 L5 产品化/交易终端层、RL 动作掩码的第二个独立实现、以及一条「验证集每步复用 → 无 `num_trials` 折减 → 因子退化为 beta」的实证病因链；本文 §6 矩阵的补充行与 §8 P0/P1 清单的印证/修正均列于该报告 §3、§5。**⚠️ 本文 §0 / §7 / §8 记录的是 2026-11-14 调研当时的基线；同日 10:22–11:29，P0-1~P0-3、P0-5（统计闸门、holdout ledger、静态 AlphaPool、加密原生特征）已落地并接入主流程，故「我们没有任何统计闸门」的表述对当前代码已过时。** 校准后的完整对照见增量报告 §3.3 / §4；剩余待办为 P0-4（purge/embargo、多段 roll-forward）与 P0.5 正向验证。
+
+> **交叉评估（2026-11-14 16:1x 补记）**：新增 **[框架横向评估：成熟度 × 加密货币适配度](framework_maturity_crypto_fit.md)**，对 20 个外部框架 + FactorMiner 做双维度评分。该报告带来两处需收窄的口径：① 本文 §0.2 发现 2 与 §4.1.2 第 16 项把 `crypto-factor-lab` 的 holdout ledger 描述为全链路强制，实测其 `latest_revealed_holdout_end` 仅被 `factor_lab/service.py:510,900-905` 调用，**CLI 主入口 `scripts/run_factor_mining.py` 不调用也不写 `holdout_end`**；机制设计仍值得借鉴，且我们 `core/miner/director.py` 的接入比它更彻底。② qlib 虽有 `scripts/data_collector/crypto/collector.py`，但只有 CoinGecko 日频价格/量/市值、无 OHLC，`crypto/README.md:12` 明示不支持回测，不应计为加密适配。另发现我们评价/显著性/组合层默认 `annualisation=252`（股票口径），与加密 7×24 不符，已列为该报告 P0-a。
+
 ### 1.3 口径与可信度约定
 
 - 文中「算子数」按**可调用算子名**统计，不同仓库口径不同，已逐处说明（如 qlib 注册 52 名 / 定义 47 类；FactorMiner `BUILTIN_OPERATORS` 实测 **59** 个）。
@@ -932,6 +936,7 @@ penalty  = (coverage/coverage_floor)^2        tp = 换手惩罚（默认 0.0 关
 ## 附录 B：本次调研产出与关联文件
 
 - 源码：`D:\code\github\` 下 18 个仓库（清单见 §1.2）
+- **增量报告（第 19 个竞品 AlphaMaster）**：`FactorMiner/docs/research/alphamaster_competitor_review.md`
 - 本文档：`FactorMiner/docs/research/industry_factor_mining_survey.md`
 - 关联报告：`FactorMiner/user_workspace/reports/oos_validation_2025H1.md` + `oos_validation_comparison.csv` + `oos_validation_factor_ic.csv`
 - 关联工具：`user_workspace/experiment_tools/recompute_oos_factors.py`、`summarize_oos_validation.py`

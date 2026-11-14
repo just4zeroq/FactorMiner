@@ -25,6 +25,9 @@ import threading
 import traceback
 from typing import Any, Optional
 
+from core.evaluation import holdout_guard
+from core.evaluation.experiment_trace import HoldoutReuseError
+
 logger = logging.getLogger(__name__)
 
 BACKTEST_ROOT = os.path.join("user_workspace", "reports", "backtest_runs")
@@ -51,6 +54,8 @@ RUN_FIELDS = (
     "timeframe",
     "trade_type",
     "data_root",
+    "allow_holdout_reuse",
+    "holdout_mode",
 )
 
 
@@ -131,6 +136,21 @@ def _execute(run_id: str, request: dict) -> None:
     try:
         # Imported lazily so the API starts even when ml4t is not installed.
         from core.backtest.backtest_engine import run_backtest
+
+        # P0-b: every entry point that reads holdout returns must pass the single
+        # ledger guard BEFORE computing anything. A Web-triggered backtest on an
+        # already-revealed holdout window must be blocked here, exactly like the
+        # CLI backtest command (see core/commands/backtest.py). A burned window
+        # raises HoldoutReuseError, which is caught below and marks the run failed.
+        holdout_guard.guard(
+            start=request.get("start"),
+            end=request.get("end"),
+            purpose="final" if request.get("orientation_db_root") else "explore",
+            mode=request.get("holdout_mode"),
+            allow_reuse=bool(request.get("allow_holdout_reuse", False)),
+            source="api:backtest_runs",
+            note=f"factors={len(request.get('factor_ids') or [])} db_root={request.get('db_root')}",
+        )
 
         out = run_backtest(
             request["factor_ids"],

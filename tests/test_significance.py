@@ -101,6 +101,36 @@ class NullTest(unittest.TestCase):
         self.assertAlmostEqual(empirical_p(2.5, null), 0.5, places=2)
         self.assertAlmostEqual(empirical_p(10.0, null), 0.0, places=6)
 
+    def test_empirical_p_nonfinite_returns_one(self):
+        # A NaN/Inf statistic cannot reject the null; returning a spurious low
+        # p-value would let a hac_t=NaN candidate falsely pass the empirical-null
+        # gate (review F5/C1). It must return 1.0 instead.
+        null = np.linspace(0, 5, 101)
+        self.assertEqual(empirical_p(float("nan"), null), 1.0)
+        self.assertEqual(empirical_p(float("inf"), null), 1.0)
+        # empty null also yields the "cannot reject" answer
+        self.assertEqual(empirical_p(1.0, []), 1.0)
+
+    def test_empirical_null_gate_rejects_nan_hac_t(self):
+        # When the empirical-null gate is active and the candidate's hac_t is NaN,
+        # the gate must NOT pass. This is the exact bug from review F5/C1.
+        cfg = {"empirical_p_max": 0.05, "null_n_perm": 100}
+        metrics = {
+            "hac_t": float("nan"),
+            "p_adj": 1.0,
+            "dsr": 0.0,
+            "oos_consistent": False,
+            "cost_adj_return": 0.0,
+            "ls_t": 0.0,
+            "RankIC_oos": 0.0,
+            "oos_enabled": False,
+            "empirical_p": empirical_p(float("nan"),
+                                      np.linspace(0, 3, 101)),
+        }
+        gate = promotion_gates(metrics, cfg)
+        self.assertFalse(gate["empirical_null_pass"])
+        self.assertFalse(gate["pass"])
+
 
 class DSRTest(unittest.TestCase):
     def test_expected_max_sr_grows_with_trials(self):
