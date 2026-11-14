@@ -134,17 +134,86 @@ def infer_orientation(values: pd.DataFrame) -> float:
     return 1.0 if corr > 0 else -1.0
 
 
+def resolve_signal_weights(
+    factor_ids: Sequence[str],
+    db_root: str = DEFAULT_DB_ROOT,
+    weights: Optional[Mapping[str, float] | Sequence[float]] = None,
+) -> tuple[list[str], list[float], dict]:
+    """Expand linear-combination factors and resolve the ensemble weights.
+
+    A factor stored as ``type == "linear_combination"`` carries the member ids of
+    the factors it was fitted from (written by the director) plus the ridge
+    weights. Expanding it here is what keeps AlphaPool's learned weights intact:
+    previously the backtest only ever averaged members with an equal weight,
+    silently discarding the combination layer.
+
+    ``weights`` may be a mapping ``{factor_id: weight}`` or a sequence aligned
+    with ``factor_ids``. Weights are returned un-normalised; ``load_factor_signals``
+    divides by ``sum(|w|)`` so the signal scale stays comparable across runs.
+    """
+    if isinstance(weights, Mapping):
+        explicit = {str(k): float(v) for k, v in weights.items()}
+    elif weights is not None:
+        seq = list(weights)
+        if len(seq) != len(factor_ids):
+            raise ValueError(
+                f"weights has {len(seq)} entries but {len(factor_ids)} factor ids were given"
+            )
+        explicit = {fid: float(w) for fid, w in zip(factor_ids, seq)}
+    else:
+        explicit = {}
+
+    storage = LocalFactorStorage(db_root)
+    resolved_ids: list[str] = []
+    resolved_weights: list[float] = []
+    expanded: dict[str, dict] = {}
+
+    def _expand(fid: str, weight: float, depth: int = 0) -> None:
+        if depth > 4:
+            raise ValueError(f"linear-combination nesting too deep at {fid}")
+        meta = storage.get_metadata(fid)
+        logic = getattr(meta, "logic_reference", None) if meta else None
+        if isinstance(logic, dict) and logic.get("type") == "linear_combination":
+            members = [m for m in (logic.get("member_factor_ids") or []) if m]
+            sub_weights = [float(w) for w in (logic.get("weights") or [])]
+            if members and len(members) == len(sub_weights):
+                expanded[fid] = {
+                    "members": members,
+                    "weights": [round(w, 6) for w in sub_weights],
+                }
+                for member, sub_w in zip(members, sub_weights):
+                    _expand(member, weight * sub_w, depth + 1)
+                return
+            logger.warning(
+                "Factor %s is a linear combination without member ids; "
+                "treating it as a standalone signal",
+                fid,
+            )
+        resolved_ids.append(fid)
+        resolved_weights.append(float(weight))
+
+    for fid in factor_ids:
+        _expand(fid, explicit.get(fid, 1.0))
+
+    if not resolved_ids:
+        raise ValueError("No factors left to combine after resolving linear combinations")
+    return resolved_ids, resolved_weights, expanded
+
+
 def load_factor_signals(
     factor_ids: Sequence[str],
     db_root: str = DEFAULT_DB_ROOT,
     signal_col: str = "prediction",
     orientation_db_root: Optional[str] = None,
+    weights: Optional[Mapping[str, float] | Sequence[float]] = None,
+    resolve_combinations: bool = True,
 ) -> pd.DataFrame:
     """Ensemble factor value snapshots into a per-(timestamp, asset) signal.
 
     Each factor is ranked cross-sectionally per timestamp; the rank is oriented
-    by the factor's predictive sign, then averaged across factors into a single
-    ``signal_col`` prediction (higher => stronger long).
+    by the factor's predictive sign, then combined with its resolved weight
+    (``sum(w * rank) / sum(|w|)``, higher => stronger long). Equal weights are
+    the default, so a plain multi-factor run behaves exactly as before.
 
     ``orientation_db_root`` decouples *where the signal direction is learned*
     from *where the evaluated factor values come from*. For a genuine
@@ -160,6 +229,18 @@ def load_factor_signals(
         if orientation_db_root and orientation_db_root != db_root
         else storage
     )
+    requested_ids = list(factor_ids)
+    expanded: dict = {}
+    if resolve_combinations:
+        factor_ids, weight_list, expanded = resolve_signal_weights(
+            factor_ids, db_root=db_root, weights=weights
+        )
+        if expanded:
+            logger.info("Expanded %d linear-combination factor(s) into members", len(expanded))
+    else:
+        weight_list = [1.0] * len(factor_ids)
+    weight_map = {fid: w for fid, w in zip(factor_ids, weight_list)}
+
     frames: list[pd.DataFrame] = []
     orientations: dict[str, float] = {}
     used_ids: list[str] = []
@@ -191,17 +272,27 @@ def load_factor_signals(
     long = pd.concat(frames, ignore_index=True)
     long["rank"] = long.groupby(["timestamp", "factor_id"])["factor"].rank(method="first")
     long["oriented"] = long["factor_id"].map(orientations) * long["rank"]
-    mean_oriented = (
-        long.groupby(["timestamp", "asset"])["oriented"].mean().reset_index(name=signal_col)
+    long["weight"] = long["factor_id"].map(weight_map).fillna(0.0)
+    long["weighted"] = long["oriented"] * long["weight"]
+    combined = (
+        long.groupby(["timestamp", "asset"])["weighted"].sum().reset_index(name=signal_col)
     )
-    mean_oriented["timestamp"] = pd.to_datetime(mean_oriented["timestamp"])
-    mean_oriented = mean_oriented.sort_values(["timestamp", "asset"]).reset_index(drop=True)
+    scale = float(sum(abs(weight_map.get(fid, 0.0)) for fid in used_ids)) or 1.0
+    combined[signal_col] = combined[signal_col] / scale
+    combined["timestamp"] = pd.to_datetime(combined["timestamp"])
+    combined = combined.sort_values(["timestamp", "asset"]).reset_index(drop=True)
+    combined.attrs["effective_weights"] = {
+        fid: float(weight_map.get(fid, 0.0)) for fid in used_ids
+    }
+    combined.attrs["expanded_combinations"] = expanded
+    combined.attrs["requested_ids"] = requested_ids
     logger.info(
-        "Built ensemble signal from %d factors; orientations=%s",
+        "Built ensemble signal from %d factors; weights=%s; orientations=%s",
         len(used_ids),
+        {fid: round(weight_map.get(fid, 0.0), 4) for fid in used_ids},
         {fid: orientations[fid] for fid in used_ids},
     )
-    return mean_oriented
+    return combined
 
 
 def load_prices(
@@ -300,16 +391,27 @@ def run_backtest(
     n_short: int = 5,
     rebalance_every: int = 5,
     min_assets: Optional[int] = None,
+    weights: Optional[Mapping[str, float] | Sequence[float]] = None,
 ) -> dict:
     """Run a full cross-sectional factor backtest.
+
+    ``weights`` overrides the ensemble weights (mapping keyed by factor id, or a
+    sequence aligned with ``factor_ids``). Stored linear-combination factors are
+    expanded into their members automatically, preserving the learned
+    AlphaPool weights.
 
     Returns a dict with ``result`` (ml4t Result), ``metrics``, ``summary``,
     and the source ``prices``/``signals``/``funding`` frames for downstream
     export or analysis.
     """
     signals = load_factor_signals(
-        factor_ids, db_root=db_root, orientation_db_root=orientation_db_root
+        factor_ids,
+        db_root=db_root,
+        orientation_db_root=orientation_db_root,
+        weights=weights,
     )
+    effective_weights = signals.attrs.get("effective_weights", {})
+    expanded = signals.attrs.get("expanded_combinations", {})
     lo_all = str(signals["timestamp"].min().date())
     hi_all = str(signals["timestamp"].max().date())
 
@@ -379,6 +481,9 @@ def run_backtest(
         "commission_rate": commission_rate,
         "slippage_rate": slippage_rate,
         "daily_funding_rate": funding_rate,
+        "effective_weights": effective_weights,
+        "expanded_combinations": expanded,
+        "weighting": "explicit" if weights is not None or expanded else "equal",
     }
     return {
         "result": result,
@@ -387,4 +492,21 @@ def run_backtest(
         "prices": prices,
         "signals": signals,
         "funding": funding,
+        "equity": _equity_frame(result),
     }
+
+
+def _equity_frame(result) -> pd.DataFrame:
+    """Equity curve as a tidy pandas frame (timestamp/equity/return/drawdown)."""
+    try:
+        return result.to_equity_dataframe().to_pandas()
+    except Exception:  # pragma: no cover - defensive, older ml4t builds
+        curve = getattr(result, "equity_curve", None) or []
+        frame = pd.DataFrame(curve, columns=["timestamp", "equity"])
+        if not frame.empty:
+            frame["timestamp"] = pd.to_datetime(frame["timestamp"])
+            frame["return"] = frame["equity"].pct_change().fillna(0.0)
+            frame["drawdown"] = (
+                frame["equity"] / frame["equity"].cummax() - 1.0
+            )
+        return frame

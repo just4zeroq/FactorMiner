@@ -54,6 +54,8 @@ class FactorMinerDirector:
         self.fdr_ledger = FdrLedger(gate_cfg.get("fdr_ledger_path"))
 
         self.latest_factor_ids: List[str] = []
+        # Filled in by _save_excellent_factors; surfaced by /api/gates/budget.
+        self.hypothesis_budget: Dict[str, Any] = {}
 
     def _instantiate_miner(self, paradigm: str, config: Dict, data: Any) -> BaseFactorMiner:
         from core.miner.registry import MinerRegistry
@@ -145,13 +147,58 @@ class FactorMinerDirector:
         if evaluator is not None and hasattr(evaluator, "run_p_values"):
             evaluator.run_p_values.clear()
 
+        # Hypothesis budget: DSR's denominator is now a governed quantity. Log it
+        # every run so "the gate is impossible" is visible as a budget problem
+        # (too many trials) rather than a mystery.
+        try:
+            import statistics
+
+            obs = [int(m.get("n_obs")) for m in metrics_list if m.get("n_obs")]
+            budget_cfg = self.config.get("evaluation", {}).get("gates", {}).get("hypothesis_budget")
+            self.hypothesis_budget = self.fdr_ledger.budget_report(
+                n_obs=int(statistics.median(obs)) if obs else None,
+                budget=budget_cfg,
+            )
+            logger.info(
+                "Hypothesis budget: %d cumulative test(s) across %d run(s)%s; "
+                "DSR bar = %.3f per-period SR (%.2f annualised)",
+                self.hypothesis_budget["cumulative_tests"],
+                self.hypothesis_budget["runs"],
+                (
+                    f" (budget {self.hypothesis_budget['budget']}, "
+                    f"{self.hypothesis_budget['utilization']:.0%} used)"
+                    if self.hypothesis_budget.get("budget")
+                    else ""
+                ),
+                self.hypothesis_budget.get("bar_per_period_sharpe", float("nan")),
+                self.hypothesis_budget.get("bar_annualised_sharpe", float("nan")),
+            )
+            utilization = self.hypothesis_budget.get("utilization")
+            if utilization and utilization >= 0.8:
+                logger.warning(
+                    "Hypothesis budget is %.0f%% spent (%d tests). Every further "
+                    "run raises the DSR bar for all future candidates — widen the "
+                    "target horizon or shrink the search space instead.",
+                    utilization * 100,
+                    self.hypothesis_budget["cumulative_tests"],
+                )
+        except Exception as exc:  # pragma: no cover - reporting must not break a run
+            logger.debug("Hypothesis budget report skipped: %s", exc)
+
         # Record EVERY attempt into the cross-run ExperimentTrace so num_trials
         # stays honest across runs (the denominator of truth).
         for cand, g in zip(candidates, gates):
             self._record_trial(cand, g)
 
-        for cand, g in zip(candidates, gates):
-            factor_id = f"fac_{uuid.uuid4().hex[:8]}"
+        # Pre-allocate ids for the whole batch so a linear-combination factor can
+        # reference the stored ids of its members. Without this the combination is
+        # persisted as anonymous sub-ASTs and the backtest can only re-weight it by
+        # guessing, which is how AlphaPool weights previously got flattened to an
+        # equal-weight mean.
+        preallocated_ids = [f"fac_{uuid.uuid4().hex[:8]}" for _ in candidates]
+        object_ids = {id(cand): fid for cand, fid in zip(candidates, preallocated_ids)}
+
+        for cand, g, factor_id in zip(candidates, gates, preallocated_ids):
             self.latest_factor_ids.append(factor_id)
 
             cand.metrics["p_adj"] = g["p_adj"]
@@ -192,7 +239,13 @@ class FactorMinerDirector:
             elif isinstance(cand, FactorExpressionAction):
                 self.storage_client.save_rl_factor(cand.get_source(), b"", metadata)
             elif isinstance(cand, LinearCombinedFactor):
-                self.storage_client.save_linear_combination_factor(cand.to_dict(), metadata)
+                logic = cand.to_dict()
+                member_ids = [
+                    object_ids.get(id(sub)) for sub in cand.sub_expressions
+                ]
+                if any(member_ids):
+                    logic["member_factor_ids"] = member_ids
+                self.storage_client.save_linear_combination_factor(logic, metadata)
             elif isinstance(cand, FactorExpressionTensor):
                 src = cand.get_source()
                 artifact_reference = {}
