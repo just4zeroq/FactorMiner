@@ -1,0 +1,34 @@
+{
+  "artifact_type": "ml4t-backtest-result",
+  "schema_version": 3,
+  "library_version": "0.1.dev1+gf0143a868",
+  "account_method": "signed_notional",
+  "initial_capital": 1000000.0,
+  "holdings_sampling": "none",
+  "recorded_sampling": null,
+  "returns_include_commissions": true,
+  "complete": true,
+  "components": {
+    "trades": "trades.parquet",
+    "fills": "fills.parquet",
+    "funding": "funding.parquet",
+    "rejected_orders": "rejected_orders.parquet",
+    "predictions": "predictions.parquet",
+    "equity": "equity.parquet",
+    "portfolio_state": "portfolio_state.parquet",
+    "capital_flows": "capital_flows.parquet",
+    "daily_pnl": "daily_pnl.parquet",
+    "metrics": "metrics.json",
+    "config": "config.yaml",
+    "spec": "spec.yaml"
+  },
+  "omitted_components": {
+    "holdings": "holdings were not captured",
+    "recorded_variables": "strategy variables were not recorded",
+    "benchmark": "result has no prepared benchmark",
+    "corporate_actions": "corporate-action applications were not captured",
+    "corporate_entitlements": "corporate entitlements were not captured",
+    "futures_settlements": "futures variation was not captured",
+    "futures_rolls": "futures roll intents were not captured"
+  }
+}

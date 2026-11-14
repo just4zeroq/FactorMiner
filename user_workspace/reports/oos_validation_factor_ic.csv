@@ -1,0 +1,7 @@
+factor_id,IS_RankIC,OOS_RankIC,IC_decay_ratio,IS_direction,OOS_direction,direction_flipped
+fac_c25e28c3,-0.07,-0.0113,0.16,1,-1,True
+fac_8af952ab,-0.0678,-0.0304,0.45,-1,-1,False
+fac_b66d17ce,-0.0662,-0.0116,0.18,-1,-1,False
+fac_099a7eef,-0.05,-0.0505,1.01,-1,-1,False
+fac_f20a1349,-0.0435,-0.0063,0.15,1,-1,True
+fac_2017455e,-0.0431,-0.0577,1.34,-1,-1,False

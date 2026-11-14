@@ -1,0 +1,2 @@
+scope,n_factors,n_assets,initial_cash,final_value,total_return_pct,max_drawdown_pct,sharpe,cagr,volatility,num_trades,num_fills,total_commission,total_slippage,total_funding,total_costs,avg_turnover,avg_open_positions,rebalance_every_bars,commission_rate,slippage_rate,daily_funding_rate
+in-sample 2024-01-01..2024-12-31,6,20,1000000.0,798107.9259000012,-20.189207409999877,34.31256552318805,-0.5142976599330762,-0.2020153402455227,0.24441862693273436,464,922,0.0,0.0,0.0,0.0,0.17124073257871017,9.672131147540984,5,0.0,0.0,0.0

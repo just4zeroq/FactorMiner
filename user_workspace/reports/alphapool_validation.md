@@ -1,0 +1,308 @@
+# AlphaPool 验证报告（Phase 2，真实因子面板）
+
+## 样本内 (in-sample 2024) — `D:\code\github\FactorMiner\factor_db`
+
+- 因子数：84；AlphaPool 容量 6；mutual-IC 阈值 0.99
+- 单因子 RankIC：
+  - `fac_0452ee64`: +0.0463
+  - `fac_08924ba4`: -0.0024
+  - `fac_099a7eef`: -0.0489
+  - `fac_0cde8952`: -0.0153
+  - `fac_10e17c69`: -0.0393
+  - `fac_115ee998`: -0.0231
+  - `fac_1162a04e`: -0.0065
+  - `fac_14caba6f`: +0.0258
+  - `fac_1664907f`: -0.0381
+  - `fac_1796332d`: +0.0365
+  - `fac_17b454e2`: -0.0383
+  - `fac_1e6b47e4`: +0.0202
+  - `fac_1fd8f2b5`: -0.0381
+  - `fac_2017455e`: -0.0420
+  - `fac_29d31826`: -0.0333
+  - `fac_2b41dc8a`: +0.0272
+  - `fac_2dd92785`: -0.0133
+  - `fac_2e4c1650`: +0.0319
+  - `fac_30710a28`: +0.0172
+  - `fac_30adaf6c`: +0.0302
+  - `fac_35ca856d`: +0.0302
+  - `fac_380a1000`: -0.0360
+  - `fac_3f1d483f`: +0.0172
+  - `fac_40b72386`: -0.0166
+  - `fac_45a73eb7`: +0.0397
+  - `fac_478ba7bc`: +0.0308
+  - `fac_504664c1`: +0.0333
+  - `fac_582a1342`: +0.0353
+  - `fac_5a7cfae9`: -0.0329
+  - `fac_5c9f121d`: +0.0367
+  - `fac_5e6fadce`: +0.0047
+  - `fac_5fcf1e5a`: -0.0288
+  - `fac_6142ff09`: -0.0293
+  - `fac_657ee061`: +0.0364
+  - `fac_65fb1710`: -0.0049
+  - `fac_66d326f5`: +0.0385
+  - `fac_6a942af7`: +0.0389
+  - `fac_6b4244cc`: -0.0110
+  - `fac_6ecf3d3f`: -0.0350
+  - `fac_729391a2`: +0.0365
+  - `fac_7430f062`: -0.0392
+  - `fac_74cd05ea`: -0.0165
+  - `fac_75df0ea2`: +0.0386
+  - `fac_7a34cc77`: -0.0261
+  - `fac_7d35d4bf`: -0.0224
+  - `fac_7f9b208e`: +0.0358
+  - `fac_8603f13a`: +0.0053
+  - `fac_8a1fd732`: -0.0092
+  - `fac_8af952ab`: -0.0647
+  - `fac_8b81f24a`: -0.0376
+  - `fac_924f3f3c`: +0.0361
+  - `fac_93702eee`: +0.0406
+  - `fac_9485da46`: +0.0342
+  - `fac_983c0910`: +0.0348
+  - `fac_9849305f`: -0.0411
+  - `fac_98e70178`: -0.0309
+  - `fac_9e86ea01`: -0.0335
+  - `fac_9f134276`: +0.0234
+  - `fac_a1aef3c9`: -0.0347
+  - `fac_a2fcbcc9`: -0.0267
+  - `fac_a4693216`: -0.0404
+  - `fac_aa433fb6`: +0.0429
+  - `fac_af41c257`: +0.0172
+  - `fac_b09337b6`: +0.0388
+  - `fac_b66d17ce`: -0.0633
+  - `fac_b9920d73`: +0.0033
+  - `fac_b9ea9558`: -0.0392
+  - `fac_c0e166ec`: +0.0467
+  - `fac_c25e28c3`: -0.0673
+  - `fac_c76fcda1`: +0.0042
+  - `fac_ce249d7f`: +0.0320
+  - `fac_cf0e7829`: +0.0383
+  - `fac_d2f36abf`: +0.0376
+  - `fac_d4eb9579`: +0.0386
+  - `fac_d519ab1f`: -0.0407
+  - `fac_dd87a975`: +0.0359
+  - `fac_df68a0dc`: -0.0356
+  - `fac_e3bea5e6`: -0.0360
+  - `fac_e4b5c794`: +0.0399
+  - `fac_e50b6ce4`: +0.0048
+  - `fac_f20a1349`: -0.0403
+  - `fac_f832720b`: +0.0012
+  - `fac_fd338d02`: -0.0029
+  - `fac_fd8eaa92`: -0.0090
+- 入池判定（含 sequential mutual-IC）：
+  - `fac_0452ee64`: 入池前 mutual-IC = 0.000
+  - `fac_08924ba4`: 入池前 mutual-IC = 0.019
+  - `fac_099a7eef`: 入池前 mutual-IC = 0.214
+  - `fac_0cde8952`: 入池前 mutual-IC = 0.186
+  - `fac_10e17c69`: 入池前 mutual-IC = 0.196
+  - `fac_115ee998`: 入池前 mutual-IC = 0.451
+  - `fac_1162a04e`: 入池前 mutual-IC = 0.435
+  - `fac_14caba6f`: 入池前 mutual-IC = 0.512
+  - `fac_1664907f`: 入池前 mutual-IC = 0.998
+  - `fac_1796332d`: 入池前 mutual-IC = 0.283
+  - `fac_17b454e2`: 入池前 mutual-IC = 0.956
+  - `fac_1e6b47e4`: 入池前 mutual-IC = 0.252
+  - `fac_1fd8f2b5`: 入池前 mutual-IC = 0.998
+  - `fac_2017455e`: 入池前 mutual-IC = 0.888
+  - `fac_29d31826`: 入池前 mutual-IC = 0.974
+  - `fac_2b41dc8a`: 入池前 mutual-IC = 0.823
+  - `fac_2dd92785`: 入池前 mutual-IC = 0.431
+  - `fac_2e4c1650`: 入池前 mutual-IC = 0.714
+  - `fac_30710a28`: 入池前 mutual-IC = 0.294
+  - `fac_30adaf6c`: 入池前 mutual-IC = 0.827
+  - `fac_35ca856d`: 入池前 mutual-IC = 0.928
+  - `fac_380a1000`: 入池前 mutual-IC = 0.697
+  - `fac_3f1d483f`: 入池前 mutual-IC = 1.000
+  - `fac_40b72386`: 入池前 mutual-IC = 0.371
+  - `fac_45a73eb7`: 入池前 mutual-IC = 0.946
+  - `fac_478ba7bc`: 入池前 mutual-IC = 0.865
+  - `fac_504664c1`: 入池前 mutual-IC = 0.925
+  - `fac_582a1342`: 入池前 mutual-IC = 0.979
+  - `fac_5a7cfae9`: 入池前 mutual-IC = 0.981
+  - `fac_5c9f121d`: 入池前 mutual-IC = 0.939
+  - `fac_5e6fadce`: 入池前 mutual-IC = 0.444
+  - `fac_5fcf1e5a`: 入池前 mutual-IC = 0.581
+  - `fac_6142ff09`: 入池前 mutual-IC = 0.908
+  - `fac_657ee061`: 入池前 mutual-IC = 0.960
+  - `fac_65fb1710`: 入池前 mutual-IC = 0.478
+  - `fac_66d326f5`: 入池前 mutual-IC = 0.999
+  - `fac_6a942af7`: 入池前 mutual-IC = 0.999
+  - `fac_6b4244cc`: 入池前 mutual-IC = 0.163
+  - `fac_6ecf3d3f`: 入池前 mutual-IC = 0.978
+  - `fac_729391a2`: 入池前 mutual-IC = 0.981
+  - `fac_7430f062`: 入池前 mutual-IC = 0.956
+  - `fac_74cd05ea`: 入池前 mutual-IC = 0.835
+  - `fac_75df0ea2`: 入池前 mutual-IC = 0.998
+  - `fac_7a34cc77`: 入池前 mutual-IC = 0.868
+  - `fac_7d35d4bf`: 入池前 mutual-IC = 0.860
+  - `fac_7f9b208e`: 入池前 mutual-IC = 0.992
+  - `fac_8603f13a`: 入池前 mutual-IC = 0.925
+  - `fac_8a1fd732`: 入池前 mutual-IC = 0.542
+  - `fac_8af952ab`: 入池前 mutual-IC = 0.382
+  - `fac_8b81f24a`: 入池前 mutual-IC = 0.845
+  - `fac_924f3f3c`: 入池前 mutual-IC = 0.957
+  - `fac_93702eee`: 入池前 mutual-IC = 0.688
+  - `fac_9485da46`: 入池前 mutual-IC = 0.968
+  - `fac_983c0910`: 入池前 mutual-IC = 0.999
+  - `fac_9849305f`: 入池前 mutual-IC = 0.968
+  - `fac_98e70178`: 入池前 mutual-IC = 0.484
+  - `fac_9e86ea01`: 入池前 mutual-IC = 0.985
+  - `fac_9f134276`: 入池前 mutual-IC = 0.977
+  - `fac_a1aef3c9`: 入池前 mutual-IC = 0.732
+  - `fac_a2fcbcc9`: 入池前 mutual-IC = 0.613
+  - `fac_a4693216`: 入池前 mutual-IC = 0.996
+  - `fac_aa433fb6`: 入池前 mutual-IC = 0.974
+  - `fac_af41c257`: 入池前 mutual-IC = 1.000
+  - `fac_b09337b6`: 入池前 mutual-IC = 0.999
+  - `fac_b66d17ce`: 入池前 mutual-IC = 0.958
+  - `fac_b9920d73`: 入池前 mutual-IC = 0.302
+  - `fac_b9ea9558`: 入池前 mutual-IC = 1.000
+  - `fac_c0e166ec`: 入池前 mutual-IC = 0.790
+  - `fac_c25e28c3`: 入池前 mutual-IC = 0.963
+  - `fac_c76fcda1`: 入池前 mutual-IC = 0.589
+  - `fac_ce249d7f`: 入池前 mutual-IC = 0.993
+  - `fac_cf0e7829`: 入池前 mutual-IC = 0.998
+  - `fac_d2f36abf`: 入池前 mutual-IC = 0.993
+  - `fac_d4eb9579`: 入池前 mutual-IC = 0.998
+  - `fac_d519ab1f`: 入池前 mutual-IC = 0.972
+  - `fac_dd87a975`: 入池前 mutual-IC = 0.982
+  - `fac_df68a0dc`: 入池前 mutual-IC = 0.994
+  - `fac_e3bea5e6`: 入池前 mutual-IC = 0.994
+  - `fac_e4b5c794`: 入池前 mutual-IC = 0.978
+  - `fac_e50b6ce4`: 入池前 mutual-IC = 0.584
+  - `fac_f20a1349`: 入池前 mutual-IC = 0.950
+  - `fac_f832720b`: 入池前 mutual-IC = 0.422
+  - `fac_fd338d02`: 入池前 mutual-IC = 0.316
+  - `fac_fd8eaa92`: 入池前 mutual-IC = 0.810
+- 最终入池结果：
+  - `fac_0452ee64`: 入池 (ok)
+  - `fac_08924ba4`: 入池 (ok)
+  - `fac_099a7eef`: 入池 (ok)
+  - `fac_0cde8952`: 入池 (ok)
+  - `fac_10e17c69`: 入池 (ok)
+  - `fac_115ee998`: 入池 (ok)
+  - `fac_1162a04e`: 入池 (replaced fac_115ee998)
+  - `fac_14caba6f`: 入池 (replaced fac_08924ba4)
+  - `fac_1664907f`: 入池 (replaced fac_0452ee64)
+  - `fac_1796332d`: 入池 (replaced fac_1162a04e)
+  - `fac_17b454e2`: 入池 (replaced fac_14caba6f)
+  - `fac_1e6b47e4`: 入池 (replaced fac_099a7eef)
+  - `fac_1fd8f2b5`: 拒绝 (no_improvement)
+  - `fac_2017455e`: 入池 (replaced fac_0cde8952)
+  - `fac_29d31826`: 入池 (replaced fac_1664907f)
+  - `fac_2b41dc8a`: 入池 (replaced fac_2017455e)
+  - `fac_2dd92785`: 入池 (replaced fac_2b41dc8a)
+  - `fac_2e4c1650`: 入池 (replaced fac_1796332d)
+  - `fac_30710a28`: 入池 (replaced fac_10e17c69)
+  - `fac_30adaf6c`: 入池 (replaced fac_2dd92785)
+  - `fac_35ca856d`: 入池 (replaced fac_1e6b47e4)
+  - `fac_380a1000`: 入池 (replaced fac_35ca856d)
+  - `fac_3f1d483f`: 入池 (replaced fac_380a1000)
+  - `fac_40b72386`: 入池 (replaced fac_3f1d483f)
+  - `fac_45a73eb7`: 入池 (replaced fac_40b72386)
+  - `fac_478ba7bc`: 入池 (replaced fac_30adaf6c)
+  - `fac_504664c1`: 入池 (replaced fac_45a73eb7)
+  - `fac_582a1342`: 入池 (replaced fac_478ba7bc)
+  - `fac_5a7cfae9`: 入池 (replaced fac_504664c1)
+  - `fac_5c9f121d`: 入池 (replaced fac_2e4c1650)
+  - `fac_5e6fadce`: 入池 (replaced fac_17b454e2)
+  - `fac_5fcf1e5a`: 入池 (replaced fac_582a1342)
+  - `fac_6142ff09`: 入池 (replaced fac_5fcf1e5a)
+  - `fac_657ee061`: 入池 (replaced fac_5e6fadce)
+  - `fac_65fb1710`: 入池 (replaced fac_657ee061)
+  - `fac_66d326f5`: 入池 (replaced fac_65fb1710)
+  - `fac_6a942af7`: 入池 (replaced fac_6142ff09)
+  - `fac_6b4244cc`: 入池 (replaced fac_6a942af7)
+  - `fac_6ecf3d3f`: 入池 (replaced fac_66d326f5)
+  - `fac_729391a2`: 入池 (replaced fac_6b4244cc)
+  - `fac_7430f062`: 入池 (replaced fac_6ecf3d3f)
+  - `fac_74cd05ea`: 拒绝 (no_improvement)
+  - `fac_75df0ea2`: 入池 (replaced fac_729391a2)
+  - `fac_7a34cc77`: 拒绝 (no_improvement)
+  - `fac_7d35d4bf`: 入池 (replaced fac_75df0ea2)
+  - `fac_7f9b208e`: 拒绝 (no_improvement)
+  - `fac_8603f13a`: 入池 (replaced fac_5a7cfae9)
+  - `fac_8a1fd732`: 拒绝 (no_improvement)
+  - `fac_8af952ab`: 入池 (replaced fac_7d35d4bf)
+  - `fac_8b81f24a`: 入池 (replaced fac_30710a28)
+  - `fac_924f3f3c`: 入池 (replaced fac_8603f13a)
+  - `fac_93702eee`: 入池 (replaced fac_8af952ab)
+  - `fac_9485da46`: 入池 (replaced fac_8b81f24a)
+  - `fac_983c0910`: 入池 (replaced fac_9485da46)
+  - `fac_9849305f`: 入池 (replaced fac_983c0910)
+  - `fac_98e70178`: 入池 (replaced fac_9849305f)
+  - `fac_9e86ea01`: 入池 (replaced fac_93702eee)
+  - `fac_9f134276`: 入池 (replaced fac_98e70178)
+  - `fac_a1aef3c9`: 入池 (replaced fac_924f3f3c)
+  - `fac_a2fcbcc9`: 入池 (replaced fac_9e86ea01)
+  - `fac_a4693216`: 入池 (replaced fac_5c9f121d)
+  - `fac_aa433fb6`: 入池 (replaced fac_a1aef3c9)
+  - `fac_af41c257`: 入池 (replaced fac_a2fcbcc9)
+  - `fac_b09337b6`: 入池 (replaced fac_aa433fb6)
+  - `fac_b66d17ce`: 入池 (replaced fac_b09337b6)
+  - `fac_b9920d73`: 入池 (replaced fac_b66d17ce)
+  - `fac_b9ea9558`: 入池 (replaced fac_a4693216)
+  - `fac_c0e166ec`: 入池 (replaced fac_b9920d73)
+  - `fac_c25e28c3`: 入池 (replaced fac_c0e166ec)
+  - `fac_c76fcda1`: 入池 (replaced fac_c25e28c3)
+  - `fac_ce249d7f`: 入池 (replaced fac_9f134276)
+  - `fac_cf0e7829`: 拒绝 (no_improvement)
+  - `fac_d2f36abf`: 拒绝 (no_improvement)
+  - `fac_d4eb9579`: 拒绝 (no_improvement)
+  - `fac_d519ab1f`: 拒绝 (no_improvement)
+  - `fac_dd87a975`: 拒绝 (no_improvement)
+  - `fac_df68a0dc`: 拒绝 (no_improvement)
+  - `fac_e3bea5e6`: 入池 (replaced fac_7430f062)
+  - `fac_e4b5c794`: 入池 (replaced fac_e3bea5e6)
+  - `fac_e50b6ce4`: 入池 (replaced fac_29d31826)
+  - `fac_f20a1349`: 入池 (replaced fac_e50b6ce4)
+  - `fac_f832720b`: 入池 (replaced fac_b9ea9558)
+  - `fac_fd338d02`: 入池 (replaced fac_e4b5c794)
+  - `fac_fd8eaa92`: 入池 (replaced fac_f832720b)
+- **AlphaPool 组合 RankIC = +0.0144**（成员 6：['fac_f20a1349', 'fac_fd338d02', 'fac_c76fcda1', 'fac_af41c257', 'fac_ce249d7f', 'fac_fd8eaa92']）
+- 最优单因子 RankIC = +0.0467
+- 全体等权 RankIC = -0.0264
+
+  **mutual-IC 去冗余实测**：以真实面板克隆一个因子 (`fac_0452ee64` ×1.0 + ε 噪声)
+  - 克隆的 mutual-IC = 0.999
+  - 入池判定：拒绝 (redundant(mutual_ic=0.999))  → ✅ 去冗余生效
+- 结论：⚠️ 组合 < 最优单因子（因子本身弱/冗余）
+
+## 样本外探针 (OOS 2025H1) — `D:\code\github\FactorMiner\factor_db_oos`
+
+- 因子数：6；AlphaPool 容量 6；mutual-IC 阈值 0.99
+- 单因子 RankIC：
+  - `fac_099a7eef`: -0.0254
+  - `fac_2017455e`: -0.0013
+  - `fac_8af952ab`: -0.0555
+  - `fac_b66d17ce`: -0.0545
+  - `fac_c25e28c3`: -0.0576
+  - `fac_f20a1349`: -0.0573
+- 入池判定（含 sequential mutual-IC）：
+  - `fac_099a7eef`: 入池前 mutual-IC = 0.000
+  - `fac_2017455e`: 入池前 mutual-IC = 0.875
+  - `fac_8af952ab`: 入池前 mutual-IC = 0.164
+  - `fac_b66d17ce`: 入池前 mutual-IC = 0.960
+  - `fac_c25e28c3`: 入池前 mutual-IC = 0.968
+  - `fac_f20a1349`: 入池前 mutual-IC = 0.769
+- 最终入池结果：
+  - `fac_099a7eef`: 入池 (ok)
+  - `fac_2017455e`: 入池 (ok)
+  - `fac_8af952ab`: 入池 (ok)
+  - `fac_b66d17ce`: 入池 (ok)
+  - `fac_c25e28c3`: 入池 (ok)
+  - `fac_f20a1349`: 入池 (ok)
+- **AlphaPool 组合 RankIC = +0.0168**（成员 6：['fac_099a7eef', 'fac_2017455e', 'fac_8af952ab', 'fac_b66d17ce', 'fac_c25e28c3', 'fac_f20a1349']）
+- 最优单因子 RankIC = -0.0013
+- 全体等权 RankIC = +0.0168
+
+  **mutual-IC 去冗余实测**：以真实面板克隆一个因子 (`fac_099a7eef` ×1.0 + ε 噪声)
+  - 克隆的 mutual-IC = 1.000
+  - 入池判定：拒绝 (redundant(mutual_ic=1.000))  → ✅ 去冗余生效
+- 结论：✅ 组合 ≥ 最优单因子
+
+---
+
+说明：6 个 legacy 因子在 Phase 1 已被证明样本内过拟合、OOS 全亏；
+因此 OOS 探针的弱表现是因子本身问题，而非 AlphaPool 缺陷。
+AlphaPool 在此的真实价值是 **mutual-IC 去冗余** + **组合权重优化**，
+需配合「在统计闸门下重新挖掘出的 OOS 成立因子」才能体现组合 alpha。

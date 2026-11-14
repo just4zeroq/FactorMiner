@@ -95,6 +95,8 @@ pip install -e .
 uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
+Windows 建议先执行 `set PYTHONUTF8=1`（PowerShell：`$env:PYTHONUTF8="1"`），否则终端默认 GBK 编码读取 UTF-8 配置会报 `UnicodeDecodeError`。项目内的文件读写已显式指定 UTF-8，这一步用于给第三方库兜底。
+
 **启动极客工作台 (React Web)**
 ```bash
 # 新开一个终端窗口
@@ -103,6 +105,17 @@ npm install  # 仅首次需要
 npm run dev
 ```
 启动成功后，浏览器访问 `http://localhost:5173` 即可进入 FactorMiner 极客工作台。
+
+**数据下载的网络代理**
+
+后端通过 ccxt 连接币安 / OKX 拉取行情和交易对列表时，默认走本机 HTTP 代理 `http://127.0.0.1:7890`（Clash / v2rayN 常用端口）。可用环境变量调整，无需改代码：
+
+```bash
+export FACTORMINER_PROXY=http://127.0.0.1:7897   # 更换端口；socks5:// 需额外 pip install pysocks
+export FACTORMINER_NO_PROXY=1                    # 关闭代理，直连
+```
+
+Windows PowerShell 用 `$env:FACTORMINER_PROXY="http://127.0.0.1:7897"`。配置在每次创建交易所实例时读取，改完重新触发一次下载即可生效。
 
 **Factor Inspector（Phase II）**
 

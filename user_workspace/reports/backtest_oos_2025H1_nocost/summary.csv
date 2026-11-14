@@ -1,0 +1,2 @@
+scope,n_factors,n_assets,initial_cash,final_value,total_return_pct,max_drawdown_pct,sharpe,cagr,volatility,num_trades,num_fills,total_commission,total_slippage,total_funding,total_costs,avg_turnover,avg_open_positions,rebalance_every_bars,commission_rate,slippage_rate,daily_funding_rate
+2025-01-01..2025-06-30,6,20,1000000.0,958133.4109900015,-4.186658900999851,16.53321537359423,-0.09772140896390064,-0.08312479721665944,0.2598293294642054,209,449,0.0,0.0,0.0,0.0,0.1587521175201778,9.751381215469614,5,0.0,0.0,0.0

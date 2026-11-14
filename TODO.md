@@ -1,6 +1,6 @@
 # FactorMiner V4 待办事项
 
-> 🚀 **项目状态**: V4 架构底层引擎已搭建完毕，成功跑通 GP、RL、NN、LLM 四大异构挖掘范式！评估引擎 (`ParallelEvaluator` + `custom_fitness` 钩子) 也已通过沙盒与真实数据回测的闭环验证。目前正处于补齐“持久化存储”并向 Web UI 界面对接的阶段。
+> 🚀 **项目状态**: V4 架构底层引擎已搭建完毕，成功跑通 GP、RL、NN、LLM 四大异构挖掘范式。评估引擎 (`ParallelEvaluator` + `custom_fitness` 钩子) 已通过沙盒与真实数据回测的闭环验证。统计闸门（NW-HAC t / BH-FDR / DSR / 一次性 holdout）、静态 AlphaPool 与加密原生特征（3A）均已落地；当前重心是**用未使用过的区间做严格 OOS 复验**，并补齐单标的时序闸门。
 
 ## 🔄 当前核心任务 (进行中)
 
@@ -22,14 +22,38 @@
 - [x] **用户算子端到端接入**: 动态加载的 OperatorRegistry 已接入 GP/RL 的搜索空间、按 arity 生成 AST、统一求值和运行期异常报告；MyCustomGP 默认使用四则运算、ts_mean/ts_std 和衰减、Z-score、变化、排名、波动率等用户时序算子。
 - [x] **扩展启动校验与四范式 CLI smoke tests**: CLI/Launchpad 会在读取数据前校验 Miner、算子、Fitness Hook 与用户模块加载错误；MyCustomGP、MyCustomRL、MyCustomLLM、NN 均有真实 Feather 数据的一轮 CLI smoke test。
 - [x] **MyCustomGP 真实数据回归与指标契约核验**: 重启 FastAPI 后以当前 `config.json` 完整运行 BTC、SUI 永续挖掘，确认用户算子进入 AST、候选评分非零，并将 `IC`、`RankIC`、`Turnover`、`fitness_score` 与 Phase II 值/未来收益快照一同落盘。Tracker 重启后内存任务会清空，因子档案仍以 `factor_db` 为准。
-- [ ] **更多原生算子支持**: 在 `OperatorRegistry` 中预置更多金融界常用的基础算子库 (如 `ts_decay`, `ts_corr`)。
+- [x] **更多原生算子支持**: `ts_corr`、`ts_cov`、`ts_decay_linear`、`ts_min/ts_max` 等已在 `OperatorRegistry` 中预置并参与 arity 生成与求值（早期遗留项，实际已完成）。
+
+### 2b. **加密原生数据与特征** (3A 完成)
+**优先级**: 高
+**说明**: 永续合约的 funding / OI / basis / 爆仓流是股票没有的 alpha 来源；已在 59 个通用算子上以"新数据流 + 特征模板"方式接入，不新增算子。
+- [x] **加密流采集与对齐**: `core/data_feed/crypto_streams.py` 支持 funding_rate / open_interest / basis 采集、feather 落盘、增量合并与**过去式前向对齐**（绝不 backfill）；liquidation 提供用户自备文件接口。
+- [x] **数据源接入**: `RealDataClient` 新增 `data_feeds.crypto_streams`，把流并入 cross-asset / sequential 面板，缺文件静默降级。
+- [x] **特征模板库**: `core/miner/crypto_features.py` 提供 29 个参数化模板（funding / OI / basis / liquidation / interaction），按可用流过滤、窗口无关模板去重。
+- [x] **挖矿接入**: GP 自动扩充 terminals + 初始种群加密播种（`gp.crypto_seed_ratio`）；LLM prompt 注入可用字段与加密语义（仅数据感知）。
+- [x] **真实数据验证**: 20 个 1d 标的、2023-01→2026-11；56 个 AST，最强 `ts_rank(basis,48)` RankIC +0.0178（NW t 2.79），但 BH-FDR 0/56 → 不可晋升（报告 `user_workspace/reports/crypto_features_validation.md`）。
+- [ ] **爆仓数据源**: 接入付费/交易所数据门户的 liquidation 历史（当前仅支持自备 feather）。
+- [ ] **多交易所价差**: 需要第二交易所 OHLCV 与资金费，作为跨所基差特征。
+- [ ] **Point-in-time 资产池**: 上市/退市时间表，彻底消除幸存者偏差（当前以当期非空 + `min_assets` 近似）。
 
 ### 3. **去重与评估执行能力补齐** (进行中)
 **优先级**: 中
-**现状**: `DiversityFilter` 已实现基于候选源代码 MD5 的全局硬去重；相关性软去重目前仍为占位逻辑。`ParallelEvaluator` 当前采用固定 8 线程的 `ThreadPoolExecutor`，尚未接入 Ray/Celery 等可扩展的分布式执行后端。
-- [ ] **相关性软去重**: 计算候选因子面值的相关性，按阈值剔除高相关候选，并补充与历史因子库的正交性检查。
-- [ ] **可配置并行评估**: 将固定线程数改为配置项，并明确线程池的资源边界、超时和异常回收策略。
-- [ ] **分布式评估后端**: 评估并按需接入 Ray 或 Celery，实现大规模候选因子的任务分发、结果缓存与重试机制。
+**现状**: `DiversityFilter` 已实现基于候选源代码 MD5 的全局硬去重；相关性软去重目前仍为占位逻辑。`ParallelEvaluator` 的线程数已配置化（`evaluation.max_workers`，1–64），但尚无单任务超时与异常回收。
+- [ ] **相关性软去重**: 计算候选因子面值的相关性，按阈值剔除高相关候选，并补充与历史因子库的正交性检查（可复用 `AlphaPool` 的 mutual-IC 实现，仅对通过初筛的候选计算以控成本）。
+- [x] **可配置并行评估**: `max_workers` 已从 `evaluation.max_workers` 读取并校验（1–64），默认 8。
+- [ ] **评估超时与资源边界**: 为单候选评估加 timeout 与取消/回收，避免个别卡死因子拖住整轮。
+- [ ] **分布式评估后端**: 评估并按需接入 Ray 或 Celery —— 当前明确暂缓（单机 20 标的规模不构成瓶颈，先完成统计闭环再谈横向扩展）。
+
+### 3b. **统计验证闭环** (P0/P1)
+**优先级**: 最高
+**说明**: Phase 0/1/1.5/2/3A 已落地；剩余是把"闸门有效"从"拦住了坏因子"推进到"好因子在严格 OOS 上站得住"。
+- [x] **真 OOS 闭环复验**: 2025-07→2026-11 一次性 holdout（mine 2023-04→2024-12、验证 2025H1、787 次评估）。4 个候选 → 2 INSPECTED；OOS IC 同向显著（\|t\| 4.17–5.45，无翻转），但含成本组合 **-6.40%**、零成本 +2.22%；被拒因子反而净 +23.35%。结论：闸门能防"OOS 方向翻转/IC 崩塌"，不能排序经济价值。报告 `user_workspace/reports/p0_holdout/README.md`。
+- [ ] **收益口径成本闸门（P0.5）**: 把 `cost_adj_return` 从 `mean_ic - cost*turnover`（量纲不一致）改为分位多空收益（定向后）− 换手成本；必须用 2026-12 之后的新区间预注册验证（2025-07→2026-11 已消耗）。
+- [ ] **幅度感知筛选**: DSR/IR 偏向"稳定但很小"的 IC（0.050/IR 0.26）而拒掉幅度更大的 0.088/IR 0.22；组合层应同时约束 mean \|IC\| 或尾部价差。
+- [ ] **单标的时序闸门**: 当前 sequential_single 的 verdict 恒为中性（hac_t=0/p=1），导致 RL/NN/单币 GP 因子永远无法晋升；需补滚动 Spearman IC → NW-HAC t → DSR 的时序评估路径。
+- [ ] **全库重审**: 对 `factor_db` 84 个因子重算 verdict，把 6 个旧 `INSPECTED` 按新闸门降级（先只读报告，确认后备份并写回）。
+- [ ] **累积 FDR**: BH-FDR 目前只在本轮保存的候选内校正；让 `ExperimentTrace` 记录 raw `p_value`，对跨轮全部 trial 做累积 FDR。
+- [x] **DSR 真实多重检验分母**: 已修 `n_trials=1` 的空转问题 —— 评估器累计 `total_evaluated`，导演以 `trace.num_trials + 本轮评估数` 重算 DSR 并写回 `dsr/n_trials`（新增回归测试）。
 
 ### 4. **Factor Inspector 审查台** (Phase II 完成)
 **优先级**: 高
@@ -67,7 +91,7 @@
 - [x] **底层存储命名规范闭环**: `Batch Downloader`、`Main API`、`Real Client` 统一使用 `{safe_symbol}-{timeframe}-{trade_type}.feather`；期货配置必须使用 CCXT 原始标的（如 `1000CAT/USDT:USDT`），旧命名文件不再参与读取。
 ---
 
-**最后更新**: 2026年7月17日
+**最后更新**: 2026年11月14日
 **维护者**: @CharlesJ-ABu  
 
 > 💡 **提示**: 此文件记录了 V4 重构后的核心骨架与待落地的待办事项。
