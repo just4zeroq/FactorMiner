@@ -7,6 +7,7 @@
   并按**样本内学出的方向**先定向（负 IC 因子等价于反向多空，不再被符号误杀），
   再用样本内/样本外 RankIC 符号一致性判定 `oos_consistent`。
 - DSR 的 `n_trials` 取 **787**（历史运行未记录真实试验数，用 P0 的 787 次搜索预算作保守代理）。
+- `cost_adj_return` 为**收益口径**（P0.5）：定向后的分位多空组合（gross 1.0、美元中性、top/bottom 20%）在 18 bp 往返成本、5 日调仓下的每期净收益。
 - 调用真实的 `apply_promotion_gates`（含 BH-FDR 多重检验校正）给出 `lifecycle_status`。
 
 ## 结果
@@ -14,19 +15,19 @@
 
 | 因子 | 样本内RankIC | OOS RankIC | HAC t | DSR | 成本后收益 | OOS一致 | OOS强度 | 闸门结论 |
 |---|---|---|---|---|---|---|---|---|
-| fac_c25e28c3 | 0.0673 | 0.0576 | 3.34 | 0.413 | 0.0673 | True | True | DISCOVERED_UNVERIFIED |
-| fac_8af952ab | 0.0647 | 0.0555 | 3.40 | 0.443 | 0.0647 | True | True | DISCOVERED_UNVERIFIED |
-| fac_b66d17ce | 0.0633 | 0.0545 | 3.09 | 0.349 | 0.0633 | True | True | DISCOVERED_UNVERIFIED |
-| fac_099a7eef | 0.0489 | 0.0254 | 3.71 | 0.403 | 0.0489 | True | True | DISCOVERED_UNVERIFIED |
-| fac_f20a1349 | 0.0403 | 0.0573 | 3.29 | 0.395 | 0.0403 | True | True | DISCOVERED_UNVERIFIED |
-| fac_2017455e | 0.0420 | 0.0013 | 3.23 | 0.248 | 0.0420 | True | False | DISCOVERED_UNVERIFIED |
+| fac_c25e28c3 | 0.0673 | 0.0576 | 3.34 | 0.413 | -0.0002 | True | True | DISCOVERED_UNVERIFIED |
+| fac_8af952ab | 0.0647 | 0.0555 | 3.40 | 0.443 | -0.0004 | True | True | DISCOVERED_UNVERIFIED |
+| fac_b66d17ce | 0.0633 | 0.0545 | 3.09 | 0.349 | -0.0001 | True | True | DISCOVERED_UNVERIFIED |
+| fac_099a7eef | 0.0489 | 0.0254 | 3.71 | 0.403 | 0.0000 | True | True | DISCOVERED_UNVERIFIED |
+| fac_f20a1349 | 0.0403 | 0.0573 | 3.29 | 0.395 | -0.0005 | True | True | DISCOVERED_UNVERIFIED |
+| fac_2017455e | 0.0420 | 0.0013 | 3.23 | 0.248 | 0.0002 | True | False | DISCOVERED_UNVERIFIED |
 
 ## 逐因子拦截原因
-- **fac_c25e28c3**：DSR<0.90（无真 alpha） → DISCOVERED_UNVERIFIED
-- **fac_8af952ab**：DSR<0.90（无真 alpha） → DISCOVERED_UNVERIFIED
-- **fac_b66d17ce**：DSR<0.90（无真 alpha） → DISCOVERED_UNVERIFIED
+- **fac_c25e28c3**：DSR<0.90（无真 alpha）；成本后收益<=0（无 alpha） → DISCOVERED_UNVERIFIED
+- **fac_8af952ab**：DSR<0.90（无真 alpha）；成本后收益<=0（无 alpha） → DISCOVERED_UNVERIFIED
+- **fac_b66d17ce**：DSR<0.90（无真 alpha）；成本后收益<=0（无 alpha） → DISCOVERED_UNVERIFIED
 - **fac_099a7eef**：DSR<0.90（无真 alpha） → DISCOVERED_UNVERIFIED
-- **fac_f20a1349**：DSR<0.90（无真 alpha） → DISCOVERED_UNVERIFIED
+- **fac_f20a1349**：DSR<0.90（无真 alpha）；成本后收益<=0（无 alpha） → DISCOVERED_UNVERIFIED
 - **fac_2017455e**：DSR<0.90（无真 alpha）；OOS |RankIC| 跌破阈值（样本外失效） → DISCOVERED_UNVERIFIED
 
 ## 结论与重要更正

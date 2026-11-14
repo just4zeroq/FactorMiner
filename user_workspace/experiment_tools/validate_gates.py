@@ -194,6 +194,7 @@ def _print_and_write_report(df: pd.DataFrame, n_trials: int = 787) -> int:
     md.append("  并按**样本内学出的方向**先定向（负 IC 因子等价于反向多空，不再被符号误杀），")
     md.append("  再用样本内/样本外 RankIC 符号一致性判定 `oos_consistent`。")
     md.append(f"- DSR 的 `n_trials` 取 **{n_trials}**（历史运行未记录真实试验数，用 P0 的 787 次搜索预算作保守代理）。")
+    md.append("- `cost_adj_return` 为**收益口径**（P0.5）：定向后的分位多空组合（gross 1.0、美元中性、top/bottom 20%）在 18 bp 往返成本、5 日调仓下的每期净收益。")
     md.append("- 调用真实的 `apply_promotion_gates`（含 BH-FDR 多重检验校正）给出 `lifecycle_status`。")
     md.append("")
     md.append("## 结果")
