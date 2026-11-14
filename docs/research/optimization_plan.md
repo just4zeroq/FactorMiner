@@ -70,7 +70,7 @@
 | 优先级 | 事项 | 现状 / 为什么还缺 | 落点 |
 |---|---|---|---|
 | **P0** | ~~**真 OOS 闭环复验**~~ ✅ 已完成（见 Phase 4） | 2025-07→2026-11 一次性 holdout：2/4 通过闸门；OOS IC 同向显著（t 4.2–5.5），但含成本组合 -6.4%，被拒因子 +23.4%。结论：闸门能防假阳性，不能排序经济价值。 | `user_workspace/reports/p0_holdout/README.md` |
-| **P0.5** | **收益口径的成本闸门** | 当前 `cost_adj_return = mean_ic - cost_rate*turnover` 是 IC 与成本相减，量纲不一致（本次 `gate_cost_rate=0`，该闸门实际只检查 IC>0）。应改为分位多空收益（定向后）− 换手成本；**必须用 2026-12 之后的新区间预注册验证**，不能再用已消耗的 holdout。 | `core/evaluation/evaluator.py` + `significance.py` |
+| **P0.5** | ~~**收益口径的成本闸门**~~ ✅ 已完成（见 `reports/p0_5_return_gate.md`） | `cost_adj_return` 改为分位多空组合的**每期净收益**（gross 1.0、美元中性、18 bp 单边往返成本、调仓频率默认 = `target.horizon_bars`）。用新口径复判 P0 四因子：**0/4 通过**，旧闸门放行的两个（毛收益为正、被换手吃光）被精确拦下。核心结论：**必须在交易周期上挖**，1 日目标 + 20 币的换手成本（年化 6–17%）大于可得边际。正向验证仍需 2026-12 之后的新数据预注册。 | `core/evaluation/portfolio_eval.py` + `evaluator.py` + `significance.py` |
 | **P1** | **幅度感知筛选** | DSR/IR 奖励稳定性，本次偏向"稳定但很小"的 IC（0.050/IR 0.26）而拒掉幅度更大的 0.088/IR 0.22。组合层应同时约束 mean \|IC\| 或尾部价差。 | `AlphaPool` / 闸门 |
 | **P1** | **单标的时序闸门** | `_build_verdict` 对非 `(T,N)` 面板返回中性 verdict（hac_t=0、p=1），导致 sequential_single 挖出的因子**永远无法晋升**，RL/NN/temporal/单币 GP 全部受影响。需补时序 IC 的 HAC t（滚动 Spearman → NW t）与 DSR。 | `core/evaluation/evaluator.py` + `significance.py` |
 | **P1** | **全库重审** | `factor_db` 84 个因子中 6 个仍是 `INSPECTED`，但 Phase 1 已判它们不过闸门；其余 78 个 metadata 没有 `hac_t/p_value/dsr`。需要一次性重算 verdict 并降级（先出只读报告，确认后再写回 + 备份）。 | `scripts/reaudit_factor_db.py` |

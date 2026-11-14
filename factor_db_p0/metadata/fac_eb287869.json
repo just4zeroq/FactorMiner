@@ -2,7 +2,7 @@
   "factor_id": "fac_eb287869",
   "miner_type": "GP",
   "user_id": "CharlesJ-ABu",
-  "lifecycle_status": "INSPECTED",
+  "lifecycle_status": "DISCOVERED_UNVERIFIED",
   "parent_ids": [],
   "generation_config": {
     "max_iterations": 20,
@@ -160,10 +160,16 @@
     "dsr": 0.9866060135408784,
     "ir": 0.23859956352815012,
     "n_obs": 612,
-    "cost_adj_return": 0.07765983586417022,
+    "cost_adj_return": -0.0003806185095183382,
     "p_adj": 3.9810226226677514e-09,
     "n_trials": 787,
-    "orientation": -1.0
+    "orientation": -1.0,
+    "ls_return": 0.0001789723251788795,
+    "ls_sharpe": 0.21701448010286115,
+    "ls_hit": 0.5319148936170213,
+    "ls_turnover": 0.31088379705400987,
+    "ls_cost": 0.0005595908346972177,
+    "ls_t": 0.3302816718889412
   },
   "data_lineage": {
     "source": "RealDataClient",
