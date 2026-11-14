@@ -74,8 +74,8 @@
 
 - `Dockerfile` 多阶段、两个 target：`frontend`（node:20-slim → `npm ci` + `vite build`）、`api`（python:3.12-slim + git + libgomp1，uvicorn **单 worker**）、`web`（nginx:1.27-alpine 托管 dist）。
 - 单 worker 是刻意的：`TaskManager` 与 WebSocket 广播都在进程内存里，多 worker 会各答一份任务列表。
-- `web/nginx.conf`：`/assets` 一年不可变缓存、`index.html` 不缓存、未知路径回落 `index.html`（`/backtest`、`/inspector` 这类前端路由没有对应文件）。
-- `docker-compose.yml`：`api` 8000、`web` 5173（与 `npm run dev` 同端口，前端里写死的 `http://localhost:8000` 因此不用改）；四个状态目录 bind mount；容器内 `FACTORMINER_NO_PROXY=1`（宿主代理的 127.0.0.1 在容器里不可达），并给了 `host.docker.internal` 的反向示例。
+- `web/nginx.conf`：`/assets` 一年不可变缓存、`index.html` 不缓存；`/api/` 与 `/ws/` 反代到 `api:8000`（WS 需 `Upgrade`/`Connection` 头，读超时 3600s 避免长任务空档被断开）；其余未知路径回落 `index.html`。
+- `docker-compose.yml`：`api` 8000、`web` 5173（与 `npm run dev` 同端口）；`web` 构建期传 `VITE_API_BASE=""`，前端改走同源再经 nginx 反代，不再写死 `http://localhost:8000`；四个状态目录 bind mount；容器内 `FACTORMINER_NO_PROXY=1`（宿主代理的 127.0.0.1 在容器里不可达），并给了 `host.docker.internal` 的反向示例。
 - `.dockerignore` 排掉 `data/`、各 `factor_db*/`、`venv/`、`node_modules`、`*.feather`——数据量比镜像大得多，且不该进层。
 
 **未验证项**：本机 `docker` CLI 存在但 daemon 没起（`npipe:////./pipe/dockerDesktopLinuxEngine` 连不上），所以只做了 `docker compose config` 的语法/结构校验，镜像没有真正构建。第一次在有 daemon 的机器上执行 `docker compose up -d --build` 时，重点看两处：`pip install -r requirements.txt` 里 ml4t 的 git 安装，以及 nginx 下 `/backtest` 的直接访问。
@@ -136,7 +136,32 @@ venv/Scripts/python.exe scripts/update_data.py --symbols BTC/USDT:USDT --until 2
 
 清理后：**81 个文件 / 20 日线 + 1 个 5m + 60 个原生流 / 1 个滞后 / 0 个不可解析**。
 
-## 9. 仍未做
+## 9. WebSocket 监控通道修复（2026-11-15）
+
+**问题**：`app = FastAPI(dependencies=[Depends(require_auth)])` 是全局依赖，会被复制到 WebSocketRoute；而 `require_auth(request: Request)` 的 `Request` 参数只在 `isinstance(connection, Request)` 为真时才注入。WS 路由走的是 `solve_dependencies(request=websocket)`，参数从未赋值 → 任何 `/ws/monitor` 握手都抛 `TypeError: require_auth() missing 1 required positional argument: 'request'`，ASGI 侧连 `websocket.close` 都没发（`sent=[]`）。异常发生在函数体执行之前，所以 `if not API_TOKEN: return` 也救不了——**配不配 token 都是 100% 不可用**。同一依赖在 HTTP 路由正常，因此 `/api/health` 200、页面能开、任务能启动，故障很隐蔽。UI 侧表现为红点常亮、进度条与日志不动、每 3 秒无限重连；`DataDownload` 因为收不到 `download_progress>=100`，下载完成后按钮会一直卡在"下载中"。
+
+**改动**：
+
+1. `api/main.py`：`require_auth` 参数改为 `HTTPConnection`（`Request`/`WebSocket` 的共同基类，注入不看类型）；WS 额外接受 `?token=`（浏览器 WebSocket 不能设自定义头），HTTP 仍只认 header、query token 明确拒绝以免进访问日志；`/api/health` 继续公开。
+2. `websocket_endpoint` 改 `finally: manager.disconnect(...)`，异常断开不会把死连接留在广播列表。
+3. 新增 `web/src/lib/endpoints.ts` 统一 `API_BASE` / `WS_URL` / `apiFetch`，6 个页面去掉硬编码 `localhost:8000`；`useWebSocket` 把连接、定时器、卸载标志放进 effect 作用域，卸载时真正关闭连接并清除重连定时器（旧实现 cleanup 闭包捕获的是初始 `socket=null`）。
+4. `web/nginx.conf` 补 `/api/`、`/ws/` 反代，`Dockerfile` 构建传 `VITE_API_BASE=""`，`vite.config.ts` 加 dev proxy 兜底，`README.md` 增加地址/鉴权配置表。
+
+**实测**（真实 uvicorn + 标准库原生 WS 握手，不只是 ASGI 直通）：
+
+| 场景 | 结果 |
+|---|---|
+| 无 token，`/ws/monitor` | `101 Switching Protocols`，`Sec-WebSocket-Accept` 校验通过 |
+| 配 `FACTORMINER_API_TOKEN`，无凭据 / 错 query token | `401 Unauthorized` |
+| 配 token，正确 `?token=` / `X-API-Token` 头 | `101 Switching Protocols` |
+| HTTP `/api/tasks` 无头 / 带头 / query token | `401` / `200` / `401` |
+| HTTP `/api/health`（配 token） | `200` |
+
+回归测试 `tests/test_websocket_auth.py` 11 项（含「WS 路由必须保留全局鉴权依赖」与「断开后广播列表清空」两个结构性断言）。全量 `pytest tests/ -q` → **474 passed, 1 skipped, 56 subtests**；前端 `npm run build` 通过；`docker compose config` 通过。**镜像仍未实构建**（本机 daemon 未运行），nginx 反代只在配置层校验过，首次 `up -d --build` 需实测 `/ws/` 的 Upgrade 是否穿透。
+
+**限制**：`VITE_API_TOKEN` 会内联进公开 JS，只适合本地/内网；公网部署应在反向代理层做鉴权，不要把它当作密钥。
+
+## 10. 仍未做
 
 - 跨轮因子面值正交检查（不同 run 之间只比 archive 内 40 个签名）。
 - 回测归因层：NN 特征归因、中性化、Brinson。

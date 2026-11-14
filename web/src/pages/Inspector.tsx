@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/endpoints';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import ReactECharts from 'echarts-for-react';
@@ -16,7 +17,6 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
-const API_BASE = 'http://localhost:8000';
 const LIFECYCLE_STATUSES = ['DISCOVERED', 'INSPECTED', 'PAPER_TRADING', 'LIVE', 'RETIRED'];
 
 type Metrics = Record<string, number>;
@@ -300,7 +300,7 @@ export function Inspector() {
   const loadCatalog = useCallback(async () => {
     setLoadingCatalog(true);
     try {
-      const response = await fetch(`${API_BASE}/api/factors?limit=500`);
+      const response = await apiFetch(`/api/factors?limit=500`);
       if (!response.ok) throw new Error('Unable to load the factor catalog.');
       const payload = await response.json();
       setFactors(payload.factors || []);
@@ -327,7 +327,7 @@ export function Inspector() {
     const loadDetail = async () => {
       setLoadingDetail(true);
       try {
-        const response = await fetch(`${API_BASE}/api/factors/${encodeURIComponent(selectedId)}`);
+        const response = await apiFetch(`/api/factors/${encodeURIComponent(selectedId)}`);
         if (!response.ok) throw new Error('This factor no longer exists in the local catalog.');
         const payload = await response.json();
         setDetail(payload);
@@ -351,7 +351,7 @@ export function Inspector() {
     const loadAnalysis = async () => {
       setLoadingAnalysis(true);
       try {
-        const response = await fetch(`${API_BASE}/api/factors/${encodeURIComponent(selectedId)}/analysis`);
+        const response = await apiFetch(`/api/factors/${encodeURIComponent(selectedId)}/analysis`);
         if (response.status === 409) {
           setAnalysis(null);
           return;
@@ -395,7 +395,7 @@ export function Inspector() {
     if (!detail) return;
     setSavingStatus(true);
     try {
-      const response = await fetch(`${API_BASE}/api/factors/${encodeURIComponent(detail.metadata.factor_id)}/lifecycle`, {
+      const response = await apiFetch(`/api/factors/${encodeURIComponent(detail.metadata.factor_id)}/lifecycle`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lifecycle_status: statusDraft }),
@@ -418,7 +418,7 @@ export function Inspector() {
     if (!selectedForReview.length) return;
     setSavingBatch(true);
     try {
-      const response = await fetch(`${API_BASE}/api/factors/lifecycle/batch`, {
+      const response = await apiFetch(`/api/factors/lifecycle/batch`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ factor_ids: selectedForReview, lifecycle_status: batchStatus }),
@@ -446,7 +446,7 @@ export function Inspector() {
     if (selectedForReview.length < 2 || selectedForReview.length > 5) return;
     setLoadingComparison(true);
     try {
-      const response = await fetch(`${API_BASE}/api/factors/compare`, {
+      const response = await apiFetch(`/api/factors/compare`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ factor_ids: selectedForReview }),

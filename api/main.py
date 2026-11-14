@@ -4,10 +4,10 @@ from fastapi import (
     WebSocketDisconnect,
     BackgroundTasks,
     HTTPException,
-    Request,
     Depends,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.requests import HTTPConnection
 from pydantic import BaseModel
 from api.ws_manager import manager
 from api.task_store import TaskStore, MiningCancelled, request_cancel, check_cancelled
@@ -26,24 +26,40 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Optional API authentication (review T6).
 #
-# When ``FACTORMINER_API_TOKEN`` is set, every HTTP endpoint requires it via the
+# When ``FACTORMINER_API_TOKEN`` is set, every endpoint requires it via the
 # ``Authorization: Bearer <token>`` (or ``X-API-Token``) header. With no token
 # configured the API runs open (dev mode) so existing local workflows keep
 # working. The health endpoint is always public.
+#
+# This is a *global* FastAPI dependency, so it also runs for websocket routes.
+# The parameter must be HTTPConnection (the shared base of Request and
+# WebSocket), NOT Request: FastAPI's websocket routes call
+# solve_dependencies(request=websocket), and a Request-typed parameter is only
+# filled when isinstance(connection, Request) is true. With a plain Request the
+# argument is never injected and the handshake dies with
+# "require_auth() missing 1 required positional argument" before the function
+# body runs -- which also means the `if not API_TOKEN` shortcut cannot help.
+# HTTPConnection is injected unconditionally for both scope types.
 # ---------------------------------------------------------------------------
 API_TOKEN = os.environ.get("FACTORMINER_API_TOKEN")
 
 
-async def require_auth(request: Request) -> None:
+async def require_auth(conn: HTTPConnection) -> None:
     if not API_TOKEN:
         return
-    if request.url.path == "/api/health":
+    if conn.url.path == "/api/health":
         return
-    auth = request.headers.get("Authorization", "")
+    auth = conn.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         token = auth[len("Bearer "):]
     else:
-        token = request.headers.get("X-API-Token", "")
+        token = conn.headers.get("X-API-Token", "")
+    # The browser WebSocket constructor cannot set custom headers, so the
+    # monitor channel carries the same token as a query parameter. Deliberately
+    # websocket-only: accepting a token in an HTTP URL would leak it into access
+    # logs and browser history.
+    if not token and conn.scope.get("type") == "websocket":
+        token = conn.query_params.get("token", "")
     if token and token == API_TOKEN:
         return
     raise HTTPException(status_code=401, detail="Invalid or missing API token")
@@ -963,6 +979,11 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             # Just keep the connection alive
-            data = await websocket.receive_text()
+            await websocket.receive_text()
     except WebSocketDisconnect:
+        pass
+    finally:
+        # Any other exception (or a dropped transport) must not leave a stale
+        # socket in the broadcast list, otherwise every later broadcast keeps
+        # catching errors on a dead connection.
         manager.disconnect(websocket)

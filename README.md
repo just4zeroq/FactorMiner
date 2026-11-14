@@ -307,9 +307,22 @@ docker compose up -d --build
 ~~~
 
 - `api`（:8000）跑 uvicorn **单 worker**：任务状态与 WebSocket 广播都在进程内存里，多 worker 会各自回答一份任务列表。
-- `web`（:5173）用 nginx 托管前端构建产物：`/assets` 长缓存，`index.html` 不缓存，未知路径回落到 `index.html` 以支持前端路由。
+- `web`（:5173）用 nginx 托管前端构建产物：`/assets` 长缓存，`index.html` 不缓存；`/api/` 与 `/ws/` 反代到 `api:8000`（WS 带 `Upgrade` 头、读超时 3600s），其余未知路径回落 `index.html` 以支持前端路由。
 - `data/`、`factor_db/`、`user_workspace/`、`logs/` 都是 bind mount，重建镜像不会丢研究产物。
 - 容器内默认 `FACTORMINER_NO_PROXY=1`（宿主代理的 `127.0.0.1` 在容器里不可达）；需要走宿主代理时注释掉它并设置 `FACTORMINER_PROXY=http://host.docker.internal:7890`。
+
+### API 地址与鉴权
+
+前端地址统一由 `web/src/lib/endpoints.ts` 管理，不再逐页写死 `localhost:8000`：
+
+| 场景 | 配置 | 效果 |
+|---|---|---|
+| 本机 `npm run dev`（默认） | 不设 `VITE_API_BASE` | 直连 `http://localhost:8000` / `ws://localhost:8000` |
+| Docker / nginx（镜像默认） | `VITE_API_BASE=""` | 同源，`/api/`、`/ws/` 走 nginx 反代 |
+| Vite dev 也走同源 | `VITE_API_BASE=""` | `vite.config.ts` 的 dev proxy 转发到 8000 |
+| API 部署在别的主机 | `VITE_API_BASE=https://host` | 显式覆盖 |
+
+设置 `FACTORMINER_API_TOKEN` 后所有端点都需要 token：HTTP 用 `Authorization: Bearer` 或 `X-API-Token` 头；浏览器 WebSocket 无法设置自定义头，因此监控通道改用 `?token=`（后端只在 websocket scope 接受 query token）。`VITE_API_TOKEN` 仅供本地/内网使用——所有 `VITE_*` 变量都会被内联进公开的 JS，**不是密钥**；公网部署应在反向代理层做鉴权。
 
 ### 持续集成
 

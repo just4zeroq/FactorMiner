@@ -1,3 +1,4 @@
+import { apiFetch, WS_URL } from '../lib/endpoints';
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Play, Filter, Terminal } from 'lucide-react';
@@ -18,7 +19,7 @@ export function Launchpad() {
   // Track scatter points and logs per task
   const [taskData, setTaskData] = useState<Record<string, { scatter: any[], logs: string[] }>>({});
 
-  const { lastMessage, isConnected } = useWebSocket('ws://localhost:8000/ws/monitor');
+  const { lastMessage, isConnected } = useWebSocket(WS_URL);
 
   useEffect(() => {
     if (!lastMessage) return;
@@ -73,7 +74,7 @@ export function Launchpad() {
 
   useEffect(() => {
     // Fetch Miners
-    fetch('http://localhost:8000/api/miners')
+    apiFetch('/api/miners')
       .then(res => res.json())
       .then(data => {
         if (data.miners) {
@@ -86,7 +87,7 @@ export function Launchpad() {
       .catch(err => console.error('Failed to fetch miners:', err));
       
     // Fetch Configs
-    fetch('http://localhost:8000/api/configs')
+    apiFetch('/api/configs')
       .then(res => res.json())
       .then(data => {
         if (data.configs) {
@@ -101,7 +102,7 @@ export function Launchpad() {
       .catch(err => console.error('Failed to fetch configs:', err));
 
     // Fetch Initial Tasks
-    fetch('http://localhost:8000/api/tasks')
+    apiFetch('/api/tasks')
       .then(res => res.json())
       .then(data => {
         if (data.tasks) setTasks(data.tasks);
@@ -112,7 +113,7 @@ export function Launchpad() {
   const handleLaunch = () => {
     if (!selectedMiner || !selectedConfig) return;
     
-    fetch('http://localhost:8000/api/launch', {
+    apiFetch('/api/launch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ miner: selectedMiner, config: selectedConfig })
@@ -125,7 +126,7 @@ export function Launchpad() {
   };
 
   const cancelTask = (taskId: string) => {
-    fetch(`http://localhost:8000/api/tasks/${taskId}/cancel`, { method: 'POST' })
+    apiFetch(`/api/tasks/${taskId}/cancel`, { method: 'POST' })
       .then(res => res.json())
       .then(data => console.log('Cancellation requested:', data))
       .catch(err => console.error('Failed to cancel task:', err));

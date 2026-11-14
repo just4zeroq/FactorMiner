@@ -4,11 +4,14 @@
 #   --target api  -> uvicorn on :8000
 #   --target web  -> nginx serving the built SPA on :80
 #
-# The SPA is built with an absolute API base (http://localhost:8000), so the API
-# must stay published on 8000 on the host. That is why compose maps 5173:80 for
-# the UI rather than fronting the API behind nginx.
+# The SPA is built with VITE_API_BASE="" (same origin), so /api and /ws go
+# through the nginx proxy in the web image. The API is still published on 8000
+# for direct/CLI access. Never bake VITE_API_TOKEN into this build: every
+# VITE_* variable is inlined into public JavaScript.
 
 FROM node:20-slim AS frontend
+ARG VITE_API_BASE=""
+ENV VITE_API_BASE=${VITE_API_BASE}
 WORKDIR /app/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci

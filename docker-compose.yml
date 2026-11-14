@@ -30,10 +30,13 @@ services:
     build:
       context: .
       target: web
+      args:
+        # Same origin: nginx proxies /api/ and /ws/ to the api service. Set a
+        # full URL here instead only if the API is hosted elsewhere.
+        VITE_API_BASE: ""
     image: factorminer-web:local
     ports:
-      # 5173 keeps the URL identical to `npm run dev`, and the SPA's absolute
-      # API base (http://localhost:8000) keeps working unchanged.
+      # 5173 keeps the URL identical to `npm run dev`.
       - "5173:80"
     depends_on:
       - api

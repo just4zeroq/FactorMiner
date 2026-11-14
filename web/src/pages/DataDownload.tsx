@@ -1,3 +1,4 @@
+import { apiFetch, WS_URL } from '../lib/endpoints';
 import { useState, useEffect, useCallback } from 'react';
 import { Download, CheckCircle2, Info, Loader2 } from 'lucide-react';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -40,12 +41,12 @@ export function DataDownload() {
   const [coverageResults, setCoverageResults] = useState<any[]>([]);
   const [freshnessKey, setFreshnessKey] = useState(0);
 
-  const { lastMessage } = useWebSocket('ws://localhost:8000/ws/monitor');
+  const { lastMessage } = useWebSocket(WS_URL);
 
   // Fetch Meta
   useEffect(() => {
     setLoadingMeta(true);
-    fetch(`http://localhost:8000/api/exchange_meta?exchange=${exchange}&trade_type=${tradeType}`)
+    apiFetch(`/api/exchange_meta?exchange=${exchange}&trade_type=${tradeType}`)
       .then(res => res.json())
       .then(data => {
         setMeta(data);
@@ -63,7 +64,7 @@ export function DataDownload() {
       setCoverageResults([]);
       return;
     }
-    fetch('http://localhost:8000/api/batch_data_coverage', {
+    apiFetch('/api/batch_data_coverage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -114,7 +115,7 @@ export function DataDownload() {
     const startDate = new Date(dateRange[0]).toISOString().split('T')[0];
     const endDate = new Date(dateRange[1]).toISOString().split('T')[0];
 
-    fetch('http://localhost:8000/api/download_data', {
+    apiFetch('/api/download_data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

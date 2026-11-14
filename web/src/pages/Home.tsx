@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/endpoints';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -19,7 +20,6 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
-const API_BASE = 'http://localhost:8000';
 
 type Factor = {
   factor_id: string;
@@ -93,7 +93,7 @@ export function Home() {
     let active = true;
     const loadDashboard = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/dashboard`);
+        const response = await apiFetch(`/api/dashboard`);
         if (!response.ok) throw new Error('Dashboard data is unavailable.');
         const data = await response.json();
         if (!active) return;

@@ -1,8 +1,8 @@
+import { apiFetch } from '../lib/endpoints';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Clock, Database } from 'lucide-react';
 import { useI18n } from '../i18n';
 
-const API_BASE = 'http://localhost:8000';
 
 type FreshnessItem = {
   symbol: string;
@@ -54,7 +54,7 @@ export function FreshnessPanel({ refreshKey = 0 }: { refreshKey?: number }) {
 
   const load = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/data/freshness`);
+      const response = await apiFetch('/api/data/freshness');
       if (!response.ok) throw new Error(response.statusText);
       setPayload(await response.json());
       setError(null);

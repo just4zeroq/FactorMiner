@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/endpoints';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ReactECharts from 'echarts-for-react';
@@ -15,7 +16,6 @@ import {
 } from 'lucide-react';
 import { useI18n } from '../i18n';
 
-const API_BASE = 'http://localhost:8000';
 
 type Metrics = Record<string, number>;
 
@@ -109,7 +109,7 @@ export function Backtest() {
   const loadCatalog = useCallback(async () => {
     setLoadingCatalog(true);
     try {
-      const response = await fetch(`${API_BASE}/api/factors?limit=500&sort_by=created_at`);
+      const response = await apiFetch(`/api/factors?limit=500&sort_by=created_at`);
       const payload = await response.json();
       setFactors(payload.factors || []);
     } catch (err) {
@@ -121,7 +121,7 @@ export function Backtest() {
 
   const loadRuns = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/backtest/runs?limit=20`);
+      const response = await apiFetch(`/api/backtest/runs?limit=20`);
       const payload = await response.json();
       setRuns(payload.runs || []);
     } catch {
@@ -136,7 +136,7 @@ export function Backtest() {
 
   const openRun = useCallback(async (runId: string) => {
     try {
-      const response = await fetch(`${API_BASE}/api/backtest/runs/${encodeURIComponent(runId)}`);
+      const response = await apiFetch(`/api/backtest/runs/${encodeURIComponent(runId)}`);
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || response.statusText);
       setActive(payload);
@@ -224,7 +224,7 @@ export function Backtest() {
       const weights = resolveWeights();
       if (weights) body.weights = weights;
 
-      const response = await fetch(`${API_BASE}/api/backtest`, {
+      const response = await apiFetch(`/api/backtest`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
