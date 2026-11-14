@@ -49,7 +49,7 @@
 **说明**: Phase 0/1/1.5/2/3A 已落地；剩余是把"闸门有效"从"拦住了坏因子"推进到"好因子在严格 OOS 上站得住"。
 - [x] **真 OOS 闭环复验**: 2025-07→2026-11 一次性 holdout（mine 2023-04→2024-12、验证 2025H1、787 次评估）。4 个候选 → 2 INSPECTED；OOS IC 同向显著（\|t\| 4.17–5.45，无翻转），但含成本组合 **-6.40%**、零成本 +2.22%；被拒因子反而净 +23.35%。结论：闸门能防"OOS 方向翻转/IC 崩塌"，不能排序经济价值。报告 `user_workspace/reports/p0_holdout/README.md`。
 - [x] **收益口径成本闸门（P0.5）**: `cost_adj_return` 改为分位多空组合的每期净收益（gross 1.0、美元中性、18 bp 往返成本、调仓频率默认 = `target.horizon_bars`），新增 `ls_return/ls_cost/ls_turnover/ls_sharpe/ls_t` 落库与可选 `ls_t_min` 闸门。复判 P0 四因子 **0/4 通过**，旧闸门放行的两个（毛收益为正、被换手吃光）被精确拦下。核心结论：必须在交易周期上挖（1 日目标 + 20 币的年化换手成本 6–17% 大于可得边际）。报告 `user_workspace/reports/p0_5_return_gate.md`。
-- [ ] **P0.5 正向验证**: 用 2026-12 之后的新区间做预注册实验，验证新闸门放行的因子在 OOS 确实为正（2025-07→2026-11 已消耗，不可复用）。
+- [ ] **P0.5 正向验证**: 用 2026-12 之后的新区间做预注册实验，验证新闸门放行的因子在 OOS 确实为正（2025-07→2026-11 已消耗，不可复用）。窗口定义在 `user_workspace/experiment_window.json`，进度条见 `/data` 页顶部（当前 0/90 根，ETA 2027-02-28）。
 - [x] **幅度感知筛选**: DSR 改为折减**策略净 Sharpe**（`sr = cost_adj_return / ls_vol`）而非 IC-IR。代价是门槛变硬：787 次试验 × 610 个观测下，基准日 Sharpe 0.148（折年化 2.35），即搜索预算本身决定了要多强的策略才算显著。报告 `user_workspace/reports/p1_gate_upgrades.md`。
 - [x] **单标的时序闸门**: Series 走 `_build_temporal_verdict` —— 滚动分位择时（252 根、只用当期信息）→ 净收益序列 → NW-HAC t + DSR，附 `ls_exposure`。BTC 1d 实测：12 个候选首次拿到真实判决，最好 t=2.31 / p=0.021 / OOS RankIC 0.121（此前恒为 t=0/p=1）。
 - [x] **全库重审**: `scripts/reaudit_factor_db.py` 重算 84 个存量因子 → **0 通过**，6 个旧 `INSPECTED` 全部降级为 `DISCOVERED_UNVERIFIED`（备份 `factor_db/metadata_pre_reaudit/`）。分母敏感性 84/20/6 均 0 通过、n_trials=1 仅 1/84 —— 主因是成本后为负。报告 `user_workspace/reports/factor_db_reaudit.md`。
@@ -57,6 +57,15 @@
 - [x] **DSR 真实多重检验分母**: 已修 `n_trials=1` 的空转问题 —— 评估器累计 `total_evaluated`，导演以 `trace.num_trials + 本轮评估数` 重算 DSR 并写回 `dsr/n_trials`（新增回归测试）。
 - [x] **假设预算上报**: `FdrLedger.budget_report()` 输出累计假设数 / 运行轮数 / 预算使用率 / 当前 DSR 门槛（`multiple_testing_bar`）。真实跑 2 代后打印：**99 tests → 基准 0.159 每期 SR（年化 2.52）**。预算达 80% 时告警，并提供 `GET /api/gates/budget`。
 - [x] **挖掘前数据质量闸门**: `core/data_feed/panel_validator.py` 在首次 `get_data()` 时校验重复时间戳、索引乱序、K 线缺口、覆盖率、全空/常数标的与极端收益。critical 默认告警，`data_quality.strict=true` 时直接拒跑——正是这条能挡住当初混进 holdout 的 31 根重复 K 线。真实 20 币面板实测通过（366 bars / 0 重复 / 0 缺口 / 覆盖率 100%）。
+
+### 3c. **运维与部署闭环** (完成)
+**优先级**: 中
+**说明**: 研究闭环已经稳定，缺的是"没人看着也能跑对"的部分——数据是否还新、失败会不会被发现、换台机器能不能起来。
+- [x] **数据新鲜度视图**: `core/data_feed/freshness.py` 扫描 `data/<exchange>/<trade_type>/*.feather`，按周期阈值（`1d` 2 天、日内 1 天）判定滞后，并按周期拆分汇总（避免一根停更的 15m 文件被读成"整个库坏了"）。`GET /api/data/freshness` + `/data` 页顶部面板。真实库实测：35 个文件 / 20 个日线标的（全部 lag=1）/ 15 个 2025-08 停更的日内探索文件。
+- [x] **预注册窗口进度**: `user_workspace/experiment_window.json` 定义下一个验证窗口，接口计算 accumulated/remaining/coverage/ETA，界面显示进度条而不是靠记忆——这是"干净 holdout"与"偷看"之间唯一的屏障。
+- [x] **增量数据更新脚本**: `scripts/update_data.py` 只补尾部（每个标的从最后一根到 T-1），幂等空跑、3 次指数退避重试、裁剪截止日之后的未收盘 K 线、JSON 报告 + 失败退出码 1。真实补数实测裁掉 652 根越界数据；同时修掉"新标的被静默跳过却报成功"的 bug 与下载器写死落盘目录的问题。
+- [x] **GitHub Actions CI**: `.github/workflows/ci.yml`，Python 3.12 跑全量测试、Node 20 构建前端；`requirements.txt` 把 `ml4t-backtest` 改为指向固定提交的公开仓库，CI 与本地使用同一份回测引擎。
+- [x] **Docker 容器化**: 多阶段 `Dockerfile`（`frontend` → `api` / `web` 两个 target）+ `docker-compose.yml`，API 单 worker（任务状态在内存）、nginx 托管 SPA、四个状态目录 bind mount。`docker compose config` 已校验；**镜像构建需在有 Docker daemon 的机器上跑一次确认**。
 
 ### 4. **Factor Inspector 审查台** (Phase II 完成)
 **优先级**: 高

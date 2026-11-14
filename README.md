@@ -143,7 +143,7 @@ WebUI 将“配置一次、执行可观测、产物可审查”串成研究闭�
 - **Mining Launchpad**（`/launchpad`）：选择范式与配置，发起任务，并从 Tracker 打开实时日志和结果；运行中可随时停止（在 epoch 边界优雅退出）。
 - **Factor Inspector**（`/inspector`）：浏览已持久化因子，审查逻辑、指标、来源和生命周期状态。
 - **Portfolio Backtest**（`/backtest`）：点选因子、配置成本与持仓，跑事件驱动多空组合，看净值、回撤与核心指标。存储的线性组合因子会自动展开为成员并沿用 AlphaPool 拟合权重。
-- **Data Center**（`/data`）：查看数据覆盖范围并下载数据。
+- **Data Center**（`/data`）：查看本地库新鲜度（按周期拆分的滞后文件、预注册实验窗口进度），并下载数据。
 
 ![Research Dashboard（中文）](docs/assets/web-dashboard-zh.jpg)
 
@@ -267,6 +267,51 @@ factorminer backtest --db-root factor_db_oos --orientation-db-root factor_db \
 python -m core.cli mine --miner MyCustomGP --config user_workspace/configs/configGP.json --user-dir user_workspace
 python -m core.cli inspect --factor "fac_dc9b98d8" --pairs "BTC/USDT:USDT"
 ~~~
+
+### 数据更新与新鲜度
+
+`/data` 页顶部读取 `GET /api/data/freshness`，给出本地库的整体状况：文件数、日线标的数、最新一根 K 线，以及**按周期拆分**的滞后文件。滞后阈值按周期区分（`1d` 允许 2 天，日内周期 1 天），这样一根两个月没更新的 `15m` 文件不会被"日线看起来正常"掩盖；反过来，15 个滞后的日内文件也不会被读成"整个库坏了"。
+
+同一接口会读取 `user_workspace/experiment_window.json`，把"下一次预注册验证还差多少根 K 线"画成进度条，而不是依赖记忆：
+
+~~~json
+{ "label": "P0.5 正向验证", "start": "2026-12-01", "min_bars": 90, "timeframe": "1d" }
+~~~
+
+增量补数用 CLI，幂等（已最新则空跑并退出 0，调度器提前触发也不会重复下载）：
+
+~~~bash
+python scripts/update_data.py --dry-run                 # 只报告还差多少，不下载
+python scripts/update_data.py                           # 补到 T-1
+python scripts/update_data.py --until 2026-11-13        # 指定截止日
+python scripts/update_data.py --symbols BTC/USDT:USDT   # 只补单个标的
+~~~
+
+只取尾部：每个标的从自己最后一根 K 线开始，到 T-1 为止。下载器会向前多取，因此落盘前会把晚于截止日的未收盘 K 线裁掉（一次 2025-01 的补数实测裁掉 652 根越界数据）。失败按指数退避重试 3 次，报告写入 `user_workspace/reports/data_updates/`，失败时退出码为 1。
+
+外部调度（推荐用系统任务计划或 cron，不在应用内起定时器）：
+
+~~~bash
+# cron：每天 08:10
+10 8 * * * cd /srv/FactorMiner && venv/bin/python scripts/update_data.py
+~~~
+
+Windows 任务计划程序：程序填 `D:\...\venv\Scripts\python.exe`，参数填 `scripts\update_data.py`，起始目录填仓库根目录。注意必须用装了 `ccxt` 的解释器（项目 `venv`），系统 Python 通常没有。
+
+### 部署（Docker）
+
+~~~bash
+docker compose up -d --build
+~~~
+
+- `api`（:8000）跑 uvicorn **单 worker**：任务状态与 WebSocket 广播都在进程内存里，多 worker 会各自回答一份任务列表。
+- `web`（:5173）用 nginx 托管前端构建产物：`/assets` 长缓存，`index.html` 不缓存，未知路径回落到 `index.html` 以支持前端路由。
+- `data/`、`factor_db/`、`user_workspace/`、`logs/` 都是 bind mount，重建镜像不会丢研究产物。
+- 容器内默认 `FACTORMINER_NO_PROXY=1`（宿主代理的 `127.0.0.1` 在容器里不可达）；需要走宿主代理时注释掉它并设置 `FACTORMINER_PROXY=http://host.docker.internal:7890`。
+
+### 持续集成
+
+`.github/workflows/ci.yml` 在两个 job 上验证改动：Python 3.12 跑 `pytest tests/`，Node 20 跑 `npm ci && npm run build`（`tsc -b` 先行，类型错误会让 job 失败）。`ml4t-backtest` 不在 PyPI，`requirements.txt` 直接指向固定提交的公开仓库，因此 CI 与本地用的是同一份回测引擎代码。
 
 ---
 
