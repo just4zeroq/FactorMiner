@@ -2,6 +2,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, BackgroundTasks, HT
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from api.ws_manager import manager
+from api.task_store import TaskStore, MiningCancelled, request_cancel, check_cancelled
 import asyncio
 import random
 import time
@@ -13,8 +14,27 @@ from pathlib import Path
 
 app = FastAPI(title="FactorMiner V4 API")
 
+
 class TaskManager:
+    """Dict-shaped task registry mirrored to .workbuddy/tasks.json."""
+
     tasks = {}
+    store = TaskStore()
+
+    @classmethod
+    def load(cls):
+        cls.store.load(cls.tasks)
+
+    @classmethod
+    def persist(cls, force: bool = False):
+        cls.store.flush(cls.tasks, force=force)
+
+    @classmethod
+    def get(cls, task_id: str):
+        return cls.tasks.get(task_id)
+
+
+TaskManager.load()
 
 class LaunchRequest(BaseModel):
     miner: str
@@ -38,6 +58,25 @@ class BatchLifecycleUpdateRequest(BaseModel):
 
 class CompareFactorsRequest(BaseModel):
     factor_ids: list[str]
+
+class BacktestRequest(BaseModel):
+    factor_ids: list[str]
+    weights: dict[str, float] | None = None
+    start: str | None = None
+    end: str | None = None
+    db_root: str = "factor_db"
+    orientation_db_root: str | None = None
+    data_root: str = "data"
+    exchange: str = "binance"
+    timeframe: str = "1d"
+    trade_type: str = "futures"
+    initial_cash: float = 1_000_000.0
+    commission_rate: float = 0.0004
+    slippage_rate: float = 0.0005
+    funding_rate: float = 0.0001
+    n_long: int = 5
+    n_short: int = 5
+    rebalance_every: int = 5
 
 LIFECYCLE_STATUSES = {"DISCOVERED", "INSPECTED", "PAPER_TRADING", "LIVE", "RETIRED"}
 
@@ -312,7 +351,10 @@ async def get_dashboard():
 
     tasks = list(TaskManager.tasks.values())
     recent_tasks = sorted(tasks, key=lambda task: task["start_time"], reverse=True)[:6]
-    task_statuses = {status: 0 for status in ("running", "completed", "completed_empty", "failed")}
+    task_statuses = {
+        status: 0
+        for status in ("running", "completed", "completed_empty", "failed", "cancelled", "interrupted")
+    }
     for task in tasks:
         task_statuses[task.get("status", "failed")] = task_statuses.get(task.get("status", "failed"), 0) + 1
 
@@ -467,12 +509,26 @@ async def launch_mining(req: LaunchRequest, background_tasks: BackgroundTasks):
         "logs": [],
     }
     TaskManager.tasks[task_id] = task_data
+    TaskManager.persist(force=True)
     
     # Broadcast new task immediately
     await manager.broadcast({"type": "task_update", "task": task_data})
     
     background_tasks.add_task(run_mining_task_background, task_id, req.miner, req.config)
     return {"task_id": task_id}
+
+@app.post("/api/tasks/{task_id}/cancel")
+async def cancel_mining_task(task_id: str):
+    """Ask a running task to stop at the next epoch boundary."""
+    task = TaskManager.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"Unknown task: {task_id}")
+    if not request_cancel(task):
+        return {"task_id": task_id, "status": task.get("status"), "cancelled": False}
+    task["error_msg"] = None
+    await manager.broadcast({"type": "task_update", "task": task})
+    TaskManager.persist(force=True)
+    return {"task_id": task_id, "status": task.get("status"), "cancelled": True}
 
 async def run_mining_task_background(task_id: str, miner_name: str, config_name: str):
     import json
@@ -512,6 +568,9 @@ async def run_mining_task_background(task_id: str, miner_name: str, config_name:
         task_logger.addHandler(ws_handler)
     
     def progress_callback(epoch, max_epoch, best_factor):
+        # Cooperative cancellation: the callback fires once per epoch, which is
+        # the cheapest safe boundary to stop at (no half-written factor row).
+        check_cancelled(task)
         progress = int((epoch / max_epoch) * 100) if max_epoch > 0 else 0
         task["progress"] = progress
         
@@ -539,6 +598,8 @@ async def run_mining_task_background(task_id: str, miner_name: str, config_name:
             manager.broadcast({"type": "task_update", "task": task}),
             main_loop
         )
+        # Throttled (5s) so progress survives a restart without hammering disk.
+        TaskManager.persist()
 
     try:
         config_path = os.path.join("user_workspace", "configs", config_name)
@@ -587,6 +648,10 @@ async def run_mining_task_background(task_id: str, miner_name: str, config_name:
             task["result_count"] = 0
             task["error_msg"] = "任务正常结束，但没有产生可保存的有效因子。请检查执行日志、数据和筛选条件。"
             
+    except MiningCancelled:
+        task["status"] = "cancelled"
+        task["error_msg"] = "任务已被用户手动停止。已完成的 epoch 结果仍保存在 factor_db 中。"
+
     except Exception as e:
         task["status"] = "failed"
         task["error_msg"] = str(e) + "\n" + traceback.format_exc()
@@ -597,6 +662,7 @@ async def run_mining_task_background(task_id: str, miner_name: str, config_name:
             task_logger.setLevel(previous_logger_levels[task_logger])
         elapsed = time.time() - start_time
         task["duration"] = f"{int(elapsed // 60)}m {int(elapsed % 60)}s"
+        TaskManager.persist(force=True)
         try:
             # Need a hack to broadcast from this async context
             await manager.broadcast({"type": "task_update", "task": task})
@@ -740,6 +806,39 @@ async def run_batch_download_task_background(task_id: str, exchange: str, symbol
             callback(100, f"Error: {str(e)}")
             
         current_task += 1
+
+@app.post("/api/backtest")
+async def create_backtest(req: BacktestRequest):
+    """Queue an event-driven cross-sectional backtest over stored factors."""
+    from api import backtest_runs
+
+    try:
+        status = backtest_runs.start_run(req.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return status
+
+@app.get("/api/backtest/runs")
+async def list_backtest_runs(limit: int = 30):
+    from api import backtest_runs
+
+    return {"runs": backtest_runs.list_runs(limit=limit)}
+
+@app.get("/api/backtest/runs/{run_id}")
+async def get_backtest_run(run_id: str):
+    from api import backtest_runs
+
+    try:
+        return backtest_runs.get_run(run_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"Unknown backtest run: {run_id}") from exc
+
+@app.get("/api/gates/budget")
+async def get_hypothesis_budget(n_obs: int | None = None, budget: int | None = None):
+    """Cumulative multiple-testing budget and the Sharpe bar it implies."""
+    from core.evaluation.experiment_trace import FdrLedger
+
+    return FdrLedger().budget_report(n_obs=n_obs, budget=budget)
 
 @app.websocket("/ws/monitor")
 async def websocket_endpoint(websocket: WebSocket):
