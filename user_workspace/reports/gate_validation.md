@@ -15,12 +15,12 @@
 
 | 因子 | 样本内RankIC | OOS RankIC | HAC t | DSR | 成本后收益 | OOS一致 | OOS强度 | 闸门结论 |
 |---|---|---|---|---|---|---|---|---|
-| fac_c25e28c3 | 0.0673 | 0.0576 | 3.34 | 0.413 | -0.0002 | True | True | DISCOVERED_UNVERIFIED |
-| fac_8af952ab | 0.0647 | 0.0555 | 3.40 | 0.443 | -0.0004 | True | True | DISCOVERED_UNVERIFIED |
-| fac_b66d17ce | 0.0633 | 0.0545 | 3.09 | 0.349 | -0.0001 | True | True | DISCOVERED_UNVERIFIED |
-| fac_099a7eef | 0.0489 | 0.0254 | 3.71 | 0.403 | 0.0000 | True | True | DISCOVERED_UNVERIFIED |
-| fac_f20a1349 | 0.0403 | 0.0573 | 3.29 | 0.395 | -0.0005 | True | True | DISCOVERED_UNVERIFIED |
-| fac_2017455e | 0.0420 | 0.0013 | 3.23 | 0.248 | 0.0002 | True | False | DISCOVERED_UNVERIFIED |
+| fac_c25e28c3 | 0.0673 | 0.0576 | 3.34 | 0.000 | -0.0002 | True | True | DISCOVERED_UNVERIFIED |
+| fac_8af952ab | 0.0647 | 0.0555 | 3.40 | 0.000 | -0.0004 | True | True | DISCOVERED_UNVERIFIED |
+| fac_b66d17ce | 0.0633 | 0.0545 | 3.09 | 0.000 | -0.0001 | True | True | DISCOVERED_UNVERIFIED |
+| fac_099a7eef | 0.0489 | 0.0254 | 3.71 | 0.001 | 0.0000 | True | True | DISCOVERED_UNVERIFIED |
+| fac_f20a1349 | 0.0403 | 0.0573 | 3.29 | 0.000 | -0.0005 | True | True | DISCOVERED_UNVERIFIED |
+| fac_2017455e | 0.0420 | 0.0013 | 3.23 | 0.003 | 0.0002 | True | False | DISCOVERED_UNVERIFIED |
 
 ## 逐因子拦截原因
 - **fac_c25e28c3**：DSR<0.90（无真 alpha）；成本后收益<=0（无 alpha） → DISCOVERED_UNVERIFIED

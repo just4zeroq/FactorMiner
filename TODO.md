@@ -50,10 +50,10 @@
 - [x] **真 OOS 闭环复验**: 2025-07→2026-11 一次性 holdout（mine 2023-04→2024-12、验证 2025H1、787 次评估）。4 个候选 → 2 INSPECTED；OOS IC 同向显著（\|t\| 4.17–5.45，无翻转），但含成本组合 **-6.40%**、零成本 +2.22%；被拒因子反而净 +23.35%。结论：闸门能防"OOS 方向翻转/IC 崩塌"，不能排序经济价值。报告 `user_workspace/reports/p0_holdout/README.md`。
 - [x] **收益口径成本闸门（P0.5）**: `cost_adj_return` 改为分位多空组合的每期净收益（gross 1.0、美元中性、18 bp 往返成本、调仓频率默认 = `target.horizon_bars`），新增 `ls_return/ls_cost/ls_turnover/ls_sharpe/ls_t` 落库与可选 `ls_t_min` 闸门。复判 P0 四因子 **0/4 通过**，旧闸门放行的两个（毛收益为正、被换手吃光）被精确拦下。核心结论：必须在交易周期上挖（1 日目标 + 20 币的年化换手成本 6–17% 大于可得边际）。报告 `user_workspace/reports/p0_5_return_gate.md`。
 - [ ] **P0.5 正向验证**: 用 2026-12 之后的新区间做预注册实验，验证新闸门放行的因子在 OOS 确实为正（2025-07→2026-11 已消耗，不可复用）。
-- [ ] **幅度感知筛选**: DSR/IR 偏向"稳定但很小"的 IC（0.050/IR 0.26）而拒掉幅度更大的 0.088/IR 0.22；组合层应同时约束 mean \|IC\| 或尾部价差。
-- [ ] **单标的时序闸门**: 当前 sequential_single 的 verdict 恒为中性（hac_t=0/p=1），导致 RL/NN/单币 GP 因子永远无法晋升；需补滚动 Spearman IC → NW-HAC t → DSR 的时序评估路径。
-- [ ] **全库重审**: 对 `factor_db` 84 个因子重算 verdict，把 6 个旧 `INSPECTED` 按新闸门降级（先只读报告，确认后备份并写回）。
-- [ ] **累积 FDR**: BH-FDR 目前只在本轮保存的候选内校正；让 `ExperimentTrace` 记录 raw `p_value`，对跨轮全部 trial 做累积 FDR。
+- [x] **幅度感知筛选**: DSR 改为折减**策略净 Sharpe**（`sr = cost_adj_return / ls_vol`）而非 IC-IR。代价是门槛变硬：787 次试验 × 610 个观测下，基准日 Sharpe 0.148（折年化 2.35），即搜索预算本身决定了要多强的策略才算显著。报告 `user_workspace/reports/p1_gate_upgrades.md`。
+- [x] **单标的时序闸门**: Series 走 `_build_temporal_verdict` —— 滚动分位择时（252 根、只用当期信息）→ 净收益序列 → NW-HAC t + DSR，附 `ls_exposure`。BTC 1d 实测：12 个候选首次拿到真实判决，最好 t=2.31 / p=0.021 / OOS RankIC 0.121（此前恒为 t=0/p=1）。
+- [x] **全库重审**: `scripts/reaudit_factor_db.py` 重算 84 个存量因子 → **0 通过**，6 个旧 `INSPECTED` 全部降级为 `DISCOVERED_UNVERIFIED`（备份 `factor_db/metadata_pre_reaudit/`）。分母敏感性 84/20/6 均 0 通过、n_trials=1 仅 1/84 —— 主因是成本后为负。报告 `user_workspace/reports/factor_db_reaudit.md`。
+- [x] **累积 FDR**: `ParallelEvaluator.run_p_values` 累计所有成功评估候选的原始 p；新增 `FdrLedger`（`.fdr_ledger.jsonl`，按 run_id 幂等）；BH 作用于历史 + 本轮全部假设（冒烟校验 10 个假设时 p 0.000532 → p_adj 0.005321）。
 - [x] **DSR 真实多重检验分母**: 已修 `n_trials=1` 的空转问题 —— 评估器累计 `total_evaluated`，导演以 `trace.num_trials + 本轮评估数` 重算 DSR 并写回 `dsr/n_trials`（新增回归测试）。
 
 ### 4. **Factor Inspector 审查台** (Phase II 完成)

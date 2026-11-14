@@ -71,10 +71,10 @@
 |---|---|---|---|
 | **P0** | ~~**真 OOS 闭环复验**~~ ✅ 已完成（见 Phase 4） | 2025-07→2026-11 一次性 holdout：2/4 通过闸门；OOS IC 同向显著（t 4.2–5.5），但含成本组合 -6.4%，被拒因子 +23.4%。结论：闸门能防假阳性，不能排序经济价值。 | `user_workspace/reports/p0_holdout/README.md` |
 | **P0.5** | ~~**收益口径的成本闸门**~~ ✅ 已完成（见 `reports/p0_5_return_gate.md`） | `cost_adj_return` 改为分位多空组合的**每期净收益**（gross 1.0、美元中性、18 bp 单边往返成本、调仓频率默认 = `target.horizon_bars`）。用新口径复判 P0 四因子：**0/4 通过**，旧闸门放行的两个（毛收益为正、被换手吃光）被精确拦下。核心结论：**必须在交易周期上挖**，1 日目标 + 20 币的换手成本（年化 6–17%）大于可得边际。正向验证仍需 2026-12 之后的新数据预注册。 | `core/evaluation/portfolio_eval.py` + `evaluator.py` + `significance.py` |
-| **P1** | **幅度感知筛选** | DSR/IR 奖励稳定性，本次偏向"稳定但很小"的 IC（0.050/IR 0.26）而拒掉幅度更大的 0.088/IR 0.22。组合层应同时约束 mean \|IC\| 或尾部价差。 | `AlphaPool` / 闸门 |
-| **P1** | **单标的时序闸门** | `_build_verdict` 对非 `(T,N)` 面板返回中性 verdict（hac_t=0、p=1），导致 sequential_single 挖出的因子**永远无法晋升**，RL/NN/temporal/单币 GP 全部受影响。需补时序 IC 的 HAC t（滚动 Spearman → NW t）与 DSR。 | `core/evaluation/evaluator.py` + `significance.py` |
-| **P1** | **全库重审** | `factor_db` 84 个因子中 6 个仍是 `INSPECTED`，但 Phase 1 已判它们不过闸门；其余 78 个 metadata 没有 `hac_t/p_value/dsr`。需要一次性重算 verdict 并降级（先出只读报告，确认后再写回 + 备份）。 | `scripts/reaudit_factor_db.py` |
-| **P1** | **累积 FDR** | BH-FDR 只在"本轮保存的候选"内校正（通常 2–6 个），没覆盖跨轮全部 trial；trace 目前只存 `p_adj`，无法回溯。应记录 raw `p_value` 并对累积 trial 做 FDR。 | `experiment_trace.py` + `significance.py` |
+| **P1** | ~~**幅度感知筛选**~~ ✅ 已完成 | DSR 改为折减**策略净 Sharpe**（`sr = cost_adj_return / ls_vol`）而非 IC-IR：IC-IR 无量纲，奖励"稳定但很小"的因子；策略 Sharpe 随真实边际增大。副作用是门槛显著变硬 —— 787 次试验下需要年化 SR ≳ 2.3 才能过 DSR 0.90，这是多重检验的真实代价。 | `core/evaluation/evaluator.py` + `significance.py` |
+| **P1** | ~~**单标的时序闸门**~~ ✅ 已完成 | `_build_verdict` 对 Series 走 `_build_temporal_verdict`：滚动分位择时（默认 252 根、只用到当期）→ 净收益序列 → NW t + DSR，另出 `ls_exposure`。BTC 1d 实测 12 个候选全部拿到真实判决（此前恒为 t=0/p=1），最好一个 t=2.31 / p=0.021 / OOS RankIC 0.121，仅差 DSR。 | `core/evaluation/portfolio_eval.py`（`timing_returns`）+ `evaluator.py` |
+| **P1** | ~~**全库重审**~~ ✅ 已完成 | `scripts/reaudit_factor_db.py`（默认只读 / `--apply` 备份后写回）重算 84 个存量因子：**0 个通过**，6 个旧 `INSPECTED` 全部降级。分母敏感性：n_trials=84/20/6 均 0 通过，即使关掉多重检验也只有 1/84 —— 主要拦截原因是成本后为负。报告 `reports/factor_db_reaudit.md`。 | `factor_db/metadata_pre_reaudit/` 备份 |
+| **P1** | ~~**累积 FDR**~~ ✅ 已完成 | `ParallelEvaluator.run_p_values` 累计所有成功评估候选的原始 p（含未入短名单）；新增 `FdrLedger`（`.fdr_ledger.jsonl`，按 run_id 幂等）；`apply_promotion_gates(family_p_values=...)` 让 BH 作用于历史全部 + 本轮全部假设。冒烟校验：10 个假设时最小 p 0.000532 → p_adj 0.005321（×10）。 | `experiment_trace.py` + `significance.py` + `director.py` |
 | **P2** | **相关性软去重** | `DiversityFilter` 只有源码 MD5 硬去重，docstring 承诺的"相关性去冗余 + 与历史库正交性"仍是占位。可复用 `AlphaPool` 的 mutual-IC / `_safe_pearson`，只对通过初筛的候选算，避免全量因子值开销。 | `core/miner/paradigms/base.py` |
 | **P2** | **评估超时与资源边界** | `max_workers` 已可配（1–64），但 `executor.map` 无单任务超时/取消：一个卡死的因子会拖住整轮。需 per-task timeout + 异常回收。 | `core/evaluation/evaluator.py` |
 | **P3** | **Inspector 组合回测/归因** | 已有快照与滚动 IC，缺分位组合净值、交易成本、行业/市场中性化与 NN 归因。 | `core/inspector/*` + Web |
