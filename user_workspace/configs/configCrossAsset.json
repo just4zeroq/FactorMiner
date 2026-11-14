@@ -1,0 +1,85 @@
+{
+  "_comment": "多资产截面因子挖掘。要求 pairs 中所有交易对在同一 timeframe、同一 mine/test 区间都有数据，否则 pivot 后会出现 NaN 拉低截面 IC。当前 20 币 1d 数据已下载齐备，共同覆盖自 2023-03-23 起（ARB 上市最晚），mine/test 区间均落在共同区间内。",
+  "_comment_universe": "当前 20 个 USDT 永续：BTC, ETH, SOL, BNB, XRP, DOGE, ADA, AVAX, LINK, DOT, LTC, TRX, ATOM, NEAR, APT, ARB, OP, INJ, FIL, ETC。扩容时先下载同一 1d 区间再追加到 pairs。",
+  "_comment_mode": "cross_asset = 所有资产合成 time x asset 宽表，用横截面 IC 评分；改成 sequential_single 则 Web 端只用 pairs[0]，CLI 端会逐币各挖一轮。",
+  "population_size": 60,
+  "max_iterations": 20,
+  "search_space": {
+    "allowed_operators": [
+      "add",
+      "sub",
+      "mul",
+      "div",
+      "ts_mean",
+      "ts_std",
+      "custom_ts_decay",
+      "ts_zscore_20",
+      "ts_delta_5",
+      "ts_rank_20",
+      "ts_volatility_20"
+    ]
+  },
+  "fitness": {
+    "hook": "my_bear_market_hunter"
+  },
+  "target": {
+    "type": "forward_return",
+    "horizon_bars": 1
+  },
+  "llm_api_config": {
+    "keys": ["sk-your_api_key_1"],
+    "base_url": "https://api.openai.com/v1/chat/completions",
+    "model": "gpt-4",
+    "max_concurrency": 2
+  },
+  "storage": {
+    "db_root": "factor_db"
+  },
+  "data_feeds": {
+    "required_streams": [
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "exchange": "binance",
+    "instrument_type": "futures",
+    "timeframe": "1d",
+    "pairs": [
+      "BTC/USDT:USDT",
+      "ETH/USDT:USDT",
+      "SOL/USDT:USDT",
+      "BNB/USDT:USDT",
+      "XRP/USDT:USDT",
+      "DOGE/USDT:USDT",
+      "ADA/USDT:USDT",
+      "AVAX/USDT:USDT",
+      "LINK/USDT:USDT",
+      "DOT/USDT:USDT",
+      "LTC/USDT:USDT",
+      "TRX/USDT:USDT",
+      "ATOM/USDT:USDT",
+      "NEAR/USDT:USDT",
+      "APT/USDT:USDT",
+      "ARB/USDT:USDT",
+      "OP/USDT:USDT",
+      "INJ/USDT:USDT",
+      "FIL/USDT:USDT",
+      "ETC/USDT:USDT"
+    ],
+    "mine_period": [
+      [
+        "2024-01-01",
+        "2024-12-31"
+      ]
+    ],
+    "test_period": [
+      [
+        "2025-01-01",
+        "2025-06-30"
+      ]
+    ],
+    "mining_mode": "cross_asset"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "_comment": "Temporary P0 integration test config (throwaway db_root).",
+  "population_size": 12,
+  "max_iterations": 2,
+  "data_feeds": {
+    "required_streams": ["open", "high", "low", "close", "volume"],
+    "exchange": "binance",
+    "instrument_type": "futures",
+    "timeframe": "1d",
+    "pairs": ["BTC/USDT:USDT"],
+    "mine_period": [["2024-01-01", "2024-06-30"]],
+    "test_period": [["2024-07-01", "2024-12-31"]],
+    "mining_mode": "sequential_single"
+  },
+  "search_space": {
+    "allowed_operators": ["add", "sub", "mul", "div", "ts_mean", "ts_zscore", "ts_rank", "ts_delta", "signed_power"],
+    "terminals": ["close", "open", "high", "low", "volume"]
+  },
+  "gp": {"max_depth": 3, "windows": [5, 10, 20], "powers": [1.0, 2.0], "parsimony": 0.05},
+  "fitness": {},
+  "evaluation": {"max_workers": 4},
+  "storage": {"db_root": "user_workspace/_p0_test_db"}
+}

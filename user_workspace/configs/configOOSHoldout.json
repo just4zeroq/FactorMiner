@@ -1,0 +1,128 @@
+{
+  "_comment": "P0 真 OOS 复验：mine 2023-04→2024-12（20 币共同起点 2023-03-23 之后），validation 2025H1（挖掘期用于 OOS fitness / 闸门强度），strict holdout 2025-07→2026-11 从未被任何实验使用，只在最后一次性回测。",
+  "_comment_holdout": "strict_holdout 由 HoldoutLedger 记录一次性揭示；重复/重叠揭示会抛异常。",
+  "_comment_gates": "evaluation.gates 现在会真正传入 promotion_gates（此前被忽略）。DSR 用 trace.num_trials + 本轮评估数作分母。",
+  "population_size": 60,
+  "max_iterations": 20,
+  "survival_count": 30,
+  "gp": {
+    "max_depth": 4,
+    "crossover_prob": 0.75,
+    "mutation_prob": 0.30,
+    "elite_count": 6
+  },
+  "search_space": {
+    "allowed_operators": [
+      "add",
+      "sub",
+      "mul",
+      "div",
+      "ts_mean",
+      "ts_std",
+      "ts_zscore",
+      "ts_rank",
+      "ts_delta",
+      "ts_momentum",
+      "ts_min",
+      "ts_max",
+      "ts_decay_linear",
+      "ts_ema",
+      "ts_sum",
+      "ts_var",
+      "ts_median",
+      "ts_skew",
+      "ts_realized_vol",
+      "ts_rsi",
+      "ts_ma_ratio",
+      "ts_corr",
+      "ts_cov",
+      "ts_regression",
+      "cs_rank",
+      "cs_zscore",
+      "cs_neutralize",
+      "cs_mad",
+      "abs",
+      "sign",
+      "log1p_abs",
+      "signed_power",
+      "tanh"
+    ]
+  },
+  "fitness": {
+    "turnover_penalty": 0.0,
+    "coverage_floor": 0.20
+  },
+  "target": {
+    "type": "forward_return",
+    "horizon_bars": 1
+  },
+  "storage": {
+    "db_root": "factor_db_p0"
+  },
+  "evaluation": {
+    "max_workers": 8,
+    "gates": {
+      "strict_holdout": {
+        "period_key": "holdout_2025H2_2026",
+        "start": "2025-07-01",
+        "end": "2026-11-13"
+      },
+      "holdout_path": "user_workspace/.holdout_ledger_p0.json",
+      "trace_path": "user_workspace/.experiment_trace_p0.jsonl",
+      "hac_t_min": 2.0,
+      "fdr_max": 0.05,
+      "dsr_min": 0.90,
+      "require_oos_consistent": true,
+      "require_cost_adj_positive": true,
+      "require_oos_strength": true,
+      "oos_rankic_min": 0.02
+    }
+  },
+  "data_feeds": {
+    "required_streams": [
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "exchange": "binance",
+    "instrument_type": "futures",
+    "timeframe": "1d",
+    "pairs": [
+      "BTC/USDT:USDT",
+      "ETH/USDT:USDT",
+      "SOL/USDT:USDT",
+      "BNB/USDT:USDT",
+      "XRP/USDT:USDT",
+      "DOGE/USDT:USDT",
+      "ADA/USDT:USDT",
+      "AVAX/USDT:USDT",
+      "LINK/USDT:USDT",
+      "DOT/USDT:USDT",
+      "LTC/USDT:USDT",
+      "TRX/USDT:USDT",
+      "ATOM/USDT:USDT",
+      "NEAR/USDT:USDT",
+      "APT/USDT:USDT",
+      "ARB/USDT:USDT",
+      "OP/USDT:USDT",
+      "INJ/USDT:USDT",
+      "FIL/USDT:USDT",
+      "ETC/USDT:USDT"
+    ],
+    "mine_period": [
+      [
+        "2023-04-01",
+        "2024-12-31"
+      ]
+    ],
+    "test_period": [
+      [
+        "2025-01-01",
+        "2025-06-30"
+      ]
+    ],
+    "mining_mode": "cross_asset"
+  }
+}
