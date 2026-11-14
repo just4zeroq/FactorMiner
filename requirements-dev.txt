@@ -1,0 +1,6 @@
+# Development / CI dependencies (not required to run the engine).
+# Install with: pip install -r requirements.txt -r requirements-dev.txt
+
+pytest>=7.4.0
+# fastapi.testclient needs httpx; without it the API endpoint tests skip.
+httpx>=0.27.0
