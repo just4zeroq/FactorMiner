@@ -30,6 +30,9 @@ class RealDataClient:
         # 预先加载好的缓存
         self._mine_data = None
         self._test_data = None
+        # Pre-mining quality gate: validated once, on the first data access.
+        self._quality_checked = False
+        self.quality_report = None
         
         # 在初始化时一次性加载数据
         self._load_all_data()
@@ -255,11 +258,52 @@ class RealDataClient:
             )
         return df
 
+    def _panel_view(self) -> Any:
+        """The mining panel without the target column (no quality-gate loop)."""
+        if isinstance(self._mine_data, pd.DataFrame):
+            return self._mine_data.drop(columns=["returns"], errors="ignore")
+        if isinstance(self._mine_data, dict):
+            return {key: value for key, value in self._mine_data.items() if key != "returns"}
+        return self._mine_data
+
+    def _ensure_quality_checked(self) -> None:
+        """Run the panel quality gate exactly once per client.
+
+        Doing it lazily (rather than in ``__init__``) keeps the download-only
+        code paths cheap, while still failing before the first evaluation.
+        """
+        if self._quality_checked:
+            return
+        self._quality_checked = True
+        quality_cfg = self.config.get("data_quality") or {}
+        if not quality_cfg.get("check_on_load", True):
+            return
+        try:
+            from core.data_feed.panel_validator import enforce, validate_panel
+
+            report = validate_panel(
+                self._panel_view(),
+                self.get_returns(),
+                timeframe=self.timeframe,
+                quality_cfg=quality_cfg,
+            )
+            self.quality_report = report.as_dict()
+            enforce(report, quality_cfg)
+        except Exception as exc:
+            # A validator bug must never take mining down with it, but the
+            # strict-mode rejection has to surface.
+            from core.data_feed.panel_validator import DataQualityError
+
+            if isinstance(exc, DataQualityError):
+                raise
+            logger.warning("Panel quality check skipped: %s", exc)
+
     def get_data(self) -> Any:
         if self._mine_data is None:
             logger.warning("Mine data is empty!")
             return None
-            
+        self._ensure_quality_checked()
+
         if isinstance(self._mine_data, pd.DataFrame):
             if self._mine_data.empty:
                 logger.warning("Mine data is empty DataFrame!")
