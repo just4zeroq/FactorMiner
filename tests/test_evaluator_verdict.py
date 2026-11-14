@@ -72,6 +72,52 @@ class BuildVerdictTest(unittest.TestCase):
         self.assertGreater(v["cost_adj_return"], 0.0)
         self.assertLess(v["p_value"], 0.05)
 
+    def test_cost_gate_uses_returns_not_ic(self):
+        # Phase P0.5: the cost gate must be denominated in returns. The same
+        # factor (identical statistics) has to pass with cheap trading and fail
+        # once the round-trip cost exceeds its edge. Before this,
+        # cost_adj_return was `mean IC - cost`, a dimensionless number that
+        # could not express "this book does not make money".
+        rng = np.random.default_rng(8)
+        T, N = 250, 30
+        idx = pd.date_range("2020-01-01", periods=T, freq="D")
+        cols = [f"A{i}" for i in range(N)]
+        f = rng.standard_normal((T, N))
+        # realistic crypto scale: ~1% daily vol, a genuine but modest edge
+        r = 0.002 * f + 0.01 * rng.standard_normal((T, N))
+        fdf = pd.DataFrame(f, index=idx, columns=cols)
+        rdf = pd.DataFrame(r, index=idx, columns=cols)
+
+        cheap = ParallelEvaluator(
+            data_client=None, config={"fitness": {"gate_cost_rate": 0.0018}}
+        )._build_verdict(fdf, rdf, {})
+        pricey = ParallelEvaluator(
+            data_client=None, config={"fitness": {"gate_cost_rate": 0.02}}
+        )._build_verdict(fdf, rdf, {})
+
+        # the statistical verdict is untouched by the cost assumption
+        self.assertAlmostEqual(cheap["hac_t"], pricey["hac_t"])
+        self.assertAlmostEqual(cheap["dsr"], pricey["dsr"])
+        # only the economics change
+        self.assertGreater(cheap["cost_adj_return"], 0.0)
+        self.assertLess(pricey["cost_adj_return"], 0.0)
+        self.assertEqual(cheap["ls_return"], pricey["ls_return"])
+
+    def test_verdict_reports_long_short_diagnostics(self):
+        rng = np.random.default_rng(9)
+        T, N = 250, 30
+        idx = pd.date_range("2020-01-01", periods=T, freq="D")
+        cols = [f"A{i}" for i in range(N)]
+        f = rng.standard_normal((T, N))
+        r = 0.4 * f + 0.8 * rng.standard_normal((T, N))
+        fdf = pd.DataFrame(f, index=idx, columns=cols)
+        rdf = pd.DataFrame(r, index=idx, columns=cols)
+        v = self.evalr._build_verdict(fdf, rdf, {})
+        for key in ("ls_return", "ls_sharpe", "ls_turnover", "ls_cost", "ls_t"):
+            self.assertIn(key, v)
+        self.assertGreater(v["ls_return"], 0.0)
+        self.assertGreater(v["ls_turnover"], 0.0)
+
     def test_sequential_mode_neutral(self):
         rng = np.random.default_rng(5)
         T = 200

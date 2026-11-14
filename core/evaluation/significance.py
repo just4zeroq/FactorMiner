@@ -277,6 +277,14 @@ DEFAULT_GATE_CFG = {
     # (oos_enabled), so it is backward-compatible with in-sample-only runs.
     "require_oos_strength": True,
     "oos_rankic_min": 0.02,  # min |RankIC_oos| to retain promotion eligibility
+    # Phase P0.5 — the cost gate is now denominated in *returns*, not IC.
+    # ``cost_adj_return`` is the per-period net return of the quantile
+    # long-short book after turnover costs (see core/evaluation/portfolio_eval).
+    # It must clear this floor, and - optionally - the Newey-West t-stat of
+    # that net return series must clear ``ls_t_min`` (0.0 = only the sign and
+    # the level are enforced; raise to ~1.5 for a stricter production run).
+    "cost_adj_return_min": 0.0,
+    "ls_t_min": 0.0,
 }
 
 
@@ -344,6 +352,7 @@ def apply_promotion_gates(
             "dsr": float(dsr),
             "oos_consistent": bool(m.get("oos_consistent", False)),
             "cost_adj_return": float(m.get("cost_adj_return", 0.0)),
+            "ls_t": float(m.get("ls_t", 0.0)),
             "RankIC_oos": float(m.get("RankIC_oos", 0.0)),
             "oos_enabled": bool(m.get("oos_enabled", False)),
         }
@@ -364,7 +373,8 @@ def promotion_gates(
       * fdr_pass          : BH-adjusted p <= fdr_max
       * dsr_pass          : deflated Sharpe probability >= dsr_min
       * oos_consistent    : OOS sign agrees with in-sample
-      * cost_adj_positive : return after costs still positive
+      * cost_adj_positive : net long-short return after turnover costs > 0
+      * ls_significant    : NW t of that net return >= ls_t_min (default off)
     """
     cfg = {**DEFAULT_GATE_CFG, **(cfg or {})}
     oos_eval = bool(metrics.get("oos_enabled", False))
@@ -376,7 +386,17 @@ def promotion_gates(
         if cfg["require_oos_consistent"]
         else True,
         "cost_adj_positive": (
-            float(metrics.get("cost_adj_return", 0.0)) > 0
+            float(metrics.get("cost_adj_return", 0.0))
+            > float(cfg["cost_adj_return_min"])
+            if cfg["require_cost_adj_positive"]
+            else True
+        ),
+        # The net long-short return must also be positive in a statistical
+        # sense, not just on average. Default 0.0 keeps this silent (the level
+        # gate above already enforces the sign); set ls_t_min ~1.5 for a
+        # stricter mining run.
+        "ls_significant": (
+            float(metrics.get("ls_t", 0.0)) >= float(cfg["ls_t_min"])
             if cfg["require_cost_adj_positive"]
             else True
         ),

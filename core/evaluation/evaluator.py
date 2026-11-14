@@ -22,6 +22,7 @@ from core.evaluation.significance import (
     deflated_sharpe_ratio,
     pvalue_from_t,
 )
+from core.evaluation.portfolio_eval import DEFAULT_LS_CFG, long_short_returns
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,12 @@ DEFAULT_FITNESS_CFG = {
     "turnover_penalty": 0.0,      # normalized-turnover penalty weight (0 = off)
     "turnover_cap": 0.5,          # turnover ratio above this starts to be penalized
     "coverage_floor": 0.20,       # coverage below this is squared-penalized
-    "gate_cost_rate": 0.0,        # per-unit-turnover cost used by cost_adj_return
+    # Round-trip cost charged per unit of portfolio turnover by the
+    # return-denominated gate (Phase P0.5). 18 bp ≈ 4 bp commission +
+    # 5 bp slippage per side.
+    "gate_cost_rate": 0.0018,
+    "gate_ls_quantile": 0.2,      # top/bottom fraction of the long-short book
+    "gate_rebalance_bars": 1,     # book is re-formed every N bars (trading horizon)
 }
 
 
@@ -71,6 +77,30 @@ class ParallelEvaluator:
             raise ValueError(
                 "evaluation.max_workers must be an integer between 1 and 64"
             )
+        self.gate_rebalance_bars = self._resolve_gate_rebalance_bars()
+
+    def _resolve_gate_rebalance_bars(self) -> int:
+        """Trading frequency used by the return-denominated gate.
+
+        The gate must judge the factor at the horizon it was mined for: a
+        1-day target means the book is re-formed every day and pays daily
+        turnover cost. An explicit ``fitness.gate_rebalance_bars`` always wins;
+        otherwise we mirror the configured prediction horizon.
+        """
+        explicit = self.config.get("fitness", {}).get("gate_rebalance_bars")
+        if explicit is not None:
+            try:
+                return max(1, int(explicit))
+            except (TypeError, ValueError):
+                pass
+        spec_getter = getattr(self.data_client, "get_target_spec", None)
+        if callable(spec_getter):
+            try:
+                horizon = int(getattr(spec_getter(), "horizon_bars", 1) or 1)
+                return max(1, horizon)
+            except Exception:  # pragma: no cover - defensive
+                pass
+        return 1
 
     # ------------------------------------------------------------------ #
     # Public entry points
@@ -438,17 +468,42 @@ class ParallelEvaluator:
             ir = mean_ic / std_ic if std_ic > 0 else 0.0
             n_obs = int(ic_ts.size)
             dsr = deflated_sharpe_ratio(sharpe=ir, n_obs=n_obs, n_trials=1)
-            cost_rate = float(cfg.get("gate_cost_rate", 0.0))
-            turnover = float(metrics.get("Turnover", 0.0))
-            cost_adj_return = mean_ic - cost_rate * turnover
+
+            # Phase P0.5 — return-denominated tradability.
+            # `mean IC - cost` mixed an information coefficient with a trading
+            # cost, so it could never answer "does this book make money?".
+            # We now build the actual quantile long-short book (gross 1.0,
+            # 50/50 dollar-neutral) on the oriented factor and charge the cost
+            # of its turnover, so `cost_adj_return` is a per-period net return
+            # that is directly comparable to a backtest.
+            ls = long_short_returns(
+                factor_values,
+                returns,
+                quantile=float(
+                    cfg.get("gate_ls_quantile", DEFAULT_LS_CFG["quantile"])
+                ),
+                orientation=float(orientation),
+                cost_rate=float(cfg.get("gate_cost_rate", 0.0)),
+                annualisation=float(cfg.get("annualisation", 252.0)),
+                rebalance_bars=int(
+                    cfg.get("gate_rebalance_bars") or self.gate_rebalance_bars
+                ),
+            )
             verdict.update({
                 "hac_t": float(hac_t),
                 "p_value": float(p_value),
                 "dsr": float(dsr),
                 "ir": float(ir),
                 "n_obs": n_obs,
-                "cost_adj_return": float(cost_adj_return),
+                "cost_adj_return": float(ls["cost_adj_return"]),
                 "orientation": float(orientation),
+                # Return-space diagnostics (net of turnover cost).
+                "ls_return": float(ls["mean_return"]),
+                "ls_sharpe": float(ls["sharpe"]),
+                "ls_hit": float(ls["hit_rate"]),
+                "ls_turnover": float(ls["turnover"]),
+                "ls_cost": float(ls["cost"]),
+                "ls_t": float(ls["ls_t"]),
             })
         except Exception as exc:  # pragma: no cover - defensive
             logger.debug("verdict skipped: %s", exc)

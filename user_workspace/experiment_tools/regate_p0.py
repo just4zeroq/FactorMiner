@@ -87,7 +87,9 @@ def main() -> None:
             "ir": verdict["ir"],
             "cost_adj": verdict["cost_adj_return"],
             "n_trials": n_trials,
-            "fail": ",".join(k for k, v in g["gate"].items() if v is False) or "-",
+            "fail": ",".join(
+                k for k, v in g["gate"].items() if v is False and k != "pass"
+            ) or "-",
         })
         if args.apply:
             os.makedirs(backup_dir, exist_ok=True)

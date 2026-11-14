@@ -38,6 +38,7 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+from core.evaluation.portfolio_eval import long_short_returns
 from core.evaluation.significance import (
     apply_promotion_gates,
     deflated_sharpe_ratio,
@@ -97,12 +98,26 @@ def _verdict_from_panel(
     std_ic = float(ic_ts.std())
     ir = mean_ic / std_ic if std_ic > 0 else 0.0
     dsr = deflated_sharpe_ratio(sharpe=ir, n_obs=int(ic_ts.size), n_trials=n_trials)
+    # Phase P0.5: the cost gate is denominated in returns, exactly like the
+    # live evaluator. `mean IC - cost` mixed units and could not tell whether
+    # the traded book made money.
+    ls = long_short_returns(
+        factor_wide,
+        ret_wide,
+        quantile=0.2,
+        orientation=float(orientation),
+        cost_rate=0.0018,
+        rebalance_bars=5,
+    )
     return {
         "hac_t": float(hac_t),
         "p_value": float(p_value),
         "dsr": float(dsr),
         "ir": float(ir),
-        "cost_adj_return": float(mean_ic),  # gate_cost_rate defaults to 0
+        "cost_adj_return": float(ls["cost_adj_return"]),
+        "ls_return": float(ls["mean_return"]),
+        "ls_t": float(ls["ls_t"]),
+        "ls_turnover": float(ls["turnover"]),
         "rankic": float(mean_ic),
         "orientation": float(orientation),
     }
