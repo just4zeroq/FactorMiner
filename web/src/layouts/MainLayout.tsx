@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Rocket, FileSearch, Database, LayoutDashboard, Languages } from 'lucide-react';
+import { Rocket, FileSearch, Database, LayoutDashboard, Languages, LineChart } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 export function MainLayout() {
@@ -11,6 +11,7 @@ export function MainLayout() {
     { name: t('nav.launchpad'), path: '/launchpad', icon: Rocket },
     { name: t('nav.data'), path: '/data', icon: Database },
     { name: t('nav.inspector'), path: '/inspector', icon: FileSearch },
+    { name: t('nav.backtest'), path: '/backtest', icon: LineChart },
   ];
 
   return (

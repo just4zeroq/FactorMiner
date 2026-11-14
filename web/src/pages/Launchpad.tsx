@@ -124,6 +124,13 @@ export function Launchpad() {
     .catch(err => console.error('Failed to launch task:', err));
   };
 
+  const cancelTask = (taskId: string) => {
+    fetch(`http://localhost:8000/api/tasks/${taskId}/cancel`, { method: 'POST' })
+      .then(res => res.json())
+      .then(data => console.log('Cancellation requested:', data))
+      .catch(err => console.error('Failed to cancel task:', err));
+  };
+
   const getTaskLogs = (task: any): string[] => taskData[task.id]?.logs || task.logs || [];
 
   return (
@@ -225,11 +232,12 @@ export function Launchpad() {
                 <th className="px-6 py-3 font-medium border-b border-border">Paradigm</th>
                 <th className="px-6 py-3 font-medium border-b border-border">Duration</th>
                 <th className="px-6 py-3 font-medium border-b border-border">Commit Hash</th>
+                <th className="px-6 py-3 font-medium border-b border-border">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {tasks.length === 0 && (
-                <tr><td colSpan={5} className="text-center py-8 text-muted-foreground">No tasks running.</td></tr>
+                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">No tasks running.</td></tr>
               )}
               {tasks.map((row) => (
                 <tr 
@@ -243,12 +251,24 @@ export function Launchpad() {
                     {row.status === 'completed' && <span className="text-green-500">✅ 完成</span>}
                     {row.status === 'completed_empty' && <span className="text-amber-500">⚠️ 已完成（无有效因子）</span>}
                     {row.status === 'failed' && <span className="text-red-500">🔴 失败</span>}
+                    {row.status === 'cancelled' && <span className="text-slate-400">⏹ 已停止</span>}
+                    {row.status === 'interrupted' && <span className="text-orange-400">⚠️ 中断（服务重启）</span>}
                   </td>
                   <td className="px-6 py-3">
                     <span className="px-2 py-1 bg-secondary rounded text-xs">{row.miner}</span>
                   </td>
                   <td className="px-6 py-3 text-muted-foreground">{row.duration}</td>
                   <td className="px-6 py-3 font-mono text-xs text-muted-foreground">{row.hash}</td>
+                  <td className="px-6 py-3">
+                    {row.status === 'running' && (
+                      <button
+                        onClick={(event) => { event.stopPropagation(); cancelTask(row.id); }}
+                        className="rounded border border-rose-800 bg-rose-950/40 px-2 py-1 text-[11px] text-rose-300 hover:bg-rose-900/50"
+                      >
+                        {row.cancel_requested ? '停止中…' : '停止'}
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -347,6 +367,18 @@ export function Launchpad() {
                     <div className="w-full bg-secondary rounded-full h-1.5">
                       <div className="bg-primary h-1.5 rounded-full transition-all duration-500" style={{ width: `${selectedTask.progress}%` }}></div>
                     </div>
+                    <button
+                      onClick={() => cancelTask(selectedTask.id)}
+                      className="mt-3 rounded border border-rose-800 bg-rose-950/40 px-3 py-1.5 text-[11px] text-rose-300 hover:bg-rose-900/50"
+                    >
+                      {selectedTask.cancel_requested ? '停止中…（等待当前 epoch 结束）' : '停止任务'}
+                    </button>
+                  </div>
+                )}
+
+                {selectedTask.status === 'cancelled' && (
+                  <div className="mt-4 p-4 border border-slate-700 bg-slate-900/40 rounded text-sm text-muted-foreground">
+                    ⏹ {selectedTask.error_msg || 'Task stopped by the user.'}
                   </div>
                 )}
               </div>

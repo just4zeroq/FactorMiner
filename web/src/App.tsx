@@ -4,6 +4,7 @@ import { Home } from './pages/Home';
 import { Launchpad } from './pages/Launchpad';
 import { DataDownload } from './pages/DataDownload';
 import { Inspector } from './pages/Inspector';
+import { Backtest } from './pages/Backtest';
 import { useEffect } from 'react';
 import { I18nProvider } from './i18n';
 
@@ -22,6 +23,7 @@ function App() {
             <Route path="launchpad" element={<Launchpad />} />
             <Route path="data" element={<DataDownload />} />
             <Route path="inspector" element={<Inspector />} />
+            <Route path="backtest" element={<Backtest />} />
           </Route>
         </Routes>
       </BrowserRouter>

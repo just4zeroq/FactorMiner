@@ -113,6 +113,8 @@ user_workspace/reports/**/funding.csv
 user_workspace/reports/**/fills.csv
 user_workspace/reports/**/portfolio_state.csv
 user_workspace/reports/**/trades.csv
+# Backtest runs are local artifacts (equity/trades per run)
+user_workspace/reports/backtest_runs/
 user_workspace/reports/**/spec.yaml
 user_workspace/reports/**/config.yaml
 web/node_modules/
