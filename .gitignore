@@ -131,3 +131,8 @@ implementation_plan.md
 
 # Agent workspace notes (local only)
 .workbuddy/
+
+# Cumulative FDR ledger (grows with every run; local state)
+user_workspace/.fdr_ledger*.jsonl
+user_workspace/.experiment_trace.jsonl
+user_workspace/.holdout_ledger.json
