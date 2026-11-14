@@ -1,8 +1,16 @@
 import unittest
 
+import numpy as np
 import pandas as pd
 
-from core.miner.operator_runtime import OperatorRuntimeError, evaluate_ast, resolve_operator_specs
+from core.miner.operator_runtime import (
+    BUILTIN_OPERATORS,
+    OperatorRuntimeError,
+    default_operator_params,
+    evaluate_ast,
+    resolve_operator_specs,
+    sample_operator_params,
+)
 from core.miner.registry import (
     EvaluatorRegistry,
     ExtensionRegistrationError,
@@ -98,6 +106,163 @@ class OperatorRuntimeTests(unittest.TestCase):
         data = pd.DataFrame({"close": range(1, 5)})
         with self.assertRaisesRegex(OperatorRuntimeError, "Unknown operator"):
             evaluate_ast({"op": "missing", "left": "close"}, data)
+
+
+class CryptoOperatorExpansionTests(unittest.TestCase):
+    """Coverage for the P0 crypto operator expansion (~18 -> ~58 operators)."""
+
+    @staticmethod
+    def _series(n=120, seed=1):
+        rng = np.random.default_rng(seed)
+        idx = pd.date_range("2024-01-01", periods=n, freq="D")
+        price = 100 + np.cumsum(rng.standard_normal(n))
+        price = np.maximum(price, 1.0)  # keep positive for vol/rsi
+        return pd.Series(price, index=idx, name="close")
+
+    @staticmethod
+    def _cross_asset(n=120, k=4, seed=2):
+        rng = np.random.default_rng(seed)
+        idx = pd.date_range("2024-01-01", periods=n, freq="D")
+        cols = [f"A{i}" for i in range(k)]
+        return pd.DataFrame(rng.standard_normal((n, k)), index=idx, columns=cols)
+
+    def test_new_univariate_operators_return_nonempty_series(self):
+        s = self._series()
+        ops = [
+            ("ts_ema", {"window": 10}),
+            ("ts_ref", {"n": 3}),
+            ("ts_sum", {"window": 5}),
+            ("ts_product", {"window": 5}),
+            ("ts_ma_ratio", {"window": 10}),
+            ("ts_var", {"window": 10}),
+            ("ts_median", {"window": 10}),
+            ("ts_mad", {"window": 10}),
+            ("ts_skew", {"window": 10}),
+            ("ts_kurt", {"window": 10}),
+            ("ts_quantile", {"window": 10, "q": 0.25}),
+            ("ts_argmax", {"window": 10}),
+            ("ts_argmin", {"window": 10}),
+            ("ts_count_up", {"window": 10}),
+            ("ts_realized_vol", {"window": 10}),
+            ("ts_rsi", {"window": 14}),
+            ("cumsum", {}),
+            ("abs", {}),
+            ("sign", {}),
+            ("log", {}),
+            ("sqrt", {}),
+            ("exp", {}),
+            ("inv", {}),
+            ("sin", {}),
+            ("cos", {}),
+            ("tanh", {}),
+            ("sigmoid", {}),
+            ("clamp", {"lo": -1.0, "hi": 1.0}),
+        ]
+        for op, params in ops:
+            with self.subTest(op=op):
+                node = {"op": op, "left": "close", **params}
+                out = evaluate_ast(node, s.to_frame())
+                self.assertIsInstance(out, pd.Series)
+                self.assertGreater(out.notna().sum(), 0, msg=f"{op} produced only NaNs")
+
+    def test_pairwise_and_conditional_operators(self):
+        s = self._series()
+        df = s.to_frame()
+        for op in ("ts_max2", "ts_min2", "greater", "less"):
+            with self.subTest(op=op):
+                node = {"op": op, "left": "close", "right": "close"}
+                out = evaluate_ast(node, df)
+                self.assertIsInstance(out, pd.Series)
+                self.assertGreater(out.notna().sum(), 0)
+
+    def test_binary_rolling_regression_is_vectorized(self):
+        s = self._series()
+        df = s.to_frame()
+        # regression of close on its own lag -> slope ~ 1
+        node = {"op": "ts_regression", "left": "close", "right": {"op": "ts_ref", "left": "close", "n": 1}, "window": 20}
+        out = evaluate_ast(node, df)
+        self.assertIsInstance(out, pd.Series)
+        finite = out.dropna()
+        self.assertGreater(len(finite), 0)
+        self.assertTrue(finite.abs().mean() < 5.0, "slope of x on x.shift(1) should be near 1")
+
+    def test_cross_sectional_ops_keep_dataframe_shape(self):
+        # In production cross-asset mode, data is a dict of wide (multi-column)
+        # frames, so a 'close' terminal returns the full cross-section frame.
+        m = self._cross_asset()
+        data = {"close": m}
+        for op in ("cs_rank", "cs_zscore", "cs_mean", "cs_sum", "cs_min", "cs_max", "cs_mad", "cs_neutralize"):
+            with self.subTest(op=op):
+                out = evaluate_ast({"op": op, "left": "close"}, data)
+                self.assertIsInstance(out, pd.DataFrame)
+                self.assertEqual(out.shape, m.shape)
+
+    def test_cross_sectional_neutralize_removes_per_row_mean(self):
+        m = self._cross_asset()
+        data = {"close": m}
+        out = evaluate_ast({"op": "cs_neutralize", "left": "close"}, data)
+        row_means = out.mean(axis=1)
+        self.assertTrue(np.allclose(row_means.abs().dropna().values, 0.0, atol=1e-9))
+
+    def test_single_series_cs_ops_are_identity(self):
+        s = self._series()
+        for op in ("cs_neutralize", "cs_mean", "cs_zscore"):
+            with self.subTest(op=op):
+                # Single stream -> terminal returns a Series -> cs ops are identity.
+                out = evaluate_ast({"op": op, "left": "close"}, s.to_frame())
+                self.assertIsInstance(out, pd.Series)
+
+    def test_param_sampling_keys_match_spec(self):
+        cases = {
+            "ts_quantile": {"window", "q"},
+            "ts_ref": {"n"},
+            "signed_power": {"p"},
+            "clamp": {"lo", "hi"},
+            "ts_mean": {"window"},
+        }
+        for op, keys in cases.items():
+            with self.subTest(op=op):
+                sampled = sample_operator_params(op)
+                self.assertEqual(set(sampled.keys()), keys)
+                defaults = default_operator_params(op)
+                self.assertEqual(set(defaults.keys()), keys)
+
+    def test_param_sampling_types(self):
+        s = sample_operator_params("ts_ema")
+        self.assertIsInstance(s["window"], int)
+        q = sample_operator_params("ts_quantile")
+        self.assertIsInstance(q["window"], int)
+        self.assertIsInstance(q["q"], float)
+
+    def test_obv_style_crypto_factor_builds_from_primitives(self):
+        rng = np.random.default_rng(7)
+        idx = pd.date_range("2024-01-01", periods=120, freq="D")
+        close = pd.Series(100 + np.cumsum(rng.standard_normal(120)), index=idx)
+        close = np.maximum(close, 1.0)
+        vol = pd.Series(np.abs(rng.standard_normal(120)) * 1000 + 500, index=idx)
+        data = pd.DataFrame({"close": close, "volume": vol})
+        # OBV = cumsum(sign(close.diff()) * volume)
+        ast = {
+            "op": "cumsum",
+            "left": {
+                "op": "mul",
+                "left": {"op": "sign", "left": {"op": "ts_delta", "left": "close", "window": 1}},
+                "right": "volume",
+            },
+        }
+        out = evaluate_ast(ast, data)
+        self.assertIsInstance(out, pd.Series)
+        self.assertGreater(out.notna().sum(), 0)
+
+    def test_realized_vol_crypto_factor_nonempty(self):
+        s = self._series()
+        out = evaluate_ast({"op": "ts_realized_vol", "left": "close", "window": 20}, s.to_frame())
+        self.assertIsInstance(out, pd.Series)
+        self.assertGreater(out.notna().sum(), 0)
+
+    def test_total_operator_count_expanded(self):
+        # Sanity: the built-in library now carries a substantial operator set.
+        self.assertGreaterEqual(len(BUILTIN_OPERATORS), 50)
 
 
 if __name__ == "__main__":

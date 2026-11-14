@@ -17,6 +17,11 @@ class RealDataClient:
         self.instrument_type = self.data_feed_config.get("instrument_type", "futures")
         self.timeframe = self.data_feed_config.get("timeframe", "1m")
         self.pairs = self.data_feed_config.get("pairs", [])
+        self.required_streams = self.data_feed_config.get("required_streams", [])
+        # Crypto-native streams (funding_rate / open_interest / basis /
+        # liquidations) to merge as extra columns.  Empty -> OHLCV only,
+        # fully backward compatible.
+        self.crypto_streams = list(self.data_feed_config.get("crypto_streams", []) or [])
         self.mine_periods = self.data_feed_config.get("mine_period", [])
         self.test_periods = self.data_feed_config.get("test_period", [])
         self.mining_mode = self.data_feed_config.get("mining_mode", "sequential_single")
@@ -44,28 +49,77 @@ class RealDataClient:
             
         elif self.mining_mode == "cross_asset":
             logger.info("Mining mode is 'cross_asset'. Loading and pivoting data for all pairs.")
-            
+
             def load_and_pivot(periods):
                 dfs = []
+                loaded_pairs = []
                 for pair in self.pairs:
                     df = self._load_periods_for_pair(pair, periods)
-                    if not df.empty:
-                        df['asset'] = pair
-                        dfs.append(df)
-                        
+                    if df.empty:
+                        logger.warning(
+                            "Cross-asset: %s has no data in the requested periods, "
+                            "it will be excluded from the universe.", pair
+                        )
+                        continue
+                    # 只保留配置声明的字段 + 前瞻收益标签，避免历史文件里的
+                    # level_0 / index 等脏列被误当成特征参与截面计算。
+                    streams = [c for c in self.required_streams if c in df.columns]
+                    if not streams:
+                        streams = [
+                            c for c in df.columns
+                            if c not in ('asset', 'date', 'time', 'timestamp', 'returns')
+                        ]
+                    extra = [
+                        c for c in self.crypto_streams
+                        if c in df.columns and c not in streams
+                    ]
+                    keep = streams + extra + (['returns'] if 'returns' in df.columns else [])
+                    part = df[keep].copy()
+                    part['asset'] = pair
+                    dfs.append(part)
+                    loaded_pairs.append(pair)
+
                 if not dfs:
+                    logger.error("Cross-asset: none of the configured pairs has data.")
                     return None
-                    
-                combined = pd.concat(dfs)
-                
-                # Pivot into a dict of DataFrames (rows: date, cols: asset)
+
+                long_df = pd.concat(dfs).reset_index()
+                date_col = long_df.columns[0]
+                long_df = long_df.rename(columns={date_col: 'date'})
+                # 同一 (date, asset) 出现多条时保留最后一条，否则 pivot 会抛
+                # "Index contains duplicate entries, cannot reshape"。
+                duplicates = int(long_df.duplicated(subset=['date', 'asset']).sum())
+                if duplicates:
+                    logger.warning(
+                        "Cross-asset: dropping %d duplicate (date, asset) rows before pivot.",
+                        duplicates,
+                    )
+                    long_df = long_df.drop_duplicates(subset=['date', 'asset'], keep='last')
+
+                # 统一所有特征的 index / columns，保证 sandbox 与 evaluator 的
+                # 严格对齐校验能通过；缺失格以 NaN 表示，不静默丢行。
+                all_dates = pd.DatetimeIndex(sorted(long_df['date'].unique()))
+                all_assets = sorted(loaded_pairs)
                 pivot_dict = {}
-                features = [c for c in combined.columns if c not in ['asset', 'date', 'time', 'timestamp']]
-                for feature in features:
-                    pivot_dict[feature] = combined.pivot(columns='asset', values=feature)
-                    
+                for feature in [c for c in long_df.columns if c not in ('date', 'asset')]:
+                    wide = long_df.pivot(index='date', columns='asset', values=feature)
+                    pivot_dict[feature] = wide.reindex(index=all_dates, columns=all_assets)
+
+                ref = pivot_dict.get('close', next(iter(pivot_dict.values())))
+                logger.info(
+                    "Cross-asset data ready: %d assets x %d timestamps, close coverage %.1f%%",
+                    len(all_assets), len(all_dates), ref.notna().mean().mean() * 100,
+                )
+                for asset in all_assets:
+                    cov = ref[asset].notna().mean()
+                    if cov < 0.90:
+                        logger.warning(
+                            "Cross-asset: %s coverage is only %.1f%%. Check its listing "
+                            "date or re-download the same range as the other pairs.",
+                            asset, cov * 100,
+                        )
                 return pivot_dict
-                
+
             self._mine_data = load_and_pivot(self.mine_periods)
             self._test_data = load_and_pivot(self.test_periods)
             
@@ -102,18 +156,26 @@ class RealDataClient:
             if not all_dates:
                 return pd.DataFrame()
                 
-            start_date = min(all_dates).strftime('%Y-%m-%d')
-            end_date = max(all_dates).strftime('%Y-%m-%d')
-            
+            # 预留滚动窗口预热与标签尾部余量：否则首批因子的 ts_* 算子全为
+            # NaN，最后几根 bar 的前瞻收益也无从计算。按 120 根 bar 估算。
+            try:
+                bar = pd.Timedelta(self.timeframe)
+            except (ValueError, TypeError):
+                bar = pd.Timedelta(days=1)
+            margin = max(bar * 120, pd.Timedelta(days=1))
+            start_date = (min(all_dates) - margin).strftime('%Y-%m-%d')
+            end_date = (max(all_dates) + margin).strftime('%Y-%m-%d')
+
             from core.data_feed.data_downloader import DataDownloader
             downloader = DataDownloader()
-            
+
             res = downloader.download_ohlcv(
                 symbol=pair,
                 timeframe=self.timeframe,
                 start_date=start_date,
                 end_date=end_date,
-                trade_type=self.instrument_type
+                trade_type=self.instrument_type,
+                exchange_id=self.exchange,
             )
             
             if not file_path.exists():
@@ -124,7 +186,9 @@ class RealDataClient:
             
         logger.info(f"Loading data from {file_path}")
         df = pd.read_feather(file_path)
-        
+        # 历史写入残留的辅助列不能参与因子计算（NN 会把全表当特征）
+        df = df.drop(columns=[c for c in ('level_0', 'index') if c in df.columns])
+
         # 标准化索引
         if 'date' in df.columns:
             df.set_index('date', inplace=True)
@@ -151,9 +215,45 @@ class RealDataClient:
                 
         if sliced_dfs:
             final_df = pd.concat(sliced_dfs)
+            final_df = self._attach_crypto_streams(final_df, pair)
             return final_df
             
         return pd.DataFrame()
+
+    def _attach_crypto_streams(self, df: pd.DataFrame, pair: str) -> pd.DataFrame:
+        """Merge stored crypto streams as extra columns, aligned past-only.
+
+        Missing files are skipped, so enabling ``crypto_streams`` on a machine
+        that has not downloaded them yet degrades gracefully to OHLCV-only.
+        """
+        if df.empty or not self.crypto_streams:
+            return df
+        from core.data_feed.crypto_streams import load_crypto_streams
+
+        data_root = Path(os.getcwd()) / "data"
+        try:
+            streams = load_crypto_streams(
+                data_root,
+                self.exchange,
+                pair,
+                self.timeframe,
+                self.instrument_type,
+                pd.DatetimeIndex(df.index),
+                streams=self.crypto_streams,
+            )
+        except Exception as exc:
+            logger.warning("Failed to attach crypto streams for %s: %s", pair, exc)
+            return df
+
+        for name, series in streams.items():
+            if name not in df.columns:
+                df[name] = series.values
+        if streams:
+            logger.info(
+                "Attached crypto streams for %s: %s",
+                pair, ", ".join(sorted(streams)),
+            )
+        return df
 
     def get_data(self) -> Any:
         if self._mine_data is None:

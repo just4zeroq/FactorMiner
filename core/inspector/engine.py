@@ -79,7 +79,61 @@ class FactorInspectorEngine:
 
         results_by_pair: Dict[str, Dict[str, Any]] = {}
 
-        # 3. 逐个交易对加载数据并审查
+        # 3a. 截面因子必须按截面口径审查：把所有资产合成 time × asset 宽表，
+        #     用横截面 IC 评估。沿用逐币 sequential_single 会让审查结果与
+        #     挖掘时的 fitness 完全不可比。
+        mining_mode = df_cfg.get("mining_mode", "sequential_single")
+        if factor_id and mining_mode == "sequential_single":
+            try:
+                stored_meta = self.resolver.storage.get_metadata(factor_id)
+                lineage = (getattr(stored_meta, "data_lineage", {}) or {}) if stored_meta else {}
+                if lineage.get("mining_mode") == "cross_asset":
+                    mining_mode = "cross_asset"
+            except Exception as exc:
+                logger.debug("Cannot read mining_mode from factor lineage: %s", exc)
+
+        if mining_mode == "cross_asset":
+            label = f"ALL ({len(target_pairs)} assets, cross-asset)"
+            cfg = {
+                "target": target_spec.as_dict(),
+                "data_feeds": {
+                    "exchange": target_exchange,
+                    "instrument_type": target_inst,
+                    "timeframe": target_tf,
+                    "pairs": target_pairs,
+                    "required_streams": df_cfg.get(
+                        "required_streams", ["open", "high", "low", "close", "volume"]
+                    ),
+                    "mine_period": target_periods,
+                    "mining_mode": "cross_asset",
+                },
+            }
+            try:
+                data_client = RealDataClient(cfg)
+                data = data_client.get_data()
+                returns = data_client.get_returns()
+                if not isinstance(data, dict) or not data:
+                    raise ValueError("Cross-asset inspection requires aligned data for all pairs")
+                factor_values = expression.compute(data)
+                metrics = InspectorMetricEngine.calculate_comprehensive_metrics(
+                    factor_values=factor_values,
+                    returns=returns,
+                    close_prices=data.get("close"),
+                    price_data=data,
+                    target_spec=target_spec,
+                )
+                metrics["target"] = target_spec.as_dict()
+                metrics["forward_return_definition"] = target_spec.definition()
+                metrics["mining_mode"] = "cross_asset"
+                results_by_pair[label] = metrics
+            except Exception as e:
+                logger.error("Failed cross-asset inspection: %s", e, exc_info=True)
+                results_by_pair[label] = {"error": str(e), "coverage": 0.0}
+
+            InspectorReporter.print_inspection_report(expression_display, results_by_pair)
+            return results_by_pair
+
+        # 3b. 单资产：逐个交易对加载数据并审查
         for pair in target_pairs:
             logger.info("Inspecting pair: %s (Timeframe: %s)", pair, target_tf)
             cfg = {

@@ -11,8 +11,8 @@ import ccxt
 from datetime import datetime, timedelta
 import time
 import logging
-import os
 
+from config.settings import apply_proxy_to_exchange, ccxt_proxy_config, get_proxy_url
 from config.user_config import config_manager
 from .health_checker import health_checker
 from .processor import data_processor
@@ -25,6 +25,9 @@ class DataDownloader:
     def __init__(self):
         """初始化数据下载器"""
         self.logger = logging.getLogger(__name__)
+        # 落盘目录必须与数据源一致；SmartBatchDownloader 会在
+        # download_ohlcv_batch 里按入参覆盖此值。
+        self.exchange_id = "binance"
 
     def get_exchange_instance(self, config_id: int = None, exchange_id: str = None, trade_type: str = None) -> Optional[ccxt.Exchange]:
         """
@@ -42,30 +45,36 @@ class DataDownloader:
             if config_id is None:
                 # 使用指定的 exchange_id，或者默认的 Binance 配置
                 target_exchange = exchange_id if exchange_id else 'binance'
+                self.exchange_id = target_exchange
                 exchange_class = getattr(ccxt, target_exchange)
-                # 检测环境变量中的代理配置
-                http_proxy = os.getenv('HTTP_PROXY')
-                https_proxy = os.getenv('HTTPS_PROXY')
-                proxies = {}
-                if http_proxy:
-                    proxies['http'] = http_proxy
-                if https_proxy:
-                    proxies['https'] = https_proxy
-                    
+
                 # Setup CCXT options
                 options = {}
                 if trade_type:
                     options['defaultType'] = 'future' if trade_type == 'futures' else 'spot'
+                    # 币安按市场类型分别请求 api/fapi/dapi 三个域名的 exchangeInfo。
+                    # 只加载当前需要的类型，减少经代理时的请求数与超时概率。
+                    # OKX 会把 fetchMarkets 当作 instType 参数，因此仅对币安设置。
+                    if target_exchange == 'binance':
+                        options['fetchMarkets'] = ['linear'] if trade_type == 'futures' else ['spot']
 
-                exchange = exchange_class({
+                proxy_url = get_proxy_url()
+                exchange_config = {
                     'enableRateLimit': True,
                     'timeout': 30000,
-                    'proxies': proxies if proxies else None,
                     'options': options,
                     'headers': {
                         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
                     }
-                })
+                }
+                # ccxt 4.x 的代理字段互斥，只能传 ccxt_proxy_config() 返回的那一个
+                exchange_config.update(ccxt_proxy_config())
+                exchange = exchange_class(exchange_config)
+                apply_proxy_to_exchange(exchange, proxy_url)
+                self.logger.info(
+                    f"交易所 {target_exchange} 网络出口: "
+                    f"{'代理 ' + proxy_url if proxy_url else '直连'}"
+                )
                 return exchange
 
             # 使用配置文件
@@ -74,14 +83,18 @@ class DataDownloader:
                 self.logger.error(f"配置不存在: {config_id}")
                 return None
 
+            self.exchange_id = config['exchange_id']
             exchange_class = getattr(ccxt, config['exchange_id'])
-            exchange = exchange_class({
+            exchange_config = {
                 'apiKey': config['api_key'],
                 'secret': config['secret'],
                 'password': config['password'],
                 'sandbox': config['sandbox'],
                 'enableRateLimit': True
-            })
+            }
+            exchange_config.update(ccxt_proxy_config())
+            exchange = exchange_class(exchange_config)
+            apply_proxy_to_exchange(exchange)
 
             return exchange
         except Exception as e:
@@ -89,7 +102,8 @@ class DataDownloader:
             return None
 
     def download_ohlcv(self, config_id: int = None, symbol: str = None, timeframe: str = None,
-                      start_date: str = None, end_date: str = None, trade_type: str = None, progress_callback=None) -> Dict:
+                      start_date: str = None, end_date: str = None, trade_type: str = None,
+                      progress_callback=None, exchange_id: str = None) -> Dict:
         """
         下载OHLCV数据 - 重构版本：确保数据完整性
         
@@ -108,9 +122,11 @@ class DataDownloader:
         try:
             # 设置交易类型属性
             self.trade_type = trade_type
+            if exchange_id:
+                self.exchange_id = exchange_id
             data_filename(symbol, timeframe, trade_type)
 
-            exchange = self.get_exchange_instance(config_id, trade_type=trade_type)
+            exchange = self.get_exchange_instance(config_id, self.exchange_id, trade_type=trade_type)
             if not exchange:
                 return {'success': False, 'error': '无法创建交易所实例'}
 
@@ -218,7 +234,7 @@ class DataDownloader:
             print(f"最终验证通过，准备保存: {len(df_save)} 条数据")
 
             filename = data_filename(symbol, timeframe, self.trade_type)
-            save_path = data_path("data", "binance", symbol, timeframe, self.trade_type)
+            save_path = data_path("data", self.exchange_id, symbol, timeframe, self.trade_type)
 
             # 检查现有文件以确定目标时区
             target_tz = None
@@ -367,7 +383,7 @@ class DataDownloader:
             合并后的数据
         """
         try:
-            save_path = data_path("data", "binance", symbol, timeframe, self.trade_type)
+            save_path = data_path("data", self.exchange_id, symbol, timeframe, self.trade_type)
 
             # 检查是否存在现有文件
             if not save_path.exists():

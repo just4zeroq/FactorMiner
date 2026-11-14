@@ -78,7 +78,7 @@ async def get_configs():
     for f in os.listdir(config_dir):
         if f.endswith(".json"):
             try:
-                with open(os.path.join(config_dir, f), 'r') as file:
+                with open(os.path.join(config_dir, f), 'r', encoding='utf-8-sig') as file:
                     configs_data[f] = json.load(file)
             except Exception as e:
                 configs_data[f] = {"error": str(e)}
@@ -115,7 +115,15 @@ async def get_exchange_meta(exchange: str, trade_type: str = "futures"):
         
         # We can optionally call ex_instance.load_markets() if it works in the region
         try:
-            ex_instance.load_markets()
+            # 经本地代理时首个请求偶发超时，重试两次；仍失败则降级到内置白名单
+            for attempt in range(3):
+                try:
+                    ex_instance.load_markets()
+                    break
+                except Exception:
+                    if attempt == 2:
+                        raise
+                    await asyncio.sleep(0.5 * (attempt + 1))
             if ex_instance.markets:
                 # filter to some USDT pairs
                 market_suffix = "/USDT:USDT" if trade_type == "futures" else "/USDT"
@@ -534,7 +542,7 @@ async def run_mining_task_background(task_id: str, miner_name: str, config_name:
 
     try:
         config_path = os.path.join("user_workspace", "configs", config_name)
-        with open(config_path, 'r') as f:
+        with open(config_path, 'r', encoding='utf-8-sig') as f:
             config = json.load(f)
             
         config["paradigm"] = miner_name

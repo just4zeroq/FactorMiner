@@ -33,6 +33,7 @@ class InspectorMetricEngine:
             "spearman": {},
             "decay": {},
             "quantiles": {},
+            "quantile_sections": 0,
             "turnover": 0.0,
             "coverage": 0.0,
             "total_bars": 0,
@@ -174,6 +175,79 @@ class InspectorMetricEngine:
         return result
 
     @staticmethod
+    def _cross_sectional_quantile_returns(
+        factor_values: pd.DataFrame,
+        returns: pd.DataFrame,
+        n_quantiles: int,
+    ) -> Tuple[Dict[str, float], int]:
+        """
+        截面分位组合收益。
+
+        在每个时间点按因子值把资产排名分成 n_quantiles 组，先求该时点各组
+        的前瞻收益均值，再对所有时间点取均值。与时序分支的语义一致（每组的
+        平均前瞻收益），区别只是分组发生在横截面上而非把全部 bar 混在一起。
+
+        返回 (分位收益字典, 参与计算的有效截面数)。若没有任何有效截面可用，
+        返回全 0 字典和 0，而不是伪造数值。
+        """
+        n_quantiles = max(2, int(n_quantiles))
+        empty = {f"Q{i + 1}": 0.0 for i in range(n_quantiles)}
+        empty["Long_Short"] = 0.0
+
+        f, r = factor_values.align(returns, join="inner")
+        if f.empty:
+            return empty, 0
+
+        # 因子与前瞻收益必须同时有效，避免把缺失收益当 0 计入分组均值
+        valid = f.notna() & r.notna()
+        f = f.where(valid)
+        r = r.where(valid)
+
+        counts = f.notna().sum(axis=1)
+        distinct = f.nunique(axis=1, dropna=True)
+        # 有效资产数不足分组数时，分位价差会被少数资产放大；因子无区分度时
+        # 分组本身没有意义（常数因子），这两种截面都直接跳过
+        usable = (counts >= n_quantiles) & (distinct >= n_quantiles)
+
+        bucket_returns: Dict[int, List[float]] = {
+            i: [] for i in range(1, n_quantiles + 1)
+        }
+        used_sections = 0
+        for ts in usable[usable].index:
+            f_row = f.loc[ts].dropna()
+            r_row = r.loc[ts].reindex(f_row.index)
+            # rank(method="first") 对并列值做确定性打散，保证每个资产只落一组
+            ranks = f_row.rank(method="first")
+            buckets = (
+                np.ceil(ranks / len(f_row) * n_quantiles)
+                .astype(int)
+                .clip(lower=1, upper=n_quantiles)
+            )
+            for q, group_ret in r_row.groupby(buckets).mean().items():
+                if pd.notna(group_ret):
+                    bucket_returns[int(q)].append(float(group_ret))
+            used_sections += 1
+
+        if not used_sections:
+            logger.warning(
+                "No cross-section has >= %d valid, distinct factor values; "
+                "quantile returns are undefined for this factor.",
+                n_quantiles,
+            )
+            return empty, 0
+
+        q_dict = {
+            f"Q{i + 1}": (
+                float(np.mean(bucket_returns[i + 1]))
+                if bucket_returns[i + 1]
+                else 0.0
+            )
+            for i in range(n_quantiles)
+        }
+        q_dict["Long_Short"] = q_dict[f"Q{n_quantiles}"] - q_dict["Q1"]
+        return q_dict, used_sections
+
+    @staticmethod
     def _evaluate_cross_asset(
         factor_values: pd.DataFrame,
         returns: pd.DataFrame,
@@ -216,6 +290,12 @@ class InspectorMetricEngine:
             cs_decay = factor_values.corrwith(lag_r, axis=1, method="spearman").mean()
             decay[f"Lag_{lag}"] = float(cs_decay) if pd.notna(cs_decay) else 0.0
 
+        quantiles, quantile_sections = (
+            InspectorMetricEngine._cross_sectional_quantile_returns(
+                factor_values, returns, n_quantiles
+            )
+        )
+
         return {
             "total_bars": total_bars,
             "valid_bars": valid_bars,
@@ -223,6 +303,7 @@ class InspectorMetricEngine:
             "pearson": calc_cs_stats(p_ics),
             "spearman": calc_cs_stats(s_ics),
             "decay": decay,
-            "quantiles": {"Q1": 0.0, "Q5": 0.0, "Long_Short": 0.0},
+            "quantiles": quantiles,
+            "quantile_sections": quantile_sections,
             "turnover": float(turnover) if pd.notna(turnover) else 0.0,
         }

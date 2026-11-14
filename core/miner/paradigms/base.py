@@ -1,10 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import logging
 import hashlib
+import numpy as np
 import pandas as pd
 
 from core.miner.expressions import FactorExpression
+from core.miner.expressions import fit_linear_combination, _safe_corr, LinearCombinedFactor
+from core.miner.pool import AlphaPool
 from core.miner.entities import EvaluationFeedback, MinerState
 
 logger = logging.getLogger(__name__)
@@ -105,10 +108,12 @@ class BaseFactorMiner(ABC):
         """
         pass
 
-    def mine(self, n_iterations: int, progress_callback=None) -> List[FactorExpression]:
+    def mine(self, n_iterations: int | None, progress_callback=None) -> List[FactorExpression]:
         """
         5. 标准的主循环引擎 (Main Loop) - 集成去重拦截器
         """
+        if n_iterations is None:
+            n_iterations = int(self.config.get("max_iterations", 5))
         logger.info(f"[{self.__class__.__name__}] Starting mining loop for {n_iterations} iterations.")
         self.initialize_search_space()
         
@@ -159,7 +164,208 @@ class BaseFactorMiner(ABC):
                 best_factor = self._get_best_factors()[0] if self._get_best_factors() else None
                 progress_callback(epoch + 1, n_iterations, best_factor)
             
-        return self._get_best_factors()
+        candidates = self._get_best_factors()
+        return self._finalize(candidates)
+
+    def _finalize(self, candidates: List[FactorExpression]) -> List[FactorExpression]:
+        """Final-stage assembly.
+
+        Two selectable strategies (config ``finalize_method``):
+
+        * ``"linear"`` (default) — fit an in-sample ridge combination of the
+          top-K diverse sub-factors (AlphaGen / Alpha101 style) and prepend it
+          as the primary recommended factor.
+        * ``"alphapool"`` (Phase 2) — feed the discovered candidates into a
+          fixed-capacity :class:`AlphaPool`: redundant factors (mutual-IC >
+          threshold) are rejected, and the whole-pool linear weights are
+          re-optimized to maximize *combined* IC. The resulting combination is a
+          :class:`LinearCombinedFactor` with the pool's fitted weights.
+
+        Both strategies train only on in-sample data, so the OOS RankIC the
+        evaluator computes afterward honestly reflects generalization.
+        """
+        cfg = self.config
+        method = cfg.get("finalize_method", "linear")
+        if method == "alphapool" and self.evaluator is not None and self.data is not None:
+            try:
+                data = self.data.get_data()
+                returns = self.data.get_returns()
+                if data is not None and returns is not None:
+                    result = self._finalize_alphapool(candidates, data, returns)
+                    if result is not None:
+                        return result
+            except Exception as exc:
+                logger.warning("AlphaPool finalize failed, falling back to linear: %s", exc)
+        # Default / fallback: in-sample ridge linear combination.
+        return self._finalize_linear(candidates)
+
+    def _finalize_linear(self, candidates: List[FactorExpression]) -> List[FactorExpression]:
+        """In-sample ridge combination of the top-K diverse sub-factors."""
+        cfg = self.config
+        lc = cfg.get("linear_combine", None)
+        if lc is None:
+            # GP defaults to ON; other paradigms OFF (NN sub-factors aren't pandas).
+            lc = (cfg.get("paradigm", "") == "GP")
+        if not lc:
+            return candidates
+        if self.evaluator is None or self.data is None:
+            return candidates
+        try:
+            data = self.data.get_data()
+            returns = self.data.get_returns()
+        except Exception as exc:
+            logger.warning("Linear combination skipped (data unavailable): %s", exc)
+            return candidates
+        if data is None or returns is None:
+            return candidates
+
+        top_k = int(cfg.get("linear_combine_top_k", 3))
+        corr_thresh = float(cfg.get("linear_combine_corr_thresh", 0.7))
+        lam = float(cfg.get("linear_combine_lambda", 1.0))
+
+        selected = self._select_diverse_combo_candidates(
+            candidates, top_k, corr_thresh, data, returns
+        )
+        if len(selected) < 2:
+            return candidates
+
+        try:
+            combined = fit_linear_combination(selected, data, returns, reg_lambda=lam)
+            fb = self.evaluator.evaluate([combined])
+            res = fb.for_candidate(combined)
+            if res and res.succeeded and res.metrics:
+                combined.metrics = res.metrics
+            logger.info(
+                "Linear combination produced with %d sub-factors; weights=%s",
+                len(selected),
+                [round(float(w), 4) for w in combined.weights],
+            )
+            return [combined] + selected
+        except Exception as exc:
+            logger.warning("Linear combination finalize failed: %s", exc)
+            return candidates
+
+    def _finalize_alphapool(
+        self,
+        candidates: List[FactorExpression],
+        data: Any,
+        returns: Any,
+    ) -> Optional[List[FactorExpression]]:
+        """Phase 2: build a static AlphaPool from the discovered candidates.
+
+        Returns the combined factor prepended to its members, or ``None`` when
+        the pool could not assemble at least two non-redundant members (so the
+        caller falls back to the linear strategy).
+        """
+        cfg = self.config
+        capacity = int(cfg.get("alphapool_capacity", 10))
+        mutual_max = float(cfg.get("alphapool_mutual_ic_max", 0.99))
+        shift = int(cfg.get("alphapool_weight_fit_shift", 21))
+        reg = float(cfg.get("alphapool_reg_lambda", 5.0))
+        top_m = int(cfg.get("alphapool_top_m", 30))
+
+        if isinstance(returns, pd.DataFrame):
+            ret_idx, ret_cols = returns.index, returns.columns
+            ret_arr = returns.to_numpy(dtype=float, na_value=float("nan"))
+        else:
+            ret_arr = np.asarray(returns, dtype=float)
+            ret_idx = ret_cols = None
+
+        pool = AlphaPool(
+            capacity=capacity,
+            mutual_ic_max=mutual_max,
+            weight_fit_shift=shift,
+            reg_lambda=reg,
+        )
+        pool.set_target(ret_arr, ret_idx, ret_cols)
+
+        expr_by_id: Dict[str, FactorExpression] = {}
+        valid = [
+            c for c in candidates
+            if getattr(c, "metrics", {}).get("fitness_score", -1e9) > -1e8
+        ]
+        ranked = sorted(
+            valid,
+            key=lambda c: float(c.metrics.get("fitness_score", -1e9)),
+            reverse=True,
+        )
+        for c in ranked[:top_m]:
+            try:
+                f = c.compute(data)
+            except Exception:
+                continue
+            if f is None:
+                continue
+            fid = c.logic_hash or str(id(c))
+            expr_by_id[fid] = c
+            pool.admit(fid, f, ret_idx, ret_cols)
+
+        if pool.report()["size"] < 2:
+            return None
+
+        selected = [expr_by_id[i] for i in pool._ids if i in expr_by_id]
+        weights = pool._weights
+        if len(selected) != len(weights) or not selected:
+            return None
+
+        combined = LinearCombinedFactor(sub_expressions=selected, weights=weights)
+        fb = self.evaluator.evaluate([combined])
+        res = fb.for_candidate(combined)
+        if res and res.succeeded and res.metrics:
+            combined.metrics = res.metrics
+        logger.info(
+            "AlphaPool finalize: %d members, pooled RankIC=%.4f, weights=%s",
+            pool.report()["size"], pool.pooled_rankic(),
+            [round(float(w), 4) for w in weights],
+        )
+        return [combined] + selected
+
+    def _select_diverse_combo_candidates(
+        self,
+        candidates: List[FactorExpression],
+        top_k: int,
+        corr_thresh: float,
+        data: Any,
+        returns: Any,
+    ) -> List[FactorExpression]:
+        """Pick the top-K fittest factors while keeping them mutually uncorrelated."""
+        valid = [
+            c for c in candidates
+            if getattr(c, "metrics", {}).get("fitness_score", -1e9) > -1e8
+        ]
+        ranked = sorted(
+            valid,
+            key=lambda c: float(c.metrics.get("fitness_score", -1e9)),
+            reverse=True,
+        )
+        chosen: List[FactorExpression] = []
+        chosen_series = []
+        for c in ranked:
+            if len(chosen) >= top_k:
+                break
+            try:
+                f = c.compute(data)
+            except Exception:
+                continue
+            if f is None:
+                continue
+            ok = True
+            for s in chosen_series:
+                corr = _safe_corr(f, s)
+                if corr is not None and abs(corr) > corr_thresh:
+                    ok = False
+                    break
+            if ok or not chosen:
+                chosen.append(c)
+                chosen_series.append(f)
+        # Pad with the next-best if diversity filtering left us with too few.
+        if len(chosen) < 2:
+            for c in ranked:
+                if c not in chosen:
+                    chosen.append(c)
+                    if len(chosen) >= 2:
+                        break
+        return chosen[: max(2, top_k)]
         
     def _log_epoch(self, epoch: int, candidates: List[FactorExpression], metrics: List[Dict[str, float]]):
         logger.info(f"Epoch {epoch} completed. Processed {len(candidates)} unique candidates.")

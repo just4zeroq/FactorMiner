@@ -10,6 +10,8 @@ from typing import Dict, List, Optional
 import ccxt
 from datetime import datetime
 
+from config.settings import apply_proxy_to_exchange, ccxt_proxy_config
+
 
 class UserConfigManager:
     """用户配置管理器"""
@@ -95,14 +97,17 @@ class UserConfigManager:
                 return {'success': False, 'error': '配置不存在'}
             
             exchange_class = getattr(ccxt, config['exchange_id'])
-            exchange = exchange_class({
+            exchange_config = {
                 'apiKey': config['api_key'],
                 'secret': config['secret'],
                 'password': config['password'],
                 'sandbox': config['sandbox'],
                 'enableRateLimit': True
-            })
-            
+            }
+            exchange_config.update(ccxt_proxy_config())
+            exchange = exchange_class(exchange_config)
+            apply_proxy_to_exchange(exchange)
+
             markets = exchange.load_markets()
             
             return {

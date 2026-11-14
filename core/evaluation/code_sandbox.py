@@ -100,6 +100,12 @@ _SAFE_ATTRIBUTES = {
     "sqrt",
 }
 
+# Windows 上没有 resource 模块，RLIMIT_AS / RLIMIT_CPU 会静默失效，
+# 沙箱只剩墙钟超时。必须同时限制常量规模，否则
+# "x = list(range(10**9))" 这类合法语法能在超时前耗尽进程内存。
+_MAX_NUMERIC_CONSTANT = 1_000_000
+_MAX_POW_EXPONENT = 6
+
 _ALLOWED_NODE_TYPES = (
     ast.Module,
     ast.Assign,
@@ -191,6 +197,30 @@ class FactorCodePolicy(ast.NodeVisitor):
             allowed = {"df", "np", "pd"} | _SAFE_BUILTINS | self.assigned_names
             if node.id not in allowed:
                 raise SecurityError(f"Use of name '{node.id}' is not allowed")
+
+    def visit_Constant(self, node: ast.Constant) -> None:
+        value = node.value
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            if abs(value) > _MAX_NUMERIC_CONSTANT:
+                raise SecurityError(
+                    f"Numeric constant {value!r} exceeds the allowed magnitude "
+                    f"({_MAX_NUMERIC_CONSTANT})"
+                )
+        self.generic_visit(node)
+
+    def visit_BinOp(self, node: ast.BinOp) -> None:
+        if isinstance(node.op, ast.Pow) and isinstance(node.right, ast.Constant):
+            exponent = node.right.value
+            if (
+                isinstance(exponent, (int, float))
+                and not isinstance(exponent, bool)
+                and exponent > _MAX_POW_EXPONENT
+            ):
+                raise SecurityError(
+                    f"Exponent {exponent!r} exceeds the allowed maximum "
+                    f"({_MAX_POW_EXPONENT})"
+                )
+        self.generic_visit(node)
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         if node.attr.startswith("_") or node.attr not in _SAFE_ATTRIBUTES:

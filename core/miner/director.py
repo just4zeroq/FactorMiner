@@ -4,6 +4,14 @@ from typing import Dict, Any, List
 from core.miner.entities import FactorMetadata, EvaluationFeedback
 from core.storage.factor_storage import get_global_storage
 from core.evaluation.evaluator import ParallelEvaluator
+from core.evaluation.significance import apply_promotion_gates
+from core.evaluation.experiment_trace import (
+    ExperimentTrace,
+    HoldoutLedger,
+    HoldoutReuseError,
+    TrialRecord,
+    signature_of,
+)
 from core.miner.paradigms.base import BaseFactorMiner
 
 logger = logging.getLogger(__name__)
@@ -19,7 +27,9 @@ class FactorMinerDirector:
         normalize_deprecated_miner(config)
         self.config = config
         self.data_client = data_client
-        self.storage_client = get_global_storage()
+        # Honor a per-run storage root if configured; otherwise the default root.
+        _db_root = self.config.get("storage", {}).get("db_root")
+        self.storage_client = get_global_storage(_db_root)
         
         # 1. 初始化统一并行评价器
         self.evaluator = ParallelEvaluator(self.data_client, self.config)
@@ -33,7 +43,12 @@ class FactorMinerDirector:
         # 将统一的 evaluator 和 storage_client 注入到 miner 中
         self.miner.evaluator = self.evaluator
         self.miner.storage_client = self.storage_client
-        
+
+        # Phase 1: statistical-gate infrastructure (cross-run persistence).
+        gate_cfg = self.config.get("evaluation", {}).get("gates", {})
+        self.trace = ExperimentTrace(gate_cfg.get("trace_path"))
+        self.holdout = HoldoutLedger(gate_cfg.get("holdout_path"))
+
         self.latest_factor_ids: List[str] = []
 
     def _instantiate_miner(self, paradigm: str, config: Dict, data: Any) -> BaseFactorMiner:
@@ -70,19 +85,51 @@ class FactorMinerDirector:
         
         self._save_excellent_factors(best_candidates)
         self._print_results_table(best_candidates)
-        
+        self._enforce_holdout()  # Phase 1: one-time strict-holdout guard
+
         logger.info("FactorMiner loop completed.")
         return best_candidates
 
     def _save_excellent_factors(self, candidates):
         import uuid
         from datetime import datetime
-        
+
         self.latest_factor_ids = []
-        for cand in candidates:
+
+        # Phase 1: batch promotion gates. BH-FDR across the candidate set is the
+        # multiple-testing control that was missing before; only factors whose
+        # gates are all green become INSPECTED, the rest stay DISCOVERED_UNVERIFIED.
+        metrics_list = [(getattr(c, "metrics", None) or {}) for c in candidates]
+        # DSR must be deflated by the *real* number of ideas tried: everything
+        # recorded in the cross-run trace plus every candidate this run handed
+        # to the evaluator (including the ones that never made the shortlist).
+        evaluator = getattr(self.miner, "evaluator", None)
+        raw_trials = getattr(evaluator, "total_evaluated", 0)
+        run_trials = (
+            int(raw_trials)
+            if isinstance(raw_trials, (int, float)) and not isinstance(raw_trials, bool)
+            else 0
+        )
+        if run_trials <= 0:
+            run_trials = len(candidates)
+        n_trials = int(self.trace.num_trials) + run_trials
+        # Honour threshold overrides from config (evaluation.gates.*); without
+        # this the gate always ran on DEFAULT_GATE_CFG.
+        gate_cfg = self.config.get("evaluation", {}).get("gates")
+        gates = apply_promotion_gates(metrics_list, cfg=gate_cfg, n_trials=n_trials)
+
+        # Record EVERY attempt into the cross-run ExperimentTrace so num_trials
+        # stays honest across runs (the denominator of truth).
+        for cand, g in zip(candidates, gates):
+            self._record_trial(cand, g)
+
+        for cand, g in zip(candidates, gates):
             factor_id = f"fac_{uuid.uuid4().hex[:8]}"
             self.latest_factor_ids.append(factor_id)
-            
+
+            cand.metrics["p_adj"] = g["p_adj"]
+            cand.metrics["dsr"] = g["dsr"]
+            cand.metrics["n_trials"] = n_trials
             metadata = FactorMetadata(
                 factor_id=factor_id,
                 miner_type=self.config.get("paradigm"),
@@ -94,11 +141,18 @@ class FactorMinerDirector:
                     for key in ("max_iterations", "population_size", "top_k_factors", "hidden_dim")
                     if key in self.config
                 },
-                created_at=datetime.now().isoformat()
+                created_at=datetime.now().isoformat(),
+                lifecycle_status=g["status"],
             )
-            
+
             # 存储分流
-            from core.miner.expressions import FactorExpressionAST, FactorExpressionCode, FactorExpressionTensor, FactorExpressionAction
+            from core.miner.expressions import (
+                FactorExpressionAST,
+                FactorExpressionCode,
+                FactorExpressionTensor,
+                FactorExpressionAction,
+                LinearCombinedFactor,
+            )
             if isinstance(cand, FactorExpressionAST):
                 self.storage_client.save_gp_factor(cand.get_source(), metadata)
             elif isinstance(cand, FactorExpressionCode):
@@ -110,6 +164,8 @@ class FactorMinerDirector:
                 )
             elif isinstance(cand, FactorExpressionAction):
                 self.storage_client.save_rl_factor(cand.get_source(), b"", metadata)
+            elif isinstance(cand, LinearCombinedFactor):
+                self.storage_client.save_linear_combination_factor(cand.to_dict(), metadata)
             elif isinstance(cand, FactorExpressionTensor):
                 src = cand.get_source()
                 artifact_reference = {}
@@ -148,6 +204,50 @@ class FactorMinerDirector:
                 )
 
             self._save_factor_snapshot(factor_id, cand)
+
+    def _record_trial(self, cand, gate) -> None:
+        """Persist one evaluated candidate into the cross-run ExperimentTrace."""
+        try:
+            payload = (
+                cand.get_source()
+                if callable(getattr(cand, "get_source", None))
+                else cand
+            )
+            m = getattr(cand, "metrics", {}) or {}
+            self.trace.record(
+                TrialRecord(
+                    signature=signature_of(payload),
+                    fitness=float(m.get("fitness_score", float("nan"))),
+                    rank_ic=float(m.get("RankIC", float("nan"))),
+                    rank_ic_oos=float(m.get("RankIC_oos", float("nan"))),
+                    significant=bool(gate["gate"]["pass"]),
+                    meta={"p_adj": gate["p_adj"]},
+                )
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("trial record skipped: %s", exc)
+
+    def _enforce_holdout(self) -> None:
+        """Phase 1: enforce the one-time strict-holdout ledger (fail loud).
+
+        Only active when ``evaluation.gates.strict_holdout`` is configured. A
+        second reveal of the same (or overlapping) strict holdout raises
+        :class:`HoldoutReuseError` — this is what stops a 'validated' factor from
+        quietly peeking at the test window again.
+        """
+        cfg = (
+            self.config.get("evaluation", {})
+            .get("gates", {})
+            .get("strict_holdout")
+        )
+        if not cfg:
+            return
+        self.holdout.reveal(
+            cfg["period_key"],
+            cfg["start"],
+            cfg["end"],
+            note="strict holdout final verification",
+        )
 
     def _snapshot_lineage(
         self,

@@ -3,7 +3,7 @@ import json
 import logging
 import pandas as pd
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import dataclasses
 
 from core.miner.entities import FactorMetadata
@@ -146,7 +146,7 @@ class LocalFactorStorage(FactorStorageInterface):
             
     def _save_meta(self, metadata: FactorMetadata):
         path = os.path.join(self.meta_dir, f"{metadata.factor_id}.json")
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             json.dump(dataclasses.asdict(metadata), f, indent=4)
             
     def save_gp_factor(self, ast_dict: Dict, metadata: FactorMetadata) -> bool:
@@ -176,7 +176,7 @@ class LocalFactorStorage(FactorStorageInterface):
     ) -> bool:
         code_file = f"{metadata.factor_id}.py"
         code_path = os.path.join(self.src_dir, code_file)
-        with open(code_path, "w") as f:
+        with open(code_path, "w", encoding="utf-8") as f:
             f.write(python_code)
             
         metadata.logic_reference = {
@@ -279,6 +279,15 @@ class LocalFactorStorage(FactorStorageInterface):
             return False
         return self.save_factor_snapshot(factor_id, values_df, returns, {})
 
+    def save_linear_combination_factor(
+        self, logic_dict: Dict[str, Any], metadata: FactorMetadata
+    ) -> bool:
+        """Persist a linear-combination factor (sub-ASTs + learned weights)."""
+        metadata.logic_reference = logic_dict
+        self._save_meta(metadata)
+        logger.info("Saved linear-combination factor metadata for %s", metadata.factor_id)
+        return True
+
     @staticmethod
     def _snapshot_frame(factor_values: Any, forward_returns: Any) -> pd.DataFrame:
         """Normalize sequential and cross-asset values into a stable parquet schema."""
@@ -345,7 +354,7 @@ class LocalFactorStorage(FactorStorageInterface):
     def get_metadata(self, factor_id: str) -> FactorMetadata:
         path = os.path.join(self.meta_dir, f"{factor_id}.json")
         if os.path.exists(path):
-            with open(path, "r") as f:
+            with open(path, "r", encoding="utf-8-sig") as f:
                 data = json.load(f)
             return FactorMetadata(**data)
         return None
@@ -386,7 +395,7 @@ class LocalFactorStorage(FactorStorageInterface):
             if filename.endswith(".json"):
                 path = os.path.join(self.meta_dir, filename)
                 try:
-                    with open(path, "r") as f:
+                    with open(path, "r", encoding="utf-8-sig") as f:
                         data = json.load(f)
                         if "logic_hash" in data and data["logic_hash"]:
                             hashes.add(data["logic_hash"])
@@ -395,5 +404,11 @@ class LocalFactorStorage(FactorStorageInterface):
         return hashes
 
 
-def get_global_storage() -> FactorStorageInterface:
-    return LocalFactorStorage()
+def get_global_storage(db_root: Optional[str] = None) -> FactorStorageInterface:
+    """Construct a storage client.
+
+    ``db_root`` lets callers (e.g. the Director) honor a per-run ``storage.db_root``
+    from config instead of always writing to the default ``factor_db``. When
+    omitted, behaviour is unchanged (default root).
+    """
+    return LocalFactorStorage(db_root or "factor_db")

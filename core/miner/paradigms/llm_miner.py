@@ -3,11 +3,18 @@ import re
 import hashlib
 from typing import List, Dict, Any
 
+import pandas as pd
+
 from core.miner.paradigms.base import BaseFactorMiner
 from core.miner.expressions import FactorExpression, FactorExpressionCode
 from core.miner.entities import EvaluationFeedback
 from core.evaluation.evaluator import RestrictedSandbox
 from core.miner.paradigms.llm_api_manager import LLMAPIManager
+from core.miner.crypto_features import (
+    CRYPTO_STREAM_SPECS,
+    crypto_streams_in,
+    describe_available_streams,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +22,25 @@ class LLMFactorMiner(BaseFactorMiner):
     """
     大模型(LLM)因子挖掘器
     """
+
+    def _data_panel(self):
+        """Best-effort access to the loaded panel (dict or DataFrame)."""
+        try:
+            if hasattr(self.data, "get_data"):
+                return self.data.get_data()
+            return self.data
+        except Exception as exc:
+            logger.warning("LLM: unable to inspect data panel: %s", exc)
+            return None
+
+    def _available_fields(self) -> List[str]:
+        panel = self._data_panel()
+        if isinstance(panel, dict):
+            return list(panel.keys())
+        if isinstance(panel, pd.DataFrame):
+            return list(panel.columns)
+        return []
+
     def initialize_search_space(self) -> None:
         logger.info("Initializing LLM search space (prompts)...")
         sandbox_config = self.config.get("llm_sandbox", {})
@@ -43,6 +69,29 @@ class LLMFactorMiner(BaseFactorMiner):
             f"factor using pandas. {input_contract} ONLY output Python code, "
             "without markdown formatting."
         )
+
+        # Ground the prompt in the fields that actually exist, so the model
+        # neither invents OHLCV columns nor misses crypto-native tapes.
+        fields = self._available_fields()
+        if fields:
+            self.system_prompt += (
+                f"\nAvailable data fields: {', '.join(fields)}. "
+                "Only reference these fields; never invent columns."
+            )
+        panel = self._data_panel()
+        present = crypto_streams_in(panel) if panel is not None else set()
+        if present:
+            semantics = "; ".join(
+                f"{s}: "
+                f"{CRYPTO_STREAM_SPECS.get(s, {}).get('rationale', '').rstrip('.')}"
+                for s in sorted(present)
+            )
+            self.system_prompt += (
+                "\nCrypto-native field semantics — " + semantics + ". "
+                "Prefer economically motivated, stationary transforms "
+                "(z-score, delta, rank, ratios) over raw levels."
+            )
+            logger.info("LLM: %s", describe_available_streams(present))
         
         # 从用户的 config 里提取 LLM 相关的详细配置
         api_config = self.config.get("llm_api_config", {})

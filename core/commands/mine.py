@@ -28,7 +28,7 @@ def run_miner(args):
         logger.error(f"Config file {args.config} not found!")
         sys.exit(1)
         
-    with open(args.config, 'r') as f:
+    with open(args.config, 'r', encoding='utf-8-sig') as f:
         try:
             config_dict = json.load(f)
         except json.JSONDecodeError as e:
@@ -130,7 +130,12 @@ def run_miner(args):
             logger.info("=== Mining Target: ALL (Cross-Asset) ===")
             data_client = RealDataClient(config_dict)
             director = FactorMinerDirector(config_dict, data_client)
-            best_candidates = director.run(max_iterations=args.iterations)
+            iterations = (
+                args.iterations
+                if args.iterations is not None
+                else config_dict.get("max_iterations", 5)
+            )
+            best_candidates = director.run(max_iterations=iterations)
             
             try:
                 from rich.console import Console

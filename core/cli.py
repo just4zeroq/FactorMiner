@@ -1,5 +1,6 @@
 import argparse
 import sys
+import os
 import logging
 import asyncio
 
@@ -36,6 +37,33 @@ def setup_parser():
     inspect_parser.add_argument("--timeframe", type=str, default=None, help="Timeframe (e.g. 5m, 1h, 1d)")
     inspect_parser.add_argument("--user-dir", type=str, default="user_workspace", help="Path to user workspace directory")
 
+    # Backtest Subcommand
+    bt_parser = subparsers.add_parser(
+        "backtest",
+        help="Backtest stored factors as a cross-sectional long/short portfolio (ml4t-backtest)",
+    )
+    bt_parser.add_argument("--factors", type=str, default=",".join([
+        "fac_c25e28c3", "fac_8af952ab", "fac_b66d17ce",
+        "fac_099a7eef", "fac_f20a1349", "fac_2017455e",
+    ]), help="Comma-separated factor IDs from factor_db (default: the 6 INSPECTED candidates)")
+    bt_parser.add_argument("--config", type=str, default=None, help="Optional JSON with cost params (commission_rate, slippage_rate, funding_rate, rebalance_every, n_long, n_short, initial_cash)")
+    bt_parser.add_argument("--start", type=str, default=None, help="Start date YYYY-MM-DD (default: factor snapshot min)")
+    bt_parser.add_argument("--end", type=str, default=None, help="End date YYYY-MM-DD (default: factor snapshot max)")
+    bt_parser.add_argument("--exchange", type=str, default="binance")
+    bt_parser.add_argument("--timeframe", type=str, default="1d")
+    bt_parser.add_argument("--trade-type", type=str, default="futures")
+    bt_parser.add_argument("--db-root", type=str, default="factor_db", help="Root holding the factor VALUE snapshots to evaluate")
+    bt_parser.add_argument("--orientation-db-root", type=str, default=None, help="Root holding IN-SAMPLE snapshots used only to learn signal direction; for strict OOS point --db-root at held-out values and this at the in-sample library")
+    bt_parser.add_argument("--data-root", type=str, default="data")
+    bt_parser.add_argument("--commission", type=float, default=0.0004, help="Taker commission (fraction of trade value)")
+    bt_parser.add_argument("--slippage", type=float, default=0.0005, help="Slippage (fraction of price)")
+    bt_parser.add_argument("--funding", type=float, default=0.0001, help="Daily perpetual funding rate (fraction)")
+    bt_parser.add_argument("--rebalance", type=int, default=5, help="Bars between rebalances")
+    bt_parser.add_argument("--n-long", type=int, default=5, help="Number of long positions")
+    bt_parser.add_argument("--n-short", type=int, default=5, help="Number of short positions")
+    bt_parser.add_argument("--initial-cash", type=float, default=1_000_000.0)
+    bt_parser.add_argument("--output", type=str, default=os.path.join("user_workspace", "reports", "backtest_run"), help="Directory to write result parquet + summary CSV")
+
     return parser
 
 def main():
@@ -51,6 +79,9 @@ def main():
     elif args.command == "inspect":
         from core.commands import inspect as inspect_main
         inspect_main.run_inspector(args)
+    elif args.command == "backtest":
+        from core.commands import backtest as bt_main
+        bt_main.run_backtest_cmd(args)
     else:
         parser.print_help()
         sys.exit(1)

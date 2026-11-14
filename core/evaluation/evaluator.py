@@ -1,7 +1,10 @@
 import concurrent.futures
 import traceback
 import logging
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+
+import numpy as np
+import pandas as pd
 
 from core.miner.expressions import FactorExpression
 from core.miner.entities import CandidateEvaluation, EvaluationFeedback
@@ -13,17 +16,48 @@ from core.evaluation.code_sandbox import (
     SandboxTimeoutError,
     SecurityError,
 )
+from core.evaluation.significance import (
+    ic_series,
+    tstat_ic,
+    deflated_sharpe_ratio,
+    pvalue_from_t,
+)
 
 logger = logging.getLogger(__name__)
+
+# Default fitness hyper-parameters. Every knob is overridable under
+# config["fitness"] so behavior stays backward compatible when test_period is
+# absent (out_of_sample auto-disables, shrinkage ~ 1 for large samples, etc.).
+DEFAULT_FITNESS_CFG = {
+    "out_of_sample": None,        # None => auto-enable only if a test split exists
+    "oos_exponent": 0.5,          # weight on OOS IC vs in-sample IC (geometric blend)
+    "shrinkage_k": 30.0,          # observation-count shrinkage prior
+    "consistency_penalty": 0.3,   # multiplier when OOS sign disagrees with in-sample
+    "turnover_penalty": 0.0,      # normalized-turnover penalty weight (0 = off)
+    "turnover_cap": 0.5,          # turnover ratio above this starts to be penalized
+    "coverage_floor": 0.20,       # coverage below this is squared-penalized
+    "gate_cost_rate": 0.0,        # per-unit-turnover cost used by cost_adj_return
+}
+
 
 class ParallelEvaluator:
     """
     V4 多范式并行执行网关
     负责安全地执行 FactorExpression，并计算 Fitness，返回统一的 EvaluationFeedback
+
+    P0 upgrade: fitness now blends in-sample (mine_period) and out-of-sample
+    (test_period) RankIC with sample-size shrinkage and a directional-consistency
+    penalty. This directly attacks the "IC looks great but the factor loses money"
+    over-fitting trap that the previous in-sample-only fitness hid.
     """
+
     def __init__(self, data_client: Any, config: Dict):
         self.data_client = data_client
         self.config = config
+        # Cumulative number of candidates handed to this evaluator. Used as the
+        # multiple-testing denominator for DSR (deflated Sharpe) so the bar rises
+        # with every idea actually tried, not just with the ones finally saved.
+        self.total_evaluated = 0
         configured_workers = self.config.get("evaluation", {}).get("max_workers", 8)
         if isinstance(configured_workers, bool):
             raise ValueError("evaluation.max_workers must be a positive integer")
@@ -38,59 +72,187 @@ class ParallelEvaluator:
                 "evaluation.max_workers must be an integer between 1 and 64"
             )
 
+    # ------------------------------------------------------------------ #
+    # Public entry points
+    # ------------------------------------------------------------------ #
+    def evaluate(self, candidates: List[FactorExpression]) -> EvaluationFeedback:
+        """Evaluate candidates on the configured mining (in-sample) split,
+        plus the out-of-sample split when the data client exposes one."""
+        test_data = None
+        test_returns = None
+        tgetter = getattr(self.data_client, "get_test_data", None)
+        rgetter = getattr(self.data_client, "get_test_returns", None)
+        if callable(tgetter):
+            try:
+                test_data = tgetter()
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("get_test_data() failed: %s", exc)
+                test_data = None
+        if callable(rgetter):
+            try:
+                test_returns = rgetter()
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning("get_test_returns() failed: %s", exc)
+                test_returns = None
+        return self.evaluate_on(
+            candidates,
+            self.data_client.get_data(),
+            self.data_client.get_returns(),
+            test_data=test_data,
+            test_returns=test_returns,
+        )
+
+    def evaluate_on(
+        self,
+        candidates: List[FactorExpression],
+        data: Any,
+        returns: Any,
+        test_data: Any = None,
+        test_returns: Any = None,
+    ) -> EvaluationFeedback:
+        """Evaluate candidates on an explicit split without mutating the data client.
+
+        `test_data` / `test_returns` (optional) enable out-of-sample fitness.
+        """
+        feedback = EvaluationFeedback()
+        if not candidates:
+            return feedback
+        self.total_evaluated += len(candidates)
+
+        # 提取用户配置的自定义打分钩子
+        fitness_hook_name = self.config.get("fitness", {}).get("hook")
+        fitness_func = None
+        if fitness_hook_name:
+            fitness_func = EvaluatorRegistry._registry.get(fitness_hook_name)
+
+        def safe_compute(expr: FactorExpression) -> CandidateEvaluation:
+            try:
+                factor_values = expr.compute(data)
+
+                # 如果是深度学习网络直接输出的 tensor (带有梯度图)
+                if hasattr(factor_values, 'requires_grad') and factor_values.requires_grad:
+                    return CandidateEvaluation(
+                        candidate=expr,
+                        status="success",
+                        raw_outputs=factor_values,
+                    )
+
+                # 标量评价
+                self._validate_metric_inputs(factor_values, returns)
+                # 强制计算基础指标 (in-sample)
+                in_metrics = self._calculate_built_in_metrics(factor_values, returns)
+
+                # 尝试计算样本外指标
+                oos_metrics = self._compute_oos_metrics(expr, test_data, test_returns)
+
+                # 用户自定义打分或降级默认打分
+                if fitness_func:
+                    custom_score = fitness_func(factor_values, returns, in_metrics)
+                    if isinstance(custom_score, dict):
+                        metrics = {**in_metrics, **custom_score}
+                    else:
+                        metrics = {**in_metrics, "fitness_score": float(custom_score)}
+                    # 仍附加 OOS 诊断字段（不覆盖用户的 fitness_score）
+                    if oos_metrics is not None:
+                        metrics.setdefault("RankIC_oos", abs(float(oos_metrics.get("RankIC", 0.0))))
+                        metrics.setdefault("IC_oos", float(oos_metrics.get("IC", 0.0)))
+                        metrics.setdefault("oos_consistent", True)
+                else:
+                    metrics = self._build_fitness(
+                        in_metrics, oos_metrics, factor_values, returns
+                    )
+
+                # Phase 1: statistical verdict (HAC t / p / DSR / cost-adj) so the
+                # director can gate promotion on real evidence, not just fitness.
+                if factor_values is not None and returns is not None:
+                    verdict = self._build_verdict(factor_values, returns, metrics)
+                    metrics.update(verdict)
+
+                expr.metrics = metrics
+                return CandidateEvaluation(
+                    candidate=expr,
+                    status="success",
+                    metrics=metrics,
+                )
+            except Exception as e:
+                # 记录详细报错供 LLM 反思或排查
+                return CandidateEvaluation(
+                    candidate=expr,
+                    status="error",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    traceback=traceback.format_exc(),
+                )
+
+        worker_count = min(self.max_workers, len(candidates))
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=worker_count,
+            thread_name_prefix="factor-evaluator",
+        ) as executor:
+            results = list(executor.map(safe_compute, candidates))
+
+        feedback.results.extend(results)
+        return feedback
+
+    # ------------------------------------------------------------------ #
+    # Metric helpers
+    # ------------------------------------------------------------------ #
     @staticmethod
     def _calculate_built_in_metrics(factor_values: Any, returns: Any) -> Dict:
         """计算基础评估指标: IC, RankIC, Turnover"""
-        import pandas as pd
-        import warnings
-        
         metrics = {"IC": 0.0, "RankIC": 0.0, "Turnover": 0.0}
-        
+
         if factor_values is None or returns is None:
             return metrics
-            
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=Warning)
-            if isinstance(factor_values, pd.DataFrame) and isinstance(returns, pd.DataFrame):
-                # Cross-Asset Mode
-                if not factor_values.isna().all().all() and not returns.isna().all().all():
-                    # Cross-sectional IC: corr along assets (axis=1), then mean over time
-                    ic = factor_values.corrwith(returns, axis=1, method='pearson').mean()
-                    rank_ic = factor_values.corrwith(returns, axis=1, method='spearman').mean()
-                    
-                    if pd.notna(ic):
-                        metrics["IC"] = ic
-                    if pd.notna(rank_ic):
-                        metrics["RankIC"] = rank_ic
-                        
-                # Turnover: mean absolute difference across time, then mean across assets
-                turnover = factor_values.diff().abs().mean().mean()
-                if pd.notna(turnover):
-                    metrics["Turnover"] = turnover
-                    
-            elif isinstance(factor_values, pd.Series) and isinstance(returns, pd.Series):
-                # Sequential Single Mode
-                if not factor_values.isna().all() and not returns.isna().all():
-                    ic = factor_values.corr(returns, method='pearson', min_periods=30)
-                    rank_ic = factor_values.corr(returns, method='spearman', min_periods=30)
-                    
-                    if pd.notna(ic):
-                        metrics["IC"] = ic
-                    if pd.notna(rank_ic):
-                        metrics["RankIC"] = rank_ic
-                        
-                turnover = factor_values.diff().abs().mean()
-                if pd.notna(turnover):
-                    metrics["Turnover"] = turnover
-                    
+
+        if isinstance(factor_values, pd.DataFrame) and isinstance(returns, pd.DataFrame):
+            # Cross-Asset Mode
+            if not factor_values.isna().all().all() and not returns.isna().all().all():
+                ic = factor_values.corrwith(returns, axis=1, method='pearson').mean()
+                rank_ic = factor_values.corrwith(returns, axis=1, method='spearman').mean()
+                if pd.notna(ic):
+                    metrics["IC"] = ic
+                if pd.notna(rank_ic):
+                    metrics["RankIC"] = rank_ic
+            turnover = factor_values.diff().abs().mean().mean()
+            if pd.notna(turnover):
+                metrics["Turnover"] = turnover
+        elif isinstance(factor_values, pd.Series) and isinstance(returns, pd.Series):
+            # Sequential Single Mode
+            if not factor_values.isna().all() and not returns.isna().all():
+                ic = factor_values.corr(returns, method='pearson', min_periods=30)
+                rank_ic = factor_values.corr(returns, method='spearman', min_periods=30)
+                if pd.notna(ic):
+                    metrics["IC"] = ic
+                if pd.notna(rank_ic):
+                    metrics["RankIC"] = rank_ic
+            turnover = factor_values.diff().abs().mean()
+            if pd.notna(turnover):
+                metrics["Turnover"] = turnover
+
         return metrics
+
+    def _compute_oos_metrics(self, expr, test_data, test_returns) -> Optional[Dict]:
+        """Compute out-of-sample metrics if a usable test split is available."""
+        if test_data is None or test_returns is None:
+            return None
+        try:
+            if isinstance(test_data, pd.DataFrame) and test_data.empty:
+                return None
+            if isinstance(test_data, dict) and (not test_data or all(
+                getattr(v, "empty", False) for v in test_data.values()
+            )):
+                return None
+            oos_values = expr.compute(test_data)
+            self._validate_metric_inputs(oos_values, test_returns)
+            return self._calculate_built_in_metrics(oos_values, test_returns)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("OOS metric computation skipped: %s", exc)
+            return None
 
     @staticmethod
     def _validate_metric_inputs(factor_values: Any, returns: Any) -> None:
         """Reject shape/index coercion before metrics can silently realign data."""
-        import numpy as np
-        import pandas as pd
-
         if isinstance(returns, pd.Series):
             if not isinstance(factor_values, pd.Series):
                 raise FactorOutputError(
@@ -130,94 +292,186 @@ class ParallelEvaluator:
         if factor_values.notna().to_numpy().sum() == 0:
             raise FactorOutputError("Factor output must contain at least one finite value")
 
-    def evaluate(self, candidates: List[FactorExpression]) -> EvaluationFeedback:
-        """Evaluate candidates on the configured mining split."""
-        return self.evaluate_on(
-            candidates,
-            self.data_client.get_data(),
-            self.data_client.get_returns(),
-        )
-
-    def evaluate_on(
+    # ------------------------------------------------------------------ #
+    # Fitness blend (the P0 upgrade)
+    # ------------------------------------------------------------------ #
+    def _build_fitness(
         self,
-        candidates: List[FactorExpression],
-        data: Any,
+        in_metrics: Dict,
+        oos_metrics: Optional[Dict],
+        factor_values: Any,
         returns: Any,
-    ) -> EvaluationFeedback:
-        """Evaluate candidates on an explicit split without mutating the data client."""
-        feedback = EvaluationFeedback()
-        if not candidates:
-            return feedback
-        
-        # 提取用户配置的自定义打分钩子
-        fitness_hook_name = self.config.get("fitness", {}).get("hook")
-        fitness_func = None
-        if fitness_hook_name:
-            fitness_func = EvaluatorRegistry._registry.get(fitness_hook_name)
+    ) -> Dict:
+        cfg = {**DEFAULT_FITNESS_CFG, **self.config.get("fitness", {})}
 
-        def safe_compute(expr: FactorExpression) -> CandidateEvaluation:
+        # Coverage of the in-sample factor (guards against all-NaN tricks).
+        coverage = self._coverage(factor_values)
+        cov_floor = cfg["coverage_floor"]
+        penalty = (coverage / cov_floor) ** 2 if coverage < cov_floor else 1.0
+
+        # Effective sample size -> shrinkage (James-Stein style). For real-sized
+        # datasets (thousands of bars) this is ~1.0 and only bites tiny samples.
+        n_obs = self._valid_pair_count(factor_values, returns)
+        k = cfg["shrinkage_k"]
+        shrink = float(np.sqrt(max(n_obs - k, 0) / max(n_obs, 1))) if n_obs > 0 else 0.0
+
+        rankic_in = abs(float(in_metrics.get("RankIC", 0.0)))
+        ic_in = float(in_metrics.get("IC", 0.0))
+
+        oos_present = oos_metrics is not None
+        oos_enabled = cfg["out_of_sample"]
+        if oos_enabled is None:
+            oos_enabled = oos_present  # auto-enable only when a test split exists
+        use_oos = bool(oos_enabled and oos_present)
+
+        if use_oos:
+            rankic_oos = abs(float(oos_metrics.get("RankIC", 0.0)))
+            ic_oos = float(oos_metrics.get("IC", 0.0))
+            in_sign = 1 if in_metrics.get("RankIC", 0) >= 0 else -1
+            oos_sign = 1 if oos_metrics.get("RankIC", 0) >= 0 else -1
+            consistent = (in_sign == oos_sign) and (abs(in_metrics.get("RankIC", 0)) > 1e-9)
+            cons_mult = 1.0 if consistent else float(cfg["consistency_penalty"])
+        else:
+            rankic_oos = rankic_in
+            ic_oos = ic_in
+            consistent = True
+            cons_mult = 1.0
+
+        lam = float(cfg["oos_exponent"])
+        lam = min(max(lam, 0.0), 1.0)
+        # Geometric blend of in-sample and OOS RankIC. If OOS RankIC collapses to
+        # ~0, the whole fitness collapses -> over-fit factors are no longer rewarded.
+        if rankic_in <= 0:
+            blended = 0.0
+        else:
+            blended = (rankic_in ** (1.0 - lam)) * (rankic_oos ** lam)
+
+        # Shrinkage only kicks in when we are actually doing out-of-sample
+        # evaluation, so the pure in-sample path is numerically unchanged.
+        if not use_oos:
+            shrink = 1.0
+
+        # Normalized-turnover penalty (off by default; scale-free).
+        tp = 1.0
+        gamma = float(cfg["turnover_penalty"])
+        if gamma > 0 and rankic_in > 0:
             try:
-                factor_values = expr.compute(data)
-                
-                # 如果是深度学习网络直接输出的 tensor (带有梯度图)
-                if hasattr(factor_values, 'requires_grad') and factor_values.requires_grad:
-                    return CandidateEvaluation(
-                        candidate=expr,
-                        status="success",
-                        raw_outputs=factor_values,
-                    )
+                level = float(abs(factor_values).mean().mean()) if isinstance(
+                    factor_values, pd.DataFrame
+                ) else float(abs(factor_values).mean())
+                tn_norm = float(in_metrics.get("Turnover", 0.0)) / (level + 1e-9)
+                cap = float(cfg["turnover_cap"])
+                tp = 1.0 / (1.0 + gamma * max(0.0, tn_norm - cap))
+            except Exception:
+                tp = 1.0
 
-                # 标量评价
-                self._validate_metric_inputs(factor_values, returns)
-                # 强制计算基础指标
-                base_metrics = self._calculate_built_in_metrics(factor_values, returns)
-                
-                # 用户自定义打分或降级默认打分
-                if fitness_func:
-                    # 传入基础指标，返回的是用户定制的字典或标量
-                    custom_score = fitness_func(factor_values, returns, base_metrics)
-                    # 组合两者
-                    if isinstance(custom_score, dict):
-                        metrics = {**base_metrics, **custom_score}
-                    else:
-                        metrics = {**base_metrics, "fitness_score": float(custom_score)}
-                else:
-                    # 默认与 Inspector 对齐：使用 RankIC (Spearman) 乘以覆盖率惩罚项
-                    rank_ic = base_metrics.get("RankIC", 0.0)
-                    if hasattr(factor_values, 'dropna'):
-                        valid_count = int(factor_values.dropna().count().sum()) if hasattr(factor_values.dropna().count(), 'sum') else int(factor_values.dropna().count())
-                        total_count = int(factor_values.size)
-                        coverage = valid_count / total_count if total_count > 0 else 0.0
-                    else:
-                        coverage = 1.0
-                    
-                    # 覆盖率小于 20% 时进行惩罚
-                    penalty = (coverage / 0.20) ** 2 if coverage < 0.20 else 1.0
-                    fitness_score = abs(rank_ic) * 100.0 * penalty
-                    metrics = {**base_metrics, "coverage": coverage, "fitness_score": float(fitness_score)}
-                
-                expr.metrics = metrics
-                return CandidateEvaluation(
-                    candidate=expr,
-                    status="success",
-                    metrics=metrics,
-                )
-            except Exception as e:
-                # 记录详细报错供 LLM 反思或排查
-                return CandidateEvaluation(
-                    candidate=expr,
-                    status="error",
-                    error_type=type(e).__name__,
-                    error_message=str(e),
-                    traceback=traceback.format_exc(),
-                )
+        fitness_score = 100.0 * blended * cons_mult * shrink * tp * penalty
 
-        worker_count = min(self.max_workers, len(candidates))
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=worker_count,
-            thread_name_prefix="factor-evaluator",
-        ) as executor:
-            results = list(executor.map(safe_compute, candidates))
-            
-        feedback.results.extend(results)
-        return feedback
+        metrics = {
+            **in_metrics,
+            "RankIC_oos": rankic_oos,
+            "IC_oos": ic_oos,
+            "oos_consistent": bool(consistent),
+            "oos_enabled": bool(oos_enabled and oos_present),
+            "shrinkage": shrink,
+            "coverage": coverage,
+            "turnover_penalty": tp,
+            "fitness_score": float(fitness_score),
+        }
+        return metrics
+
+    # ------------------------------------------------------------------ #
+    # Phase 1 statistical verdict (per-factor, cross-sectional panels)
+    # ------------------------------------------------------------------ #
+    def _build_verdict(
+        self, factor_values: Any, returns: Any, metrics: Dict
+    ) -> Dict:
+        """Compute the per-factor statistical verdict used by the promotion gate.
+
+        Uses the *in-sample* cross-sectional IC time series (needs a (T, N)
+        panel, i.e. cross-asset mode). For sequential single-asset mode the
+        cross-section does not exist, so the verdict is left neutral (the
+        factor simply cannot be statistically validated by this gate yet —
+        it must go through temporal assessment instead, see the survey's
+        trade-learn note on single-asset evaluation).
+
+        Returns: hac_t, p_value, dsr, ir, n_obs, cost_adj_return, orientation.
+
+        All inference is done on the *oriented* factor (direction learned from
+        the in-sample IC sign), so a consistently negative-IC factor is judged
+        as the long-short strategy it actually is.
+        """
+        cfg = {**DEFAULT_FITNESS_CFG, **self.config.get("fitness", {})}
+        verdict = {
+            "hac_t": 0.0,
+            "p_value": 1.0,
+            "dsr": 0.0,
+            "ir": 0.0,
+            "n_obs": 0,
+            "cost_adj_return": 0.0,
+        }
+        try:
+            if not (
+                isinstance(factor_values, pd.DataFrame)
+                and isinstance(returns, pd.DataFrame)
+            ):
+                logger.debug("verdict neutral: not a cross-asset panel")
+                return verdict
+            f = factor_values.to_numpy(dtype=float)
+            r = returns.to_numpy(dtype=float)
+            ic_ts = ic_series(f, r)
+            ic_ts = ic_ts[np.isfinite(ic_ts)]
+            if ic_ts.size < 4:
+                return verdict
+            hac_t = tstat_ic(f, r)
+            p_value = pvalue_from_t(hac_t)
+            mean_ic = float(ic_ts.mean())
+            # Orientation is part of the model and is learned in-sample (the
+            # backtest does the same via infer_orientation). A factor with a
+            # consistently negative IC is a perfectly good *long-short* signal;
+            # judging DSR / cost-adjusted return on the raw sign would reject
+            # every such factor for a purely cosmetic reason.
+            orientation = 1.0 if mean_ic >= 0 else -1.0
+            mean_ic = abs(mean_ic)
+            hac_t = abs(float(hac_t))
+            std_ic = float(ic_ts.std())
+            ir = mean_ic / std_ic if std_ic > 0 else 0.0
+            n_obs = int(ic_ts.size)
+            dsr = deflated_sharpe_ratio(sharpe=ir, n_obs=n_obs, n_trials=1)
+            cost_rate = float(cfg.get("gate_cost_rate", 0.0))
+            turnover = float(metrics.get("Turnover", 0.0))
+            cost_adj_return = mean_ic - cost_rate * turnover
+            verdict.update({
+                "hac_t": float(hac_t),
+                "p_value": float(p_value),
+                "dsr": float(dsr),
+                "ir": float(ir),
+                "n_obs": n_obs,
+                "cost_adj_return": float(cost_adj_return),
+                "orientation": float(orientation),
+            })
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("verdict skipped: %s", exc)
+        return verdict
+
+    @staticmethod
+    def _coverage(factor_values: Any) -> float:
+        try:
+            if hasattr(factor_values, "dropna"):
+                valid = int(factor_values.dropna().count().sum()) if hasattr(
+                    factor_values.dropna().count(), "sum"
+                ) else int(factor_values.dropna().count())
+                total = int(getattr(factor_values, "size", 0)) or 1
+                return valid / total if total > 0 else 1.0
+        except Exception:
+            pass
+        return 1.0
+
+    @staticmethod
+    def _valid_pair_count(factor_values: Any, returns: Any) -> int:
+        try:
+            if isinstance(factor_values, pd.DataFrame):
+                return int((factor_values.notna() & returns.notna()).sum().sum())
+            return int((factor_values.notna() & returns.notna()).sum())
+        except Exception:
+            return 0
