@@ -43,6 +43,10 @@ const translations: Record<Language, Record<string, string>> = {
     'bt.result': '回测结果', 'bt.empty': '选择因子并运行，结果会出现在这里。', 'bt.metrics': '核心指标', 'bt.equity': '净值曲线', 'bt.equityAxis': '组合净值', 'bt.drawdownAxis': '回撤',
     'bt.totalReturn': '累计收益', 'bt.maxDrawdown': '最大回撤', 'bt.sharpe': '夏普', 'bt.cagr': '年化收益', 'bt.volatility': '波动率', 'bt.trades': '成交笔数', 'bt.costs': '总成本', 'bt.turnover': '平均换手', 'bt.scope': '区间', 'bt.assets': '标的数',
     'bt.effectiveWeights': '实际生效权重', 'bt.expanded': '展开的合成因子', 'bt.history': '历史运行', 'bt.noHistory': '尚无回测记录。', 'bt.failed': '失败', 'bt.viewRun': '查看', 'bt.openInspector': '在审查台打开',
+    'data.freshness': '数据新鲜度', 'data.files': '文件', 'data.assets1d': '日线标的', 'data.latest': '最新', 'data.stale': '个滞后', 'data.allFresh': '全部最新',
+    'data.details': '明细', 'data.symbol': '标的', 'data.first': '起始', 'data.last': '末尾', 'data.rows': '行数', 'data.lag': '滞后',
+    'data.experimentReady': '窗口已就绪：这次预注册验证可以开始了。', 'data.experimentPending': '还差 {remaining} 根，最早 {eta} 可用。', 'data.freshnessUnavailable': '新鲜度不可用',
+    'data.staleList': '滞后标的：{symbols}',
   },
   en: {
     'nav.dashboard': 'Dashboard', 'nav.launchpad': 'Launchpad', 'nav.data': 'Data Downloader', 'nav.inspector': 'Factor Inspector',
@@ -77,6 +81,10 @@ const translations: Record<Language, Record<string, string>> = {
     'bt.result': 'Result', 'bt.empty': 'Pick factors and run; the result will appear here.', 'bt.metrics': 'Key metrics', 'bt.equity': 'Equity curve', 'bt.equityAxis': 'Portfolio value', 'bt.drawdownAxis': 'Drawdown',
     'bt.totalReturn': 'Total return', 'bt.maxDrawdown': 'Max drawdown', 'bt.sharpe': 'Sharpe', 'bt.cagr': 'CAGR', 'bt.volatility': 'Volatility', 'bt.trades': 'Trades', 'bt.costs': 'Total costs', 'bt.turnover': 'Avg turnover', 'bt.scope': 'Window', 'bt.assets': 'Assets',
     'bt.effectiveWeights': 'Effective weights', 'bt.expanded': 'Expanded combination', 'bt.history': 'Run history', 'bt.noHistory': 'No backtest has been run yet.', 'bt.failed': 'Failed', 'bt.viewRun': 'View', 'bt.openInspector': 'Open in Inspector',
+    'data.freshness': 'Data freshness', 'data.files': 'Files', 'data.assets1d': 'Daily assets', 'data.latest': 'Latest', 'data.stale': 'stale', 'data.allFresh': 'All current',
+    'data.details': 'Details', 'data.symbol': 'Symbol', 'data.first': 'First', 'data.last': 'Last', 'data.rows': 'Rows', 'data.lag': 'Lag',
+    'data.experimentReady': 'Window is ripe: the pre-registered test can start.', 'data.experimentPending': '{remaining} bars to go, usable from {eta}.', 'data.freshnessUnavailable': 'Freshness unavailable',
+    'data.staleList': 'Stale symbols: {symbols}',
   },
   de: {
     'nav.dashboard': 'Dashboard', 'nav.launchpad': 'Startbereich', 'nav.data': 'Daten-Download', 'nav.inspector': 'Faktor-Inspektor',
@@ -111,6 +119,10 @@ const translations: Record<Language, Record<string, string>> = {
     'bt.result': 'Ergebnis', 'bt.empty': 'Faktoren wählen und starten; das Ergebnis erscheint hier.', 'bt.metrics': 'Kennzahlen', 'bt.equity': 'Kapitalkurve', 'bt.equityAxis': 'Portfoliowert', 'bt.drawdownAxis': 'Drawdown',
     'bt.totalReturn': 'Gesamtrendite', 'bt.maxDrawdown': 'Max. Drawdown', 'bt.sharpe': 'Sharpe', 'bt.cagr': 'CAGR', 'bt.volatility': 'Volatilität', 'bt.trades': 'Trades', 'bt.costs': 'Gesamtkosten', 'bt.turnover': 'Umschlag', 'bt.scope': 'Zeitraum', 'bt.assets': 'Assets',
     'bt.effectiveWeights': 'Effektive Gewichte', 'bt.expanded': 'Aufgelöste Kombination', 'bt.history': 'Verlauf', 'bt.noHistory': 'Noch kein Backtest durchgeführt.', 'bt.failed': 'Fehlgeschlagen', 'bt.viewRun': 'Ansehen', 'bt.openInspector': 'Im Inspektor öffnen',
+    'data.freshness': 'Datenaktualität', 'data.files': 'Dateien', 'data.assets1d': 'Tageswerte', 'data.latest': 'Neueste', 'data.stale': 'veraltet', 'data.allFresh': 'Alle aktuell',
+    'data.details': 'Details', 'data.symbol': 'Symbol', 'data.first': 'Beginn', 'data.last': 'Ende', 'data.rows': 'Zeilen', 'data.lag': 'Verzug',
+    'data.experimentReady': 'Fenster ist reif: der vorregistrierte Test kann starten.', 'data.experimentPending': 'Noch {remaining} Bars, nutzbar ab {eta}.', 'data.freshnessUnavailable': 'Aktualität nicht verfügbar',
+    'data.staleList': 'Veraltete Symbole: {symbols}',
   },
 };
 

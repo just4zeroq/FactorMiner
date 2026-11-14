@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Download, CheckCircle2, Info, Loader2 } from 'lucide-react';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { FreshnessPanel } from '../components/FreshnessPanel';
 import Slider from 'rc-slider';
 import 'rc-slider/assets/index.css';
 
@@ -37,6 +38,7 @@ export function DataDownload() {
   const [logs, setLogs] = useState<string[]>([]);
   
   const [coverageResults, setCoverageResults] = useState<any[]>([]);
+  const [freshnessKey, setFreshnessKey] = useState(0);
 
   const { lastMessage } = useWebSocket('ws://localhost:8000/ws/monitor');
 
@@ -92,6 +94,7 @@ export function DataDownload() {
       if (lastMessage.progress >= 100) {
         setIsDownloading(false);
         fetchCoverage();
+        setFreshnessKey((value) => value + 1);
       }
     }
   }, [lastMessage, fetchCoverage]);
@@ -161,6 +164,7 @@ export function DataDownload() {
 
   return (
     <div className="flex flex-col h-full gap-6 w-full pb-10">
+      <FreshnessPanel refreshKey={freshnessKey} />
       <div className="border border-border bg-card rounded-xl p-8 flex flex-col">
 
         <div className="flex flex-col gap-8 mb-8">

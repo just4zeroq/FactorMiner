@@ -833,6 +833,23 @@ async def get_backtest_run(run_id: str):
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"Unknown backtest run: {run_id}") from exc
 
+@app.get("/api/data/freshness")
+async def get_data_freshness():
+    """Local library freshness plus progress toward the next pre-registered window."""
+    import json
+
+    from core.data_feed.freshness import freshness_report
+
+    spec = None
+    spec_path = os.path.join("user_workspace", "experiment_window.json")
+    if os.path.exists(spec_path):
+        try:
+            with open(spec_path, encoding="utf-8-sig") as handle:
+                spec = json.load(handle)
+        except Exception:
+            spec = None
+    return freshness_report(experiment_spec=spec)
+
 @app.get("/api/gates/budget")
 async def get_hypothesis_budget(n_obs: int | None = None, budget: int | None = None):
     """Cumulative multiple-testing budget and the Sharpe bar it implies."""
