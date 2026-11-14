@@ -1,0 +1,242 @@
+{
+  "factor_id": "fac_eb287869",
+  "miner_type": "GP",
+  "user_id": "CharlesJ-ABu",
+  "lifecycle_status": "INSPECTED",
+  "parent_ids": [],
+  "generation_config": {
+    "max_iterations": 20,
+    "population_size": 60
+  },
+  "logic_reference": {
+    "type": "json_ast",
+    "ast": {
+      "op": "add",
+      "left": {
+        "op": "add",
+        "left": {
+          "op": "add",
+          "left": {
+            "op": "add",
+            "left": {
+              "op": "cs_rank",
+              "left": {
+                "op": "cs_rank",
+                "left": {
+                  "op": "ts_rsi",
+                  "window": 10,
+                  "left": "volume"
+                }
+              }
+            },
+            "right": {
+              "op": "tanh",
+              "left": {
+                "op": "ts_ema",
+                "window": 49,
+                "left": {
+                  "op": "ts_decay_linear",
+                  "window": 26,
+                  "left": {
+                    "op": "div",
+                    "left": {
+                      "op": "ts_rsi",
+                      "window": 34,
+                      "left": "high"
+                    },
+                    "right": {
+                      "op": "ts_std",
+                      "window": 30,
+                      "left": "low"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "right": {
+            "op": "ts_realized_vol",
+            "window": 53,
+            "left": "close"
+          }
+        },
+        "right": {
+          "op": "tanh",
+          "left": {
+            "op": "add",
+            "left": {
+              "op": "ts_realized_vol",
+              "window": 9,
+              "left": "close"
+            },
+            "right": {
+              "op": "tanh",
+              "left": {
+                "op": "ts_realized_vol",
+                "window": 10,
+                "left": "close"
+              }
+            }
+          }
+        }
+      },
+      "right": {
+        "op": "add",
+        "left": {
+          "op": "add",
+          "left": {
+            "op": "cs_rank",
+            "left": {
+              "op": "add",
+              "left": {
+                "op": "add",
+                "left": {
+                  "op": "cs_rank",
+                  "left": {
+                    "op": "ts_realized_vol",
+                    "window": 9,
+                    "left": "close"
+                  }
+                },
+                "right": {
+                  "op": "ts_realized_vol",
+                  "window": 53,
+                  "left": "close"
+                }
+              },
+              "right": {
+                "op": "tanh",
+                "left": {
+                  "op": "ts_ema",
+                  "window": 49,
+                  "left": {
+                    "op": "cs_rank",
+                    "left": {
+                      "op": "ts_realized_vol",
+                      "window": 10,
+                      "left": "close"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "right": {
+            "op": "ts_realized_vol",
+            "window": 53,
+            "left": "close"
+          }
+        },
+        "right": {
+          "op": "tanh",
+          "left": {
+            "op": "ts_ema",
+            "window": 49,
+            "left": {
+              "op": "ts_rsi",
+              "window": 10,
+              "left": "volume"
+            }
+          }
+        }
+      }
+    }
+  },
+  "logic_hash": "bb43268b696195c36ef958ebf3905a91",
+  "metrics": {
+    "IC": -0.04236138150413309,
+    "RankIC": -0.07833203920340866,
+    "Turnover": 0.22935388987309002,
+    "RankIC_oos": 0.09019568789523479,
+    "IC_oos": -0.09253327271721705,
+    "oos_consistent": true,
+    "oos_enabled": true,
+    "shrinkage": 0.9987717497923667,
+    "coverage": 0.9547581903276131,
+    "turnover_penalty": 1.0,
+    "fitness_score": 8.39515760551967,
+    "hac_t": 5.884979944114143,
+    "p_value": 3.9810226226677514e-09,
+    "dsr": 0.9866060135408784,
+    "ir": 0.23859956352815012,
+    "n_obs": 612,
+    "cost_adj_return": 0.07765983586417022,
+    "p_adj": 3.9810226226677514e-09,
+    "n_trials": 787,
+    "orientation": -1.0
+  },
+  "data_lineage": {
+    "source": "RealDataClient",
+    "exchange": "binance",
+    "instrument_type": "futures",
+    "timeframe": "1d",
+    "pairs": [
+      "BTC/USDT:USDT",
+      "ETH/USDT:USDT",
+      "SOL/USDT:USDT",
+      "BNB/USDT:USDT",
+      "XRP/USDT:USDT",
+      "DOGE/USDT:USDT",
+      "ADA/USDT:USDT",
+      "AVAX/USDT:USDT",
+      "LINK/USDT:USDT",
+      "DOT/USDT:USDT",
+      "LTC/USDT:USDT",
+      "TRX/USDT:USDT",
+      "ATOM/USDT:USDT",
+      "NEAR/USDT:USDT",
+      "APT/USDT:USDT",
+      "ARB/USDT:USDT",
+      "OP/USDT:USDT",
+      "INJ/USDT:USDT",
+      "FIL/USDT:USDT",
+      "ETC/USDT:USDT"
+    ],
+    "mining_mode": "cross_asset",
+    "mine_period": [
+      [
+        "2023-04-01",
+        "2024-12-31"
+      ]
+    ],
+    "test_period": [
+      [
+        "2025-01-01",
+        "2025-06-30"
+      ]
+    ],
+    "evaluation_split": "mine",
+    "evaluation_period": [
+      [
+        "2023-04-01",
+        "2024-12-31"
+      ]
+    ],
+    "required_streams": [
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "target": {
+      "type": "forward_return",
+      "entry_price": "current_close",
+      "exit_price": "close",
+      "horizon_bars": 1,
+      "return_type": "simple"
+    },
+    "forward_return_definition": "close[t+1] / close[t] - 1",
+    "snapshot_file": "fac_eb287869.parquet",
+    "snapshot_schema": [
+      "timestamp",
+      "asset",
+      "factor",
+      "forward_return"
+    ],
+    "snapshot_rows": 12820,
+    "snapshot_start": "2023-04-01T00:00:00",
+    "snapshot_end": "2024-12-31T00:00:00"
+  },
+  "created_at": "2026-11-14T10:06:06.724750"
+}

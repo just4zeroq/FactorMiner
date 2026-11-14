@@ -1,0 +1,4 @@
+{"signature": "cbd0e132a6bd67bd", "fitness": 3.5786231057472664, "rank_ic": -0.03680756719654131, "rank_ic_oos": 0.0348791441691477, "significant": false, "meta": {"p_adj": 6.473354743596893e-05}, "at": "2026-11-14T10:06:05"}
+{"signature": "d1db070c90ce0854", "fitness": 8.39515760551967, "rank_ic": -0.07833203920340866, "rank_ic_oos": 0.09019568789523479, "significant": false, "meta": {"p_adj": 1.0294420871304055e-08}, "at": "2026-11-14T10:06:05"}
+{"signature": "b43cacea7eeb1ae2", "fitness": 7.671361035739745, "rank_ic": -0.06591709876227418, "rank_ic_oos": 0.08949891507291718, "significant": false, "meta": {"p_adj": 7.259524636834176e-06}, "at": "2026-11-14T10:06:05"}
+{"signature": "3ae936d26fbb3179", "fitness": 7.572901234193208, "rank_ic": -0.06944370731096532, "rank_ic_oos": 0.082786436289399, "significant": false, "meta": {"p_adj": 2.6906654682079534e-10}, "at": "2026-11-14T10:06:05"}

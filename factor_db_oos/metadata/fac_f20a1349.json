@@ -1,0 +1,114 @@
+{
+    "factor_id": "fac_f20a1349",
+    "miner_type": "MyCustomGP",
+    "user_id": "CharlesJ-ABu",
+    "lifecycle_status": "INSPECTED",
+    "parent_ids": [],
+    "generation_config": {
+        "max_iterations": 5,
+        "population_size": 30
+    },
+    "logic_reference": {
+        "type": "json_ast",
+        "ast": {
+            "op": "ts_std",
+            "left": {
+                "op": "div",
+                "left": "volume",
+                "right": {
+                    "op": "mul",
+                    "left": {
+                        "op": "add",
+                        "left": "volume",
+                        "right": "close"
+                    },
+                    "right": {
+                        "op": "ts_mean",
+                        "left": "open"
+                    }
+                }
+            }
+        }
+    },
+    "logic_hash": "990b9799d1126f6ee3575c50986eaf68",
+    "metrics": {
+        "IC": 0.034834087743957506,
+        "RankIC": -0.04346601373751381,
+        "Turnover": 0.002938648787572529,
+        "fitness_score": 4.346601373751382
+    },
+    "data_lineage": {
+        "source": "RealDataClient",
+        "exchange": "binance",
+        "instrument_type": "futures",
+        "timeframe": "1d",
+        "pairs": [
+            "BTC/USDT:USDT",
+            "ETH/USDT:USDT",
+            "SOL/USDT:USDT",
+            "BNB/USDT:USDT",
+            "XRP/USDT:USDT",
+            "DOGE/USDT:USDT",
+            "ADA/USDT:USDT",
+            "AVAX/USDT:USDT",
+            "LINK/USDT:USDT",
+            "DOT/USDT:USDT",
+            "LTC/USDT:USDT",
+            "TRX/USDT:USDT",
+            "ATOM/USDT:USDT",
+            "NEAR/USDT:USDT",
+            "APT/USDT:USDT",
+            "ARB/USDT:USDT",
+            "OP/USDT:USDT",
+            "INJ/USDT:USDT",
+            "FIL/USDT:USDT",
+            "ETC/USDT:USDT"
+        ],
+        "mining_mode": "cross_asset",
+        "mine_period": [
+            [
+                "2024-01-01",
+                "2024-12-31"
+            ]
+        ],
+        "test_period": [
+            [
+                "2025-01-01",
+                "2025-06-30"
+            ]
+        ],
+        "evaluation_split": "mine",
+        "evaluation_period": [
+            [
+                "2024-01-01",
+                "2024-12-31"
+            ]
+        ],
+        "required_streams": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+        ],
+        "target": {
+            "type": "forward_return",
+            "entry_price": "current_close",
+            "exit_price": "close",
+            "horizon_bars": 1,
+            "return_type": "simple"
+        },
+        "forward_return_definition": "close[t+1] / close[t] - 1",
+        "snapshot_file": "fac_f20a1349.parquet",
+        "snapshot_schema": [
+            "timestamp",
+            "asset",
+            "factor",
+            "forward_return"
+        ],
+        "snapshot_rows": 7320,
+        "snapshot_start": "2024-01-01T00:00:00",
+        "snapshot_end": "2024-12-31T00:00:00"
+    },
+    "created_at": "2026-11-13T22:12:32.749382"
+}

@@ -99,7 +99,22 @@ data/
 !data/binance/futures/.gitkeep
 factor_db/
 !factor_db/.gitkeep
+# Experiment factor databases produced by validation runs.
+# Keep metadata/*.json (small, reproducible evidence); skip the binary factor values.
+factor_db_*/values/
 user_workspace/experiments/
+# Binary run artifacts (equity curves / fills / predictions); keep .md/.json/.csv summaries
+user_workspace/reports/**/*.parquet
+user_workspace/reports/**/*.log
+# Bulk per-row dumps from backtest run bundles (regenerable from the run config)
+user_workspace/reports/**/prices.csv
+user_workspace/reports/**/signals.csv
+user_workspace/reports/**/funding.csv
+user_workspace/reports/**/fills.csv
+user_workspace/reports/**/portfolio_state.csv
+user_workspace/reports/**/trades.csv
+user_workspace/reports/**/spec.yaml
+user_workspace/reports/**/config.yaml
 web/node_modules/
 web/dist/
 .env
@@ -113,3 +128,6 @@ test_*.py
 !tests/test_*.py
 demo_v4_script.py
 implementation_plan.md
+
+# Agent workspace notes (local only)
+.workbuddy/

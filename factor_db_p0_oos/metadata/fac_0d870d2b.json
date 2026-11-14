@@ -1,0 +1,233 @@
+{
+  "factor_id": "fac_0d870d2b",
+  "miner_type": "GP",
+  "user_id": "CharlesJ-ABu",
+  "lifecycle_status": "INSPECTED",
+  "parent_ids": [],
+  "generation_config": {
+    "max_iterations": 20,
+    "population_size": 60
+  },
+  "logic_reference": {
+    "type": "json_ast",
+    "ast": {
+      "op": "add",
+      "left": {
+        "op": "add",
+        "left": {
+          "op": "add",
+          "left": {
+            "op": "add",
+            "left": {
+              "op": "cs_rank",
+              "left": {
+                "op": "cs_rank",
+                "left": {
+                  "op": "ts_rsi",
+                  "window": 10,
+                  "left": "volume"
+                }
+              }
+            },
+            "right": {
+              "op": "tanh",
+              "left": {
+                "op": "ts_ema",
+                "window": 49,
+                "left": {
+                  "op": "ts_decay_linear",
+                  "window": 26,
+                  "left": {
+                    "op": "div",
+                    "left": {
+                      "op": "ts_rsi",
+                      "window": 34,
+                      "left": "high"
+                    },
+                    "right": {
+                      "op": "ts_std",
+                      "window": 30,
+                      "left": "low"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "right": {
+            "op": "ts_realized_vol",
+            "window": 53,
+            "left": "close"
+          }
+        },
+        "right": {
+          "op": "tanh",
+          "left": {
+            "op": "ts_ema",
+            "window": 49,
+            "left": {
+              "op": "ts_rsi",
+              "window": 10,
+              "left": "volume"
+            }
+          }
+        }
+      },
+      "right": {
+        "op": "add",
+        "left": {
+          "op": "add",
+          "left": {
+            "op": "add",
+            "left": {
+              "op": "ts_realized_vol",
+              "window": 53,
+              "left": "close"
+            },
+            "right": {
+              "op": "tanh",
+              "left": {
+                "op": "ts_ema",
+                "window": 49,
+                "left": {
+                  "op": "ts_decay_linear",
+                  "window": 26,
+                  "left": {
+                    "op": "div",
+                    "left": {
+                      "op": "cs_rank",
+                      "left": {
+                        "op": "ts_realized_vol",
+                        "window": 30,
+                        "left": "close"
+                      }
+                    },
+                    "right": {
+                      "op": "ts_std",
+                      "window": 30,
+                      "left": "low"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "right": {
+            "op": "ts_realized_vol",
+            "window": 53,
+            "left": "close"
+          }
+        },
+        "right": {
+          "op": "tanh",
+          "left": {
+            "op": "ts_zscore",
+            "left": {
+              "op": "ts_rsi",
+              "window": 10,
+              "left": "volume"
+            },
+            "window": 37
+          }
+        }
+      }
+    }
+  },
+  "logic_hash": "d3c9650e3d7795a6d3ad287244b9147b",
+  "metrics": {
+    "IC": -0.03838647815537287,
+    "RankIC": -0.06944370731096532,
+    "Turnover": 0.5741966389375832,
+    "RankIC_oos": 0.082786436289399,
+    "IC_oos": -0.0856739602644943,
+    "oos_consistent": true,
+    "oos_enabled": true,
+    "shrinkage": 0.9987717497923667,
+    "coverage": 0.9547581903276131,
+    "turnover_penalty": 1.0,
+    "fitness_score": 7.572901234193208,
+    "hac_t": 6.615697775501508,
+    "p_value": 3.6980196682634414e-11,
+    "dsr": 0.9973897557556465,
+    "ir": 0.26266996096916123,
+    "n_obs": 612,
+    "cost_adj_return": 0.06894196275001228,
+    "p_adj": 3.6980196682634414e-11,
+    "n_trials": 787,
+    "orientation": -1.0
+  },
+  "data_lineage": {
+    "source": "RealDataClient",
+    "exchange": "binance",
+    "instrument_type": "futures",
+    "timeframe": "1d",
+    "pairs": [
+      "BTC/USDT:USDT",
+      "ETH/USDT:USDT",
+      "SOL/USDT:USDT",
+      "BNB/USDT:USDT",
+      "XRP/USDT:USDT",
+      "DOGE/USDT:USDT",
+      "ADA/USDT:USDT",
+      "AVAX/USDT:USDT",
+      "LINK/USDT:USDT",
+      "DOT/USDT:USDT",
+      "LTC/USDT:USDT",
+      "TRX/USDT:USDT",
+      "ATOM/USDT:USDT",
+      "NEAR/USDT:USDT",
+      "APT/USDT:USDT",
+      "ARB/USDT:USDT",
+      "OP/USDT:USDT",
+      "INJ/USDT:USDT",
+      "FIL/USDT:USDT",
+      "ETC/USDT:USDT"
+    ],
+    "mining_mode": "cross_asset",
+    "mine_period": [
+      [
+        "2023-04-01",
+        "2024-12-31"
+      ]
+    ],
+    "test_period": [
+      [
+        "2025-01-01",
+        "2025-06-30"
+      ]
+    ],
+    "evaluation_split": "mine",
+    "evaluation_period": [
+      [
+        "2023-04-01",
+        "2024-12-31"
+      ]
+    ],
+    "required_streams": [
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "target": {
+      "type": "forward_return",
+      "entry_price": "current_close",
+      "exit_price": "close",
+      "horizon_bars": 1,
+      "return_type": "simple"
+    },
+    "forward_return_definition": "close[t+1] / close[t] - 1",
+    "snapshot_file": "fac_0d870d2b.parquet",
+    "snapshot_schema": [
+      "timestamp",
+      "asset",
+      "factor",
+      "forward_return"
+    ],
+    "snapshot_rows": 12820,
+    "snapshot_start": "2023-04-01T00:00:00",
+    "snapshot_end": "2024-12-31T00:00:00"
+  },
+  "created_at": "2026-11-14T10:06:07.201205"
+}

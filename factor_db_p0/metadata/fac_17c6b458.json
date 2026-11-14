@@ -1,0 +1,434 @@
+{
+  "factor_id": "fac_17c6b458",
+  "miner_type": "GP",
+  "user_id": "CharlesJ-ABu",
+  "lifecycle_status": "DISCOVERED_UNVERIFIED",
+  "parent_ids": [],
+  "generation_config": {
+    "max_iterations": 20,
+    "population_size": 60
+  },
+  "logic_reference": {
+    "type": "linear_combination",
+    "weights": [
+      -0.0012789975226703547,
+      0.00222082450576159,
+      0.001149879837724843
+    ],
+    "sub_asts": [
+      {
+        "op": "add",
+        "left": {
+          "op": "add",
+          "left": {
+            "op": "add",
+            "left": {
+              "op": "add",
+              "left": {
+                "op": "cs_rank",
+                "left": {
+                  "op": "cs_rank",
+                  "left": {
+                    "op": "ts_rsi",
+                    "window": 10,
+                    "left": "volume"
+                  }
+                }
+              },
+              "right": {
+                "op": "tanh",
+                "left": {
+                  "op": "ts_ema",
+                  "window": 49,
+                  "left": {
+                    "op": "ts_decay_linear",
+                    "window": 26,
+                    "left": {
+                      "op": "div",
+                      "left": {
+                        "op": "ts_rsi",
+                        "window": 34,
+                        "left": "high"
+                      },
+                      "right": {
+                        "op": "ts_std",
+                        "window": 30,
+                        "left": "low"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "right": {
+              "op": "ts_realized_vol",
+              "window": 53,
+              "left": "close"
+            }
+          },
+          "right": {
+            "op": "tanh",
+            "left": {
+              "op": "add",
+              "left": {
+                "op": "ts_realized_vol",
+                "window": 9,
+                "left": "close"
+              },
+              "right": {
+                "op": "tanh",
+                "left": {
+                  "op": "ts_realized_vol",
+                  "window": 10,
+                  "left": "close"
+                }
+              }
+            }
+          }
+        },
+        "right": {
+          "op": "add",
+          "left": {
+            "op": "add",
+            "left": {
+              "op": "cs_rank",
+              "left": {
+                "op": "add",
+                "left": {
+                  "op": "add",
+                  "left": {
+                    "op": "cs_rank",
+                    "left": {
+                      "op": "ts_realized_vol",
+                      "window": 9,
+                      "left": "close"
+                    }
+                  },
+                  "right": {
+                    "op": "ts_realized_vol",
+                    "window": 53,
+                    "left": "close"
+                  }
+                },
+                "right": {
+                  "op": "tanh",
+                  "left": {
+                    "op": "ts_ema",
+                    "window": 49,
+                    "left": {
+                      "op": "cs_rank",
+                      "left": {
+                        "op": "ts_realized_vol",
+                        "window": 10,
+                        "left": "close"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "right": {
+              "op": "ts_realized_vol",
+              "window": 53,
+              "left": "close"
+            }
+          },
+          "right": {
+            "op": "tanh",
+            "left": {
+              "op": "ts_ema",
+              "window": 49,
+              "left": {
+                "op": "ts_rsi",
+                "window": 10,
+                "left": "volume"
+              }
+            }
+          }
+        }
+      },
+      {
+        "op": "add",
+        "left": {
+          "op": "ts_realized_vol",
+          "window": 9,
+          "left": "close"
+        },
+        "right": {
+          "op": "tanh",
+          "left": {
+            "op": "add",
+            "left": {
+              "op": "add",
+              "left": {
+                "op": "ts_ema",
+                "window": 49,
+                "left": {
+                  "op": "ts_decay_linear",
+                  "window": 26,
+                  "left": {
+                    "op": "div",
+                    "left": {
+                      "op": "ts_rsi",
+                      "window": 34,
+                      "left": "high"
+                    },
+                    "right": {
+                      "op": "ts_std",
+                      "window": 30,
+                      "left": "low"
+                    }
+                  }
+                }
+              },
+              "right": {
+                "op": "ts_realized_vol",
+                "window": 26,
+                "left": "close"
+              }
+            },
+            "right": {
+              "op": "tanh",
+              "left": {
+                "op": "ts_decay_linear",
+                "window": 26,
+                "left": {
+                  "op": "div",
+                  "left": {
+                    "op": "ts_rsi",
+                    "window": 39,
+                    "left": "high"
+                  },
+                  "right": {
+                    "op": "ts_std",
+                    "window": 13,
+                    "left": "low"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      {
+        "op": "add",
+        "left": {
+          "op": "add",
+          "left": {
+            "op": "add",
+            "left": {
+              "op": "add",
+              "left": {
+                "op": "cs_rank",
+                "left": {
+                  "op": "cs_rank",
+                  "left": {
+                    "op": "ts_rsi",
+                    "window": 10,
+                    "left": "volume"
+                  }
+                }
+              },
+              "right": {
+                "op": "tanh",
+                "left": {
+                  "op": "ts_ema",
+                  "window": 49,
+                  "left": {
+                    "op": "ts_decay_linear",
+                    "window": 26,
+                    "left": {
+                      "op": "div",
+                      "left": {
+                        "op": "ts_rsi",
+                        "window": 34,
+                        "left": "high"
+                      },
+                      "right": {
+                        "op": "ts_std",
+                        "window": 30,
+                        "left": "low"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "right": {
+              "op": "ts_realized_vol",
+              "window": 53,
+              "left": "close"
+            }
+          },
+          "right": {
+            "op": "tanh",
+            "left": {
+              "op": "ts_ema",
+              "window": 49,
+              "left": {
+                "op": "ts_rsi",
+                "window": 10,
+                "left": "volume"
+              }
+            }
+          }
+        },
+        "right": {
+          "op": "add",
+          "left": {
+            "op": "add",
+            "left": {
+              "op": "add",
+              "left": {
+                "op": "ts_realized_vol",
+                "window": 53,
+                "left": "close"
+              },
+              "right": {
+                "op": "tanh",
+                "left": {
+                  "op": "ts_ema",
+                  "window": 49,
+                  "left": {
+                    "op": "ts_decay_linear",
+                    "window": 26,
+                    "left": {
+                      "op": "div",
+                      "left": {
+                        "op": "cs_rank",
+                        "left": {
+                          "op": "ts_realized_vol",
+                          "window": 30,
+                          "left": "close"
+                        }
+                      },
+                      "right": {
+                        "op": "ts_std",
+                        "window": 30,
+                        "left": "low"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "right": {
+              "op": "ts_realized_vol",
+              "window": 53,
+              "left": "close"
+            }
+          },
+          "right": {
+            "op": "tanh",
+            "left": {
+              "op": "ts_zscore",
+              "left": {
+                "op": "ts_rsi",
+                "window": 10,
+                "left": "volume"
+              },
+              "window": 37
+            }
+          }
+        }
+      }
+    ]
+  },
+  "logic_hash": "",
+  "metrics": {
+    "IC": -0.02293012758417407,
+    "RankIC": -0.03680756719654131,
+    "Turnover": 0.0004945488840746704,
+    "RankIC_oos": 0.0348791441691477,
+    "IC_oos": -0.04352123148016116,
+    "oos_consistent": true,
+    "oos_enabled": true,
+    "shrinkage": 0.9987677136415694,
+    "coverage": 0.9516380655226209,
+    "turnover_penalty": 1.0,
+    "fitness_score": 3.5786231057472664,
+    "hac_t": 4.111079370374204,
+    "p_value": 3.9381378496461394e-05,
+    "dsr": 0.5118812306343207,
+    "ir": 0.14919661302381396,
+    "n_obs": 610,
+    "cost_adj_return": 0.03667693824725749,
+    "p_adj": 3.9381378496461394e-05,
+    "n_trials": 787,
+    "orientation": -1.0
+  },
+  "data_lineage": {
+    "source": "RealDataClient",
+    "exchange": "binance",
+    "instrument_type": "futures",
+    "timeframe": "1d",
+    "pairs": [
+      "BTC/USDT:USDT",
+      "ETH/USDT:USDT",
+      "SOL/USDT:USDT",
+      "BNB/USDT:USDT",
+      "XRP/USDT:USDT",
+      "DOGE/USDT:USDT",
+      "ADA/USDT:USDT",
+      "AVAX/USDT:USDT",
+      "LINK/USDT:USDT",
+      "DOT/USDT:USDT",
+      "LTC/USDT:USDT",
+      "TRX/USDT:USDT",
+      "ATOM/USDT:USDT",
+      "NEAR/USDT:USDT",
+      "APT/USDT:USDT",
+      "ARB/USDT:USDT",
+      "OP/USDT:USDT",
+      "INJ/USDT:USDT",
+      "FIL/USDT:USDT",
+      "ETC/USDT:USDT"
+    ],
+    "mining_mode": "cross_asset",
+    "mine_period": [
+      [
+        "2023-04-01",
+        "2024-12-31"
+      ]
+    ],
+    "test_period": [
+      [
+        "2025-01-01",
+        "2025-06-30"
+      ]
+    ],
+    "evaluation_split": "mine",
+    "evaluation_period": [
+      [
+        "2023-04-01",
+        "2024-12-31"
+      ]
+    ],
+    "required_streams": [
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "target": {
+      "type": "forward_return",
+      "entry_price": "current_close",
+      "exit_price": "close",
+      "horizon_bars": 1,
+      "return_type": "simple"
+    },
+    "forward_return_definition": "close[t+1] / close[t] - 1",
+    "snapshot_file": "fac_17c6b458.parquet",
+    "snapshot_schema": [
+      "timestamp",
+      "asset",
+      "factor",
+      "forward_return"
+    ],
+    "snapshot_rows": 12820,
+    "snapshot_start": "2023-04-01T00:00:00",
+    "snapshot_end": "2024-12-31T00:00:00"
+  },
+  "created_at": "2026-11-14T10:06:05.906856"
+}

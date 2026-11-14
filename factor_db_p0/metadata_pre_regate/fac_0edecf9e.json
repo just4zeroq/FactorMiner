@@ -1,0 +1,173 @@
+{
+    "factor_id": "fac_0edecf9e",
+    "miner_type": "GP",
+    "user_id": "CharlesJ-ABu",
+    "lifecycle_status": "DISCOVERED_UNVERIFIED",
+    "parent_ids": [],
+    "generation_config": {
+        "max_iterations": 20,
+        "population_size": 60
+    },
+    "logic_reference": {
+        "type": "json_ast",
+        "ast": {
+            "op": "add",
+            "left": {
+                "op": "ts_realized_vol",
+                "window": 9,
+                "left": "close"
+            },
+            "right": {
+                "op": "tanh",
+                "left": {
+                    "op": "add",
+                    "left": {
+                        "op": "add",
+                        "left": {
+                            "op": "ts_ema",
+                            "window": 49,
+                            "left": {
+                                "op": "ts_decay_linear",
+                                "window": 26,
+                                "left": {
+                                    "op": "div",
+                                    "left": {
+                                        "op": "ts_rsi",
+                                        "window": 34,
+                                        "left": "high"
+                                    },
+                                    "right": {
+                                        "op": "ts_std",
+                                        "window": 30,
+                                        "left": "low"
+                                    }
+                                }
+                            }
+                        },
+                        "right": {
+                            "op": "ts_realized_vol",
+                            "window": 26,
+                            "left": "close"
+                        }
+                    },
+                    "right": {
+                        "op": "tanh",
+                        "left": {
+                            "op": "ts_decay_linear",
+                            "window": 26,
+                            "left": {
+                                "op": "div",
+                                "left": {
+                                    "op": "ts_rsi",
+                                    "window": 39,
+                                    "left": "high"
+                                },
+                                "right": {
+                                    "op": "ts_std",
+                                    "window": 13,
+                                    "left": "low"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "logic_hash": "f35080e96f70b5b0ef5869bdde48d694",
+    "metrics": {
+        "IC": -0.02513324966787694,
+        "RankIC": -0.06591709876227418,
+        "Turnover": 0.003787530873976576,
+        "RankIC_oos": 0.08949891507291718,
+        "IC_oos": -0.050737220535062647,
+        "oos_consistent": true,
+        "oos_enabled": true,
+        "shrinkage": 0.9987677136415694,
+        "coverage": 0.9516380655226209,
+        "turnover_penalty": 1.0,
+        "fitness_score": 7.671361035739745,
+        "hac_t": -4.5468822655703685,
+        "p_value": 5.4446434776256325e-06,
+        "dsr": 1.6653345369377348e-16,
+        "ir": -0.1813743752672971,
+        "n_obs": 641,
+        "cost_adj_return": -0.061851195852345366,
+        "p_adj": 7.259524636834176e-06,
+        "n_trials": 787
+    },
+    "data_lineage": {
+        "source": "RealDataClient",
+        "exchange": "binance",
+        "instrument_type": "futures",
+        "timeframe": "1d",
+        "pairs": [
+            "BTC/USDT:USDT",
+            "ETH/USDT:USDT",
+            "SOL/USDT:USDT",
+            "BNB/USDT:USDT",
+            "XRP/USDT:USDT",
+            "DOGE/USDT:USDT",
+            "ADA/USDT:USDT",
+            "AVAX/USDT:USDT",
+            "LINK/USDT:USDT",
+            "DOT/USDT:USDT",
+            "LTC/USDT:USDT",
+            "TRX/USDT:USDT",
+            "ATOM/USDT:USDT",
+            "NEAR/USDT:USDT",
+            "APT/USDT:USDT",
+            "ARB/USDT:USDT",
+            "OP/USDT:USDT",
+            "INJ/USDT:USDT",
+            "FIL/USDT:USDT",
+            "ETC/USDT:USDT"
+        ],
+        "mining_mode": "cross_asset",
+        "mine_period": [
+            [
+                "2023-04-01",
+                "2024-12-31"
+            ]
+        ],
+        "test_period": [
+            [
+                "2025-01-01",
+                "2025-06-30"
+            ]
+        ],
+        "evaluation_split": "mine",
+        "evaluation_period": [
+            [
+                "2023-04-01",
+                "2024-12-31"
+            ]
+        ],
+        "required_streams": [
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume"
+        ],
+        "target": {
+            "type": "forward_return",
+            "entry_price": "current_close",
+            "exit_price": "close",
+            "horizon_bars": 1,
+            "return_type": "simple"
+        },
+        "forward_return_definition": "close[t+1] / close[t] - 1",
+        "snapshot_file": "fac_0edecf9e.parquet",
+        "snapshot_schema": [
+            "timestamp",
+            "asset",
+            "factor",
+            "forward_return"
+        ],
+        "snapshot_rows": 12820,
+        "snapshot_start": "2023-04-01T00:00:00",
+        "snapshot_end": "2024-12-31T00:00:00"
+    },
+    "created_at": "2026-11-14T10:06:06.910182"
+}
