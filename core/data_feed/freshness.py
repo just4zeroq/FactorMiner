@@ -63,46 +63,84 @@ def _read_last_date(path: str) -> Optional[tuple]:
     return dates.min(), dates.max(), int(len(frame))
 
 
-def scan_data_root(data_root: str = "data") -> List[Dict[str, Any]]:
-    """Every canonical data file under ``{data_root}/{exchange}/{trade_type}/``."""
-    items: List[Dict[str, Any]] = []
-    if not os.path.isdir(data_root):
-        return items
+def _candidate_files(data_root: str):
+    """Yield (path, exchange, market_type, stream) for every feather under the root.
 
+    Two directory shapes exist. Plain OHLCV lives at
+    ``{root}/{exchange}/{trade_type}/{file}``; crypto-native streams live one
+    level deeper at ``{root}/{exchange}/{trade_type}/crypto_streams/{file}``.
+    Walking only the first shape is what let 62 stream files stay invisible.
+    """
     for exchange in sorted(os.listdir(data_root)):
         exchange_dir = os.path.join(data_root, exchange)
         if not os.path.isdir(exchange_dir):
             continue
-        for trade_type in sorted(os.listdir(exchange_dir)):
-            trade_dir = os.path.join(exchange_dir, trade_type)
-            if not os.path.isdir(trade_dir):
+        for market in sorted(os.listdir(exchange_dir)):
+            market_dir = os.path.join(exchange_dir, market)
+            if not os.path.isdir(market_dir):
                 continue
-            for filename in sorted(os.listdir(trade_dir)):
-                if not filename.endswith(".feather"):
+            for filename in sorted(os.listdir(market_dir)):
+                path = os.path.join(market_dir, filename)
+                if os.path.isfile(path) and filename.endswith(".feather"):
+                    yield path, exchange, market, None
+            for sub in sorted(os.listdir(market_dir)):
+                sub_dir = os.path.join(market_dir, sub)
+                if not os.path.isdir(sub_dir):
                     continue
-                try:
-                    symbol, timeframe, parsed_type = parse_data_filename(filename)
-                except ValueError:
-                    continue
-                summary = _read_last_date(os.path.join(trade_dir, filename))
-                if summary is None:
-                    continue
-                first, last, rows = summary
-                resolved_type = parsed_type or trade_type
-                items.append(
-                    {
-                        "symbol": display_symbol(symbol, resolved_type),
-                        "safe_symbol": symbol,
-                        "exchange": exchange,
-                        "trade_type": resolved_type,
-                        "timeframe": timeframe,
-                        "start": first.strftime("%Y-%m-%d"),
-                        "last": last.strftime("%Y-%m-%d"),
-                        "rows": rows,
-                        "_last_ts": last,
-                    }
-                )
-    return items
+                for filename in sorted(os.listdir(sub_dir)):
+                    path = os.path.join(sub_dir, filename)
+                    if os.path.isfile(path) and filename.endswith(".feather"):
+                        yield path, exchange, market, sub
+
+
+def scan_library(data_root: str = "data") -> tuple:
+    """Return ``(items, skipped)`` for the whole library.
+
+    ``skipped`` matters as much as ``items``: a file that exists but cannot be
+    read or has no timestamp column is worse than a missing one, because nothing
+    downstream notices. Hiding those was how 30 MB of untimestamped 1m data sat
+    in the library while every report said it was fine.
+    """
+    items: List[Dict[str, Any]] = []
+    skipped: List[Dict[str, Any]] = []
+    if not os.path.isdir(data_root):
+        return items, skipped
+
+    for path, exchange, market, stream in _candidate_files(data_root):
+        filename = os.path.basename(path)
+        try:
+            symbol, timeframe, parsed_type = parse_data_filename(filename)
+        except ValueError as exc:
+            skipped.append({"path": path, "reason": f"non-canonical name ({exc})"})
+            continue
+        summary = _read_last_date(path)
+        if summary is None:
+            skipped.append({"path": path, "reason": "no readable 'date' column"})
+            continue
+        first, last, rows = summary
+        # Inside a stream directory the filename's last token is the stream
+        # (basis / funding_rate / open_interest), not the market type.
+        resolved_type = market if stream else (parsed_type or market)
+        record = {
+            "symbol": display_symbol(symbol, resolved_type),
+            "safe_symbol": symbol,
+            "exchange": exchange,
+            "trade_type": resolved_type,
+            "timeframe": timeframe,
+            "start": first.strftime("%Y-%m-%d"),
+            "last": last.strftime("%Y-%m-%d"),
+            "rows": rows,
+            "_last_ts": last,
+        }
+        if stream:
+            record["stream"] = parsed_type or stream
+        items.append(record)
+    return items, skipped
+
+
+def scan_data_root(data_root: str = "data") -> List[Dict[str, Any]]:
+    """Every readable data file under ``{data_root}/{exchange}/{trade_type}/``."""
+    return scan_library(data_root)[0]
 
 
 def annotate_freshness(
@@ -151,7 +189,9 @@ def experiment_progress(
     min_bars = int(spec.get("min_bars", 90))
     today = today or datetime.date.today()
 
-    relevant = [item for item in items if item.get("timeframe") == timeframe]
+    relevant = [
+        item for item in items if item.get("timeframe") == timeframe and not item.get("stream")
+    ]
     if not relevant:
         return {
             "label": spec.get("label", "experiment"),
@@ -200,24 +240,27 @@ def freshness_report(
     experiment_spec: Optional[dict] = None,
     stale_after_days: Optional[Dict[str, int]] = None,
 ) -> Dict[str, Any]:
-    items = annotate_freshness(scan_data_root(data_root), stale_after_days=stale_after_days)
+    items, skipped = scan_library(data_root)
+    items = annotate_freshness(items, stale_after_days=stale_after_days)
     stale = [item for item in items if item.get("stale")]
+    ohlcv = [item for item in items if not item.get("stream")]
 
     by_timeframe: Dict[str, int] = {}
     stale_by_timeframe: Dict[str, int] = {}
-    for item in items:
+    for item in ohlcv:
         by_timeframe[item["timeframe"]] = by_timeframe.get(item["timeframe"], 0) + 1
     for item in stale:
-        stale_by_timeframe[item["timeframe"]] = stale_by_timeframe.get(item["timeframe"], 0) + 1
+        if not item.get("stream"):
+            stale_by_timeframe[item["timeframe"]] = stale_by_timeframe.get(item["timeframe"], 0) + 1
 
-    latest = max((item["last"] for item in items), default=None)
+    latest = max((item["last"] for item in ohlcv), default=None)
     # A single dead intraday file should not read as "the library is broken",
     # but it should not hide either — so the raw count is kept and the split by
     # timeframe is reported next to it. Symbols are de-duplicated because one
     # asset can have several stale timeframes.
     stale_symbols: List[str] = []
     for item in stale:
-        if item["symbol"] not in stale_symbols:
+        if not item.get("stream") and item["symbol"] not in stale_symbols:
             stale_symbols.append(item["symbol"])
 
     return {
@@ -225,11 +268,17 @@ def freshness_report(
         "summary": {
             "files": len(items),
             "assets_1d": by_timeframe.get("1d", 0),
-            "stale": len(stale),
+            "streams": len(items) - len(ohlcv),
+            "stale": len([item for item in stale if not item.get("stream")]),
             "latest": latest,
             "stale_symbols": stale_symbols[:20],
             "timeframes": by_timeframe,
             "stale_by_timeframe": stale_by_timeframe,
+            "unreadable": {
+                "count": len(skipped),
+                "paths": [entry["path"] for entry in skipped[:10]],
+                "details": skipped[:10],
+            },
         },
         "items": sorted(items, key=lambda item: (item["timeframe"], item["symbol"])),
         "experiment": experiment_progress(experiment_spec, items),

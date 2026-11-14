@@ -136,6 +136,22 @@ class PlanTests(unittest.TestCase):
         self.assertEqual(plan[0]["status"], "pending")
         self.assertEqual(plan[0]["last"], "2024-01-05")
 
+    def test_stream_file_does_not_count_as_the_price_file(self):
+        # A stream that runs past the cutoff would read as "already current" if
+        # it were mistaken for the symbol's OHLCV file.
+        stream_dir = os.path.join(self.root, "binance", "futures", "crypto_streams")
+        os.makedirs(stream_dir, exist_ok=True)
+        pd.DataFrame(
+            {
+                "date": pd.date_range("2024-01-01", periods=10, freq="D"),
+                "funding_rate": [0.01] * 10,
+            }
+        ).to_feather(os.path.join(stream_dir, "ETH_USDT_USDT-1d-funding_rate.feather"))
+        plan = update_data.plan_updates(
+            _universe(pairs=("ETH/USDT:USDT",)), datetime.date(2024, 1, 9), self.root
+        )
+        self.assertEqual(plan[0]["status"], "new")
+
 
 class TrimTests(unittest.TestCase):
     def setUp(self):

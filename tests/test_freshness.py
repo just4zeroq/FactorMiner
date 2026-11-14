@@ -22,6 +22,7 @@ from core.data_feed.freshness import (
     experiment_progress,
     freshness_report,
     scan_data_root,
+    scan_library,
 )
 
 
@@ -100,6 +101,39 @@ class ScanTests(unittest.TestCase):
 
     def test_missing_root_is_empty_not_an_error(self):
         self.assertEqual(scan_data_root(os.path.join(self.root, "nope")), [])
+
+    def test_file_without_a_date_column_is_reported_not_hidden(self):
+        # Exactly what 30 MB of 1m data looked like: OHLCV only, no time axis.
+        path = os.path.join(self.root, "binance", "futures", "SUI_USDT_USDT-1m-futures.feather")
+        pd.DataFrame({"close": [1.0, 2.0, 3.0]}).to_feather(path)
+        items, skipped = scan_library(self.root)
+        self.assertEqual(len(items), 3)
+        self.assertEqual(len(skipped), 1)
+        self.assertEqual(skipped[0]["path"], path)
+        self.assertIn("date", skipped[0]["reason"])
+
+    def test_non_canonical_names_are_reported(self):
+        path = os.path.join(self.root, "binance", "spot", "legacy.feather")
+        pd.DataFrame({"date": pd.date_range("2024-01-01", periods=2), "close": [1.0, 2.0]}).to_feather(path)
+        _items, skipped = scan_library(self.root)
+        self.assertEqual(len(skipped), 1)
+        self.assertIn("non-canonical", skipped[0]["reason"])
+
+    def test_stream_subdirectory_is_scanned(self):
+        stream_dir = os.path.join(self.root, "binance", "futures", "crypto_streams")
+        os.makedirs(stream_dir, exist_ok=True)
+        pd.DataFrame(
+            {
+                "date": pd.date_range("2024-01-01", periods=3, freq="D"),
+                "basis": [0.1, 0.2, 0.3],
+            }
+        ).to_feather(os.path.join(stream_dir, "BTC_USDT_USDT-1d-basis.feather"))
+        items = scan_data_root(self.root)
+        streams = [item for item in items if item.get("stream")]
+        self.assertEqual(len(streams), 1)
+        self.assertEqual(streams[0]["stream"], "basis")
+        self.assertEqual(streams[0]["trade_type"], "futures")
+        self.assertEqual(streams[0]["timeframe"], "1d")
 
 
 class StalenessTests(unittest.TestCase):
@@ -250,6 +284,29 @@ class ReportTests(unittest.TestCase):
         report = freshness_report(self.root)
         newer = [item for item in report["items"] if item["symbol"] == "SOL/USDT"]
         self.assertFalse(newer[0]["stale"])
+
+    def test_streams_are_counted_apart_from_ohlcv(self):
+        stream_dir = os.path.join(self.root, "binance", "futures", "crypto_streams")
+        os.makedirs(stream_dir, exist_ok=True)
+        pd.DataFrame(
+            {
+                "date": pd.date_range("2024-01-01", periods=3, freq="D"),
+                "funding_rate": [0.01, 0.02, 0.03],
+            }
+        ).to_feather(os.path.join(stream_dir, "BTC_USDT_USDT-1d-funding_rate.feather"))
+        report = freshness_report(self.root)
+        self.assertEqual(report["summary"]["streams"], 1)
+        # A stream must not be mistaken for the asset's price file.
+        self.assertEqual(report["summary"]["assets_1d"], 1)
+        self.assertEqual(report["summary"]["stale_symbols"], ["BTC/USDT"])
+
+    def test_unreadable_files_are_surfaced(self):
+        pd.DataFrame({"close": [1.0, 2.0]}).to_feather(
+            os.path.join(self.root, "binance", "spot", "BAD_USDT-1d-spot.feather")
+        )
+        report = freshness_report(self.root)
+        self.assertEqual(report["summary"]["unreadable"]["count"], 1)
+        self.assertIn("BAD_USDT", report["summary"]["unreadable"]["paths"][0])
 
     def test_empty_library_reports_zeroes(self):
         report = freshness_report(os.path.join(self.root, "missing"))

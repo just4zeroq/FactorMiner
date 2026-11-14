@@ -39,6 +39,8 @@ type FreshnessPayload = {
     stale_symbols: string[];
     timeframes: Record<string, number>;
     stale_by_timeframe: Record<string, number>;
+    streams?: number;
+    unreadable?: { count: number; paths: string[]; details: { path: string; reason: string }[] };
   };
   items: FreshnessItem[];
   experiment: ExperimentProgress | null;
@@ -106,6 +108,11 @@ export function FreshnessPanel({ refreshKey = 0 }: { refreshKey?: number }) {
           <span className="text-muted-foreground">
             {t('data.assets1d')} <span className="font-mono text-foreground">{summary.assets_1d}</span>
           </span>
+          {(summary.streams ?? 0) > 0 && (
+            <span className="text-muted-foreground">
+              {t('data.streams')} <span className="font-mono text-foreground">{summary.streams}</span>
+            </span>
+          )}
           <span className="text-muted-foreground">
             {t('data.latest')} <span className="font-mono text-foreground">{summary.latest || '—'}</span>
           </span>
@@ -122,6 +129,22 @@ export function FreshnessPanel({ refreshKey = 0 }: { refreshKey?: number }) {
           </button>
         </div>
       </div>
+
+      {(summary.unreadable?.count ?? 0) > 0 && (
+        <div className="mt-3 rounded-lg border border-rose-900/60 bg-rose-950/20 p-3 text-[11px] text-rose-300">
+          <div className="flex items-center gap-1 font-medium">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {t('data.unreadable', { count: summary.unreadable?.count ?? 0 })}
+          </div>
+          <ul className="mt-1 space-y-0.5 font-mono text-[10px] text-rose-300/80">
+            {(summary.unreadable?.details || []).slice(0, 3).map((entry) => (
+              <li key={entry.path} className="truncate">
+                {entry.path} — {entry.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {stale && (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-rose-400/90">

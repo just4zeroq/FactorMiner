@@ -46,7 +46,7 @@ const translations: Record<Language, Record<string, string>> = {
     'data.freshness': '数据新鲜度', 'data.files': '文件', 'data.assets1d': '日线标的', 'data.latest': '最新', 'data.stale': '个滞后', 'data.allFresh': '全部最新',
     'data.details': '明细', 'data.symbol': '标的', 'data.first': '起始', 'data.last': '末尾', 'data.rows': '行数', 'data.lag': '滞后',
     'data.experimentReady': '窗口已就绪：这次预注册验证可以开始了。', 'data.experimentPending': '还差 {remaining} 根，最早 {eta} 可用。', 'data.freshnessUnavailable': '新鲜度不可用',
-    'data.staleList': '滞后标的：{symbols}',
+    'data.staleList': '滞后标的：{symbols}', 'data.streams': '原生流', 'data.unreadable': '{count} 个文件无法解析：',
   },
   en: {
     'nav.dashboard': 'Dashboard', 'nav.launchpad': 'Launchpad', 'nav.data': 'Data Downloader', 'nav.inspector': 'Factor Inspector',
@@ -84,7 +84,7 @@ const translations: Record<Language, Record<string, string>> = {
     'data.freshness': 'Data freshness', 'data.files': 'Files', 'data.assets1d': 'Daily assets', 'data.latest': 'Latest', 'data.stale': 'stale', 'data.allFresh': 'All current',
     'data.details': 'Details', 'data.symbol': 'Symbol', 'data.first': 'First', 'data.last': 'Last', 'data.rows': 'Rows', 'data.lag': 'Lag',
     'data.experimentReady': 'Window is ripe: the pre-registered test can start.', 'data.experimentPending': '{remaining} bars to go, usable from {eta}.', 'data.freshnessUnavailable': 'Freshness unavailable',
-    'data.staleList': 'Stale symbols: {symbols}',
+    'data.staleList': 'Stale symbols: {symbols}', 'data.streams': 'streams', 'data.unreadable': '{count} file(s) cannot be parsed:',
   },
   de: {
     'nav.dashboard': 'Dashboard', 'nav.launchpad': 'Startbereich', 'nav.data': 'Daten-Download', 'nav.inspector': 'Faktor-Inspektor',
@@ -122,7 +122,7 @@ const translations: Record<Language, Record<string, string>> = {
     'data.freshness': 'Datenaktualität', 'data.files': 'Dateien', 'data.assets1d': 'Tageswerte', 'data.latest': 'Neueste', 'data.stale': 'veraltet', 'data.allFresh': 'Alle aktuell',
     'data.details': 'Details', 'data.symbol': 'Symbol', 'data.first': 'Beginn', 'data.last': 'Ende', 'data.rows': 'Zeilen', 'data.lag': 'Verzug',
     'data.experimentReady': 'Fenster ist reif: der vorregistrierte Test kann starten.', 'data.experimentPending': 'Noch {remaining} Bars, nutzbar ab {eta}.', 'data.freshnessUnavailable': 'Aktualität nicht verfügbar',
-    'data.staleList': 'Veraltete Symbole: {symbols}',
+    'data.staleList': 'Veraltete Symbole: {symbols}', 'data.streams': 'Streams', 'data.unreadable': '{count} Datei(en) nicht lesbar:',
   },
 };
 

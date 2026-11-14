@@ -110,6 +110,11 @@ def plan_updates(
 
     existing: Dict[str, Dict[str, Any]] = {}
     for item in scan_data_root(data_root):
+        # Stream files (basis / funding / open interest) share the market type
+        # and timeframe of the OHLCV file they belong to; treating one as "the"
+        # symbol file would report a symbol as current when its bars are missing.
+        if item.get("stream"):
+            continue
         if (
             item["exchange"] == exchange
             and item["trade_type"] == trade_type
