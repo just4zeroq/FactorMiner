@@ -61,7 +61,8 @@
 ### 3c. **运维与部署闭环** (完成)
 **优先级**: 中
 **说明**: 研究闭环已经稳定，缺的是"没人看着也能跑对"的部分——数据是否还新、失败会不会被发现、换台机器能不能起来。
-- [x] **数据新鲜度视图**: `core/data_feed/freshness.py` 扫描 `data/<exchange>/<trade_type>/*.feather`，按周期阈值（`1d` 2 天、日内 1 天）判定滞后，并按周期拆分汇总（避免一根停更的 15m 文件被读成"整个库坏了"）。`GET /api/data/freshness` + `/data` 页顶部面板。真实库实测：35 个文件 / 20 个日线标的（全部 lag=1）/ 15 个 2025-08 停更的日内探索文件。
+- [x] **数据新鲜度视图**: `core/data_feed/freshness.py` 扫描 `data/<exchange>/<trade_type>/*.feather` 与 `crypto_streams/` 子目录，按周期阈值（`1d` 2 天、日内 1 天）判定滞后，并按周期拆分汇总（避免一根停更的 15m 文件被读成"整个库坏了"）。`GET /api/data/freshness` + `/data` 页顶部面板。**无法解析的文件单独报告**（`summary.unreadable`），不再静默跳过——这条通道曾让 30 MB 无时间轴的 1m 文件完全隐形。
+- [x] **数据清理**: 分三批删除 21 个问题文件 / 46.88 MB（孤儿日内切片、结构损坏的 1m、无时间列的 1m、1h 流残留），保留 20 个日线 + `BTC-5m`（被 5m 配置引用）。清单 `user_workspace/reports/data_cleanup_20261114.json`。遗留发现：20 个 `open_interest` 流只有 25 行（币安 30 天上限），启用 OI 特征前需先决定窗口策略。
 - [x] **预注册窗口进度**: `user_workspace/experiment_window.json` 定义下一个验证窗口，接口计算 accumulated/remaining/coverage/ETA，界面显示进度条而不是靠记忆——这是"干净 holdout"与"偷看"之间唯一的屏障。
 - [x] **增量数据更新脚本**: `scripts/update_data.py` 只补尾部（每个标的从最后一根到 T-1），幂等空跑、3 次指数退避重试、裁剪截止日之后的未收盘 K 线、JSON 报告 + 失败退出码 1。真实补数实测裁掉 652 根越界数据；同时修掉"新标的被静默跳过却报成功"的 bug 与下载器写死落盘目录的问题。
 - [x] **GitHub Actions CI**: `.github/workflows/ci.yml`，Python 3.12 跑全量测试、Node 20 构建前端；`requirements.txt` 把 `ml4t-backtest` 改为指向固定提交的公开仓库，CI 与本地使用同一份回测引擎。

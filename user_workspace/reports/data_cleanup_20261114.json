@@ -1,0 +1,261 @@
+{
+  "generated_at": "2026-11-14T12:17:22",
+  "scope": "orphan intraday files + structurally corrupt files",
+  "items": [
+    {
+      "path": "data\\binance/futures/BTC_USDT_USDT-12h-futures.feather",
+      "bytes": 5946,
+      "rows": 61,
+      "range": [
+        "2025-07-20",
+        "2025-08-19"
+      ],
+      "sha256_16": "938f8d1149b935f2",
+      "reason": "stale one-off: 2025-07/08 window, no config references 12h"
+    },
+    {
+      "path": "data\\binance/futures/BTC_USDT_USDT-1h-futures.feather",
+      "bytes": 29642,
+      "rows": 736,
+      "range": [
+        "2025-07-20",
+        "2025-08-19"
+      ],
+      "sha256_16": "caed4e56dca426ae",
+      "reason": "stale one-off: no config references 1h"
+    },
+    {
+      "path": "data\\binance/futures/BTC_USDT_USDT-2h-futures.feather",
+      "bytes": 16794,
+      "rows": 368,
+      "range": [
+        "2025-07-20",
+        "2025-08-19"
+      ],
+      "sha256_16": "b523bc484fc796ab",
+      "reason": "stale one-off: no config references 2h"
+    },
+    {
+      "path": "data\\binance/futures/BTC_USDT_USDT-3m-futures.feather",
+      "bytes": 502618,
+      "rows": 14518,
+      "range": [
+        "2025-07-20",
+        "2025-08-19"
+      ],
+      "sha256_16": "b51fe935611e6c48",
+      "reason": "stale one-off: no config references 3m"
+    },
+    {
+      "path": "data\\binance/futures/BTC_USDT_USDT-4h-futures.feather",
+      "bytes": 10330,
+      "rows": 184,
+      "range": [
+        "2025-07-20",
+        "2025-08-19"
+      ],
+      "sha256_16": "4f9e6256e26b140e",
+      "reason": "stale one-off: no config references 4h"
+    },
+    {
+      "path": "data\\binance/futures/BTC_USDT_USDT-6h-futures.feather",
+      "bytes": 8186,
+      "rows": 123,
+      "range": [
+        "2025-07-20",
+        "2025-08-19"
+      ],
+      "sha256_16": "e12c5be74956e156",
+      "reason": "stale one-off: no config references 6h"
+    },
+    {
+      "path": "data\\binance/futures/BTC_USDT_USDT-8h-futures.feather",
+      "bytes": 7042,
+      "rows": 92,
+      "range": [
+        "2025-07-20",
+        "2025-08-19"
+      ],
+      "sha256_16": "6ed840ff44e8662e",
+      "reason": "stale one-off: no config references 8h"
+    },
+    {
+      "path": "data\\binance/futures/BTC_USDT_USDT-15m-futures.feather",
+      "bytes": 104074,
+      "rows": 2944,
+      "range": [
+        "2025-07-20",
+        "2025-08-19"
+      ],
+      "sha256_16": "5f583c97f10498c9",
+      "reason": "stale one-off: no config references 15m"
+    },
+    {
+      "path": "data\\binance/futures/BCH_USDT_USDT-15m-futures.feather",
+      "bytes": 1460106,
+      "rows": 53198,
+      "range": [
+        "2024-02-01",
+        "2025-08-08"
+      ],
+      "sha256_16": "d7199858a3b15b9f",
+      "reason": "stale one-off: no config references BCH"
+    },
+    {
+      "path": "data\\binance/futures/BCH_USDT_USDT-5m-futures.feather",
+      "bytes": 4119378,
+      "rows": 156598,
+      "range": [
+        "2024-02-01",
+        "2025-07-28"
+      ],
+      "sha256_16": "b5dc89845251a731",
+      "reason": "stale one-off: no config references BCH"
+    },
+    {
+      "path": "data\\binance/futures/ASR_USDT_USDT-1m-futures.feather",
+      "bytes": 4517602,
+      "rows": 217000,
+      "range": [
+        "2025-03-01",
+        "2025-07-29"
+      ],
+      "sha256_16": "7192984a4a2c424c",
+      "reason": "corrupt: 16.4% zero-volume bars, random-alt probe"
+    },
+    {
+      "path": "data\\binance/futures/ASTR_USDT_USDT-1m-futures.feather",
+      "bytes": 4848194,
+      "rows": 217000,
+      "range": [
+        "2025-03-01",
+        "2025-07-29"
+      ],
+      "sha256_16": "2c3949f42e62c2a8",
+      "reason": "corrupt: 18.7% zero-volume bars, random-alt probe"
+    },
+    {
+      "path": "data\\binance/futures/AGT_USDT_USDT-1m-futures.feather",
+      "bytes": 666274,
+      "rows": 16984,
+      "range": [
+        "2025-05-20",
+        "2025-06-01"
+      ],
+      "sha256_16": "44f4c775e43a48bd",
+      "reason": "corrupt: zero-volume bars, 12-day alt probe"
+    },
+    {
+      "path": "data\\binance/futures/BTC_USDT_USDT-1m-futures.feather",
+      "bytes": 1646642,
+      "rows": 39560,
+      "range": [
+        "2025-07-20",
+        "2025-08-16"
+      ],
+      "sha256_16": "ca9b3462ea97e97f",
+      "reason": "corrupt: stray level_0/index columns, NaT row, unsorted"
+    },
+    {
+      "path": "data\\binance/futures/BTC_USDT_USDT-1d-futures.feather.bak-20251114",
+      "bytes": 59026,
+      "rows": 1444,
+      "range": [
+        "2023-01-01",
+        "2026-11-13"
+      ],
+      "sha256_16": "a93147dc96b95a4c",
+      "reason": "stray manual backup of the daily file"
+    }
+  ],
+  "second_pass": {
+    "note": "Found by a directory walk after the first pass: the scanner skipped these because they have no date column at all, so they never appeared in the report.",
+    "items": [
+      {
+        "path": "data/binance/futures/SUI_USDT_USDT-1m-futures.feather",
+        "bytes": 21731978,
+        "rows": 778600,
+        "columns": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "sha256_16": "4671dc4ed1c8eb22",
+        "reason": "corrupt: no timestamp column; unusable for any time-indexed pipeline"
+      },
+      {
+        "path": "data/binance/futures/1INCH_USDT_USDT-1m-futures.feather",
+        "bytes": 7982922,
+        "rows": 346600,
+        "columns": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "sha256_16": "f75d5477cc21a40d",
+        "reason": "corrupt: no timestamp column; unusable for any time-indexed pipeline"
+      },
+      {
+        "path": "data/binance/futures/1000CAT_USDT_USDT-1m-futures.feather",
+        "bytes": 1384002,
+        "rows": 61299,
+        "columns": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "sha256_16": "a62d475cb2fed574",
+        "reason": "corrupt: no timestamp column; unusable for any time-indexed pipeline"
+      },
+      {
+        "path": "data/binance/futures/A2Z_USDT_USDT-1m-futures.feather",
+        "bytes": 36954,
+        "rows": 1000,
+        "columns": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume"
+        ],
+        "sha256_16": "a23038f75ed83fc7",
+        "reason": "corrupt: no timestamp column; unusable for any time-indexed pipeline"
+      }
+    ],
+    "freed_bytes": 31135856
+  },
+  "third_pass": {
+    "note": "1h crypto streams from the same 2025-07/08 experiment; no config enables crypto_streams.",
+    "items": [
+      {
+        "path": "data/binance/futures/crypto_streams/BTC_USDT_USDT-1h-basis.feather",
+        "bytes": 13058,
+        "rows": 736,
+        "range": [
+          "2025-07-20",
+          "2025-08-19"
+        ],
+        "sha256_16": "79f3f5a6720bd6a5",
+        "reason": "stale one-off: 1h stream from the 2025-07/08 window, unreferenced"
+      },
+      {
+        "path": "data/binance/futures/crypto_streams/BTC_USDT_USDT-1h-funding_rate.feather",
+        "bytes": 3026,
+        "rows": 94,
+        "range": [
+          "2025-07-20",
+          "2025-08-20"
+        ],
+        "sha256_16": "2b1cdd1bab3f6854",
+        "reason": "stale one-off: 1h stream from the 2025-07/08 window, unreferenced"
+      }
+    ],
+    "freed_bytes": 16084
+  }
+}

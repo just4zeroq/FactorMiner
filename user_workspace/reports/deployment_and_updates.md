@@ -106,7 +106,37 @@ venv/Scripts/python.exe scripts/update_data.py --symbols BTC/USDT:USDT --until 2
 
 全量：`pytest tests/ -q` → **280 passed, 1 skipped**（新增 40 项）。
 
-## 8. 仍未做
+## 8. 数据清理（2026-11-14）
+
+用户要求清掉"有问题的数据"。分三批执行，共删除 **21 个文件 / 46.88 MB**，20 个日线文件与 `BTC-5m` 全部保留。逐文件清单（路径、字节数、行数、sha256 前 16 位、删除理由）在 `user_workspace/reports/data_cleanup_20261114.json`。
+
+**第一批（15 个，17.17 MB）**：显式列给用户确认后删除。
+
+- 10 个 2025-07-20→2025-08-19 那次实验的孤儿切片：BTC 的 12h/1h/2h/3m/4h/6h/8h/15m、BCH 的 15m/5m。没有任何配置引用这些周期/标的。
+- 4 个 1m：`BTC-1m` 结构损坏（多余的 `level_0`/`index` 列、末行 `date=NaT`、索引非升序）；`ASR-1m` 16.4% 零成交、`ASTR-1m` 18.7% 零成交、`AGT-1m` 随机山寨币探针。
+- 1 个手工备份残留 `BTC-1d-....feather.bak-20251114`。
+
+**第二批（4 个，29.69 MB）**：`find` 才发现，第一轮的扫描器根本没看见它们。
+
+`SUI-1m`(20.7 MB/778k 行)、`1INCH-1m`(7.6 MB/347k 行)、`1000CAT-1m`(1.3 MB/61k 行)、`A2Z-1m`(1.0k 行) 的列只有 `['open','high','low','close','volume']`——**没有时间列**。pandas 写 feather 时会丢弃非默认索引，这几份数据因此没有时间轴，对任何时序管线都不可用。它们比 `BTC-1m` 更彻底地坏，而库里所有报表都说"正常"。
+
+**第三批（2 个，16 KB）**：`crypto_streams/` 下 1h 的 BTC `basis`/`funding_rate`，同样是 2025-07/08 实验残留，无配置启用 `crypto_streams`。
+
+### 为什么会有第二批：扫描器的两个盲点（已修）
+
+1. **只走两层目录**：`data/<exchange>/<trade_type>/*.feather`，`crypto_streams/` 子目录（62 个文件）完全不可见。新增 `_candidate_files()` 走两层 + 一层子目录，流文件带 `stream` 字段返回。
+2. **静默跳过读不出 `date` 的文件**：`scan_data_root` 直接 `continue`，于是"文件存在但无法解析"比"文件不存在"更隐蔽。新增 `scan_library()` 返回 `(items, skipped)`，报告里出 `summary.unreadable{count, paths, details}`，界面用红色块列出前 3 条路径与原因。
+
+顺带修掉两个连带问题：`assets_1d`/`stale` 只统计 OHLCV（流文件不该被算成"一个标的"），`update_data.plan_updates` 也跳过流文件——否则 BTC 的 `basis` 文件会被当成 BTC 的价格文件，导致漏补 OHLCV。
+
+### 保留但需要知道的两件事
+
+- **`BTC-5m`（217k 行，末根 2025-08-19）仍在**：`config.json`、`configAdvancedGP.json`、`demo_config.json` 都用 5m，删除会让这些模板无本地数据。它因此是面板上唯一的 `stale`（5m×1）。注意它的 `mine_period` 是 2025-07-20→2025-08-01，对这个窗口来说数据是完整的——"滞后"是按今天算的，不是按配置窗口算的。若希望面板彻底干净，可删掉它并让配置按需重新下载。
+- **20 个 `open_interest` 流只有 25 行**（2026-10-21→2026-11-14，行数完全一致）：币安只提供约 30 天 OI 历史，不是文件损坏。当前没有配置启用 `crypto_streams`，但一旦启用 OI，特征在 2023–2025 的窗口里会几乎全空。这属于数据源上限，需要单独决定（要么只用最近窗口，要么把 OI 从特征集里去掉），不是清理能解决的。
+
+清理后：**81 个文件 / 20 日线 + 1 个 5m + 60 个原生流 / 1 个滞后 / 0 个不可解析**。
+
+## 9. 仍未做
 
 - 跨轮因子面值正交检查（不同 run 之间只比 archive 内 40 个签名）。
 - 回测归因层：NN 特征归因、中性化、Brinson。
