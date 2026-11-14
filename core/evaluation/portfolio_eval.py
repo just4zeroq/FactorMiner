@@ -45,6 +45,7 @@ DEFAULT_LS_CFG: Dict[str, Any] = {
     "cost_rate": 0.0018,      # round-trip cost per unit of turnover (18 bp)
     "annualisation": 252.0,   # periods per year, only used for the Sharpe
     "rebalance_bars": 1,      # hold the book this many bars between rebalances
+    "temporal_lookback": 252, # trailing window for the single-asset percentile
 }
 
 
@@ -181,6 +182,103 @@ def long_short_returns(
         "n_assets_long": int(np.median(n_long[finite])) if finite.any() else 0,
         "gross": 1.0,
         "ls_t": ls_t_stat(ls, lags=max(5, hold)),
+    }
+
+
+def timing_returns(
+    factor: Any,
+    returns: Any,
+    lookback: int = 252,
+    quantile: float = 0.3,
+    orientation: float = 1.0,
+    cost_rate: float = 0.0,
+    annualisation: float = 252.0,
+    rebalance_bars: int = 1,
+) -> Dict[str, float]:
+    """Evaluate a single-asset factor as a long/short *timing* strategy.
+
+    A single asset has no cross-section, so a rank IC is not tradable. What is
+    tradable is a position rule: go long when the factor sits in its own top
+    quantile, short when it sits in the bottom quantile, using a trailing
+    window so the decision only uses information available at the time.
+
+    Returns the same keys as :func:`long_short_returns`, plus ``exposure``
+    (share of bars with a non-zero position).
+    """
+    empty = {
+        "mean_return": 0.0,
+        "std_return": 0.0,
+        "sharpe": 0.0,
+        "hit_rate": 0.0,
+        "turnover": 0.0,
+        "cost": 0.0,
+        "cost_adj_return": 0.0,
+        "n_obs": 0,
+        "n_assets_long": 1,
+        "gross": 1.0,
+        "ls_t": 0.0,
+        "exposure": 0.0,
+    }
+    if not isinstance(factor, pd.Series) or not isinstance(returns, pd.Series):
+        return empty
+
+    r = returns.reindex(factor.index)
+    df = pd.DataFrame({"f": factor.astype(float), "r": r.astype(float)}).dropna()
+    if df.shape[0] < 30:
+        return empty
+
+    win = max(20, int(lookback))
+    minp = max(20, win // 5)
+    oriented = df["f"] * float(orientation)
+    # Percentile of the current observation inside its own trailing window.
+    pct = oriented.rolling(win, min_periods=minp).rank(pct=True)
+
+    q = float(quantile)
+    if not 0.0 < q < 0.5:
+        q = 0.3
+    pos = np.where(pct >= (1.0 - q), 1.0, np.where(pct <= q, -1.0, 0.0))
+    pos = np.where(np.isfinite(pct.to_numpy()), pos, np.nan)
+    pos = pd.Series(pos, index=df.index)
+
+    hold = max(1, int(rebalance_bars))
+    if hold > 1:
+        # Only re-decide every `hold` bars; carry the previous position between.
+        decided = pos.iloc[::hold].reindex(pos.index, method="ffill")
+        pos = decided
+
+    position = pos.to_numpy(dtype=float)
+    ret = df["r"].to_numpy(dtype=float)
+    with np.errstate(invalid="ignore"):
+        strat = position * ret
+    finite = np.isfinite(strat)
+    if finite.sum() < 10:
+        return empty
+    strat = strat[finite]
+    position = position[finite]
+
+    prev = np.concatenate([[0.0], position[:-1]])
+    turnover_series = 0.5 * np.abs(position - prev)
+
+    mean_ret = float(strat.mean())
+    std_ret = float(strat.std(ddof=1)) if strat.size > 1 else 0.0
+    turnover = float(turnover_series.mean())
+    cost = turnover * float(cost_rate)
+    sharpe = (
+        (mean_ret / std_ret) * np.sqrt(float(annualisation)) if std_ret > 0 else 0.0
+    )
+    return {
+        "mean_return": mean_ret,
+        "std_return": std_ret,
+        "sharpe": float(sharpe),
+        "hit_rate": float((strat > 0).mean()),
+        "turnover": turnover,
+        "cost": float(cost),
+        "cost_adj_return": float(mean_ret - cost),
+        "n_obs": int(strat.size),
+        "n_assets_long": 1,
+        "gross": 1.0,
+        "ls_t": ls_t_stat(strat, lags=max(5, hold)),
+        "exposure": float(np.mean(position != 0)),
     }
 
 

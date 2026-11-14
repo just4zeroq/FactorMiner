@@ -257,6 +257,100 @@ class ExperimentTrace:
         return list(self._records)
 
 
+class FdrLedger:
+    """Cumulative raw p-values of every hypothesis actually tested.
+
+    BH-FDR only controls the family error rate if the family is the whole set of
+    hypotheses you looked at. Correcting inside one round's short list (2–6
+    factors) is close to no correction at all: the other 1,000 candidates that
+    run — and every candidate from previous runs — silently raise the chance
+    that a survivor is luck.
+
+    The trace keeps counts (for DSR); this ledger keeps the raw p-values that
+    BH needs. Stored as one JSON line per run so the file stays append-only.
+    """
+
+    def __init__(self, path: Optional[str] = None):
+        self.path = path or os.path.join("user_workspace", ".fdr_ledger.jsonl")
+        self._lock = threading.RLock()
+        self._entries: List[Dict[str, Any]] = []
+        self._load()
+
+    def _load(self) -> None:
+        self._entries = []
+        if not self.path or not os.path.exists(self.path):
+            return
+        try:
+            with open(self.path, encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        self._entries.append(json.loads(line))
+                    except json.JSONDecodeError:  # pragma: no cover - defensive
+                        continue
+        except OSError as exc:  # pragma: no cover - defensive
+            logger.warning("FDR ledger unreadable (%s): %s", self.path, exc)
+
+    def _save_entry(self, entry: Dict[str, Any]) -> None:
+        directory = os.path.dirname(self.path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        with open(self.path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    def append(
+        self,
+        p_values: List[float],
+        run_id: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> int:
+        """Record one run's raw p-values. Idempotent per ``run_id``."""
+        import math
+
+        vals: List[float] = []
+        for p in p_values or []:
+            try:
+                val = float(p)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(val):
+                vals.append(val)
+        if not vals:
+            return 0
+        with self._lock:
+            if run_id and any(e.get("run_id") == run_id for e in self._entries):
+                return 0
+            entry = {
+                "run_id": run_id or f"run_{len(self._entries) + 1}",
+                "at": datetime.now().isoformat(timespec="seconds"),
+                "n": len(vals),
+                "p_values": vals,
+                "meta": meta or {},
+            }
+            self._entries.append(entry)
+            self._save_entry(entry)
+        return len(vals)
+
+    def cumulative(self) -> List[float]:
+        with self._lock:
+            out: List[float] = []
+            for entry in self._entries:
+                out.extend(float(p) for p in entry.get("p_values", []))
+            return out
+
+    @property
+    def num_tests(self) -> int:
+        return len(self.cumulative())
+
+    def reset(self) -> None:
+        with self._lock:
+            self._entries = []
+            if self.path and os.path.exists(self.path):
+                os.remove(self.path)
+
+
 def signature_of(expr: Any) -> str:
     """Stable signature for a factor expression (AST dict / code / hashable)."""
     import hashlib

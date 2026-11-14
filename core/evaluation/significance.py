@@ -264,7 +264,7 @@ def deflated_sharpe_ratio(
 DEFAULT_GATE_CFG = {
     "hac_t_min": 2.0,       # |NW t-stat| threshold (≈95% two-sided)
     "fdr_max": 0.05,        # adjusted p-value ceiling
-    "dsr_min": 0.90,        # P(true SR > benchmark)
+    "dsr_min": 0.90,        # P(true strategy SR > benchmark) after deflation
     "require_oos_consistent": True,
     "require_cost_adj_positive": True,
     # Phase 1.5: a factor may only be INSPECTED if it KEEPS real predictive
@@ -310,6 +310,7 @@ def apply_promotion_gates(
     metrics_list: Sequence[Dict[str, Any]],
     cfg: Optional[Dict[str, Any]] = None,
     n_trials: Optional[int] = None,
+    family_p_values: Optional[Sequence[float]] = None,
 ) -> List[Dict[str, Any]]:
     """Run the full promotion gate across a *batch* of candidate metrics.
 
@@ -330,20 +331,44 @@ def apply_promotion_gates(
     denominator so the deflation bar reflects the real search effort; when
     omitted the caller's precomputed ``dsr`` is used unchanged.
 
+    ``family_p_values`` is the raw p-value of **every hypothesis tested so far**
+    (this run plus all previous runs). BH-FDR is then applied to that whole
+    family and each candidate reads off its own adjusted value. Correcting only
+    the short list — typically 2–6 factors out of a thousand evaluated — barely
+    corrects anything, which is why this argument exists.
+
     Returns one dict per candidate: ``{"p_adj", "dsr", "gate", "status"}``.
     """
     pvals = [float(m.get("p_value", 1.0)) for m in metrics_list]
-    padj = bh_fdr(pvals)
+    if family_p_values:
+        family = np.sort(np.asarray(list(family_p_values), dtype=float))
+        family = family[np.isfinite(family)]
+        if family.size:
+            adj_sorted = bh_fdr(family)
+            padj = []
+            for p in pvals:
+                idx = int(np.searchsorted(family, p, side="left"))
+                idx = min(idx, family.size - 1)
+                padj.append(float(adj_sorted[idx]))
+        else:
+            padj = list(bh_fdr(pvals))
+    else:
+        padj = list(bh_fdr(pvals))
     out: List[Dict[str, Any]] = []
     for m, p in zip(metrics_list, padj):
         dsr = float(m.get("dsr", 0.0))
         if n_trials is not None and int(n_trials) > 1:
-            ir = m.get("ir")
-            n_obs = m.get("n_obs")
-            if ir is not None and n_obs is not None and int(n_obs) >= 2:
+            # Deflate the strategy Sharpe when available; fall back to the IC
+            # information ratio for callers that only have that (older runs).
+            sharpe = m.get("sr")
+            obs = m.get("sr_n_obs")
+            if sharpe is None or obs is None:
+                sharpe = m.get("ir")
+                obs = m.get("n_obs")
+            if sharpe is not None and obs is not None and int(obs) >= 2:
                 dsr = deflated_sharpe_ratio(
-                    sharpe=float(ir),
-                    n_obs=int(n_obs),
+                    sharpe=float(sharpe),
+                    n_obs=int(obs),
                     n_trials=int(n_trials),
                 )
         gate_input = {
@@ -371,7 +396,11 @@ def promotion_gates(
     LLM-Alpha-Mining-Framework):
       * hac_t_significant  : |NW t| of in-sample IC above threshold
       * fdr_pass          : BH-adjusted p <= fdr_max
-      * dsr_pass          : deflated Sharpe probability >= dsr_min
+      * dsr_pass          : deflated Sharpe probability >= dsr_min. The Sharpe
+                            being deflated is the *traded book's* net Sharpe
+                            (``sr``), not the scale-free IC information ratio,
+                            so the test is sensitive to how much the strategy
+                            actually earns per unit of risk.
       * oos_consistent    : OOS sign agrees with in-sample
       * cost_adj_positive : net long-short return after turnover costs > 0
       * ls_significant    : NW t of that net return >= ls_t_min (default off)

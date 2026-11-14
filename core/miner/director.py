@@ -7,6 +7,7 @@ from core.evaluation.evaluator import ParallelEvaluator
 from core.evaluation.significance import apply_promotion_gates
 from core.evaluation.experiment_trace import (
     ExperimentTrace,
+    FdrLedger,
     HoldoutLedger,
     HoldoutReuseError,
     TrialRecord,
@@ -48,6 +49,9 @@ class FactorMinerDirector:
         gate_cfg = self.config.get("evaluation", {}).get("gates", {})
         self.trace = ExperimentTrace(gate_cfg.get("trace_path"))
         self.holdout = HoldoutLedger(gate_cfg.get("holdout_path"))
+        # Phase P1: cumulative BH-FDR needs the raw p-value of every hypothesis
+        # ever tested, not just the ones that reached this round's short list.
+        self.fdr_ledger = FdrLedger(gate_cfg.get("fdr_ledger_path"))
 
         self.latest_factor_ids: List[str] = []
 
@@ -113,10 +117,33 @@ class FactorMinerDirector:
         if run_trials <= 0:
             run_trials = len(candidates)
         n_trials = int(self.trace.num_trials) + run_trials
+        # Cumulative FDR: the family is every candidate this run handed to the
+        # evaluator (including the ones that never made the shortlist) plus
+        # every candidate from previous runs. BH inside a 2-6 factor shortlist
+        # is close to no correction at all.
+        run_p_values = list(getattr(evaluator, "run_p_values", []) or [])
+        family = self.fdr_ledger.cumulative() + run_p_values
         # Honour threshold overrides from config (evaluation.gates.*); without
         # this the gate always ran on DEFAULT_GATE_CFG.
         gate_cfg = self.config.get("evaluation", {}).get("gates")
-        gates = apply_promotion_gates(metrics_list, cfg=gate_cfg, n_trials=n_trials)
+        gates = apply_promotion_gates(
+            metrics_list,
+            cfg=gate_cfg,
+            n_trials=n_trials,
+            family_p_values=family or None,
+        )
+        # Persist this run's hypotheses once; the ledger is idempotent per run.
+        run_id = getattr(self, "_fdr_run_id", None)
+        if not run_id:
+            run_id = f"run_{uuid.uuid4().hex[:8]}"
+            self._fdr_run_id = run_id
+        self.fdr_ledger.append(
+            run_p_values,
+            run_id=run_id,
+            meta={"n_candidates": len(candidates), "n_trials": n_trials},
+        )
+        if evaluator is not None and hasattr(evaluator, "run_p_values"):
+            evaluator.run_p_values.clear()
 
         # Record EVERY attempt into the cross-run ExperimentTrace so num_trials
         # stays honest across runs (the denominator of truth).

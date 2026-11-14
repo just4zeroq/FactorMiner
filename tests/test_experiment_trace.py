@@ -4,6 +4,7 @@ import unittest
 
 from core.evaluation.experiment_trace import (
     ExperimentTrace,
+    FdrLedger,
     HoldoutLedger,
     HoldoutReuseError,
     TrialRecord,
@@ -97,3 +98,37 @@ class ExperimentTraceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FdrLedgerTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.path = os.path.join(self.tmp, "fdr.jsonl")
+        self.ledger = FdrLedger(self.path)
+
+    def test_cumulative_across_appends(self):
+        self.ledger.append([0.01, 0.2], run_id="r1")
+        self.ledger.append([0.03], run_id="r2")
+        self.assertEqual(self.ledger.num_tests, 3)
+        self.assertEqual(sorted(self.ledger.cumulative()), [0.01, 0.03, 0.2])
+
+    def test_idempotent_per_run_id(self):
+        self.ledger.append([0.01, 0.02], run_id="r1")
+        # a second save of the same run must not double-count the hypotheses
+        self.ledger.append([0.01, 0.02], run_id="r1")
+        self.assertEqual(self.ledger.num_tests, 2)
+
+    def test_persists_to_disk(self):
+        self.ledger.append([0.01, 0.5], run_id="r1")
+        reloaded = FdrLedger(self.path)
+        self.assertEqual(reloaded.num_tests, 2)
+
+    def test_ignores_non_finite(self):
+        self.ledger.append([0.01, float("nan"), None, "bad"], run_id="r1")
+        self.assertEqual(self.ledger.num_tests, 1)
+
+    def test_reset(self):
+        self.ledger.append([0.01], run_id="r1")
+        self.ledger.reset()
+        self.assertEqual(self.ledger.num_tests, 0)
+        self.assertEqual(FdrLedger(self.path).num_tests, 0)

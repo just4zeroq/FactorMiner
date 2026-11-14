@@ -97,7 +97,6 @@ def _verdict_from_panel(
     hac_t = abs(float(hac_t))
     std_ic = float(ic_ts.std())
     ir = mean_ic / std_ic if std_ic > 0 else 0.0
-    dsr = deflated_sharpe_ratio(sharpe=ir, n_obs=int(ic_ts.size), n_trials=n_trials)
     # Phase P0.5: the cost gate is denominated in returns, exactly like the
     # live evaluator. `mean IC - cost` mixed units and could not tell whether
     # the traded book made money.
@@ -109,11 +108,20 @@ def _verdict_from_panel(
         cost_rate=0.0018,
         rebalance_bars=5,
     )
+    # Phase P1: DSR deflates the strategy Sharpe, not the (scale-free) IC IR.
+    sr = (
+        ls["mean_return"] / ls["std_return"] if ls["std_return"] > 0 else 0.0
+    )
+    dsr = deflated_sharpe_ratio(
+        sharpe=float(sr), n_obs=int(ls["n_obs"] or 2), n_trials=n_trials
+    )
     return {
         "hac_t": float(hac_t),
         "p_value": float(p_value),
         "dsr": float(dsr),
         "ir": float(ir),
+        "sr": float(sr),
+        "sr_n_obs": int(ls["n_obs"]),
         "cost_adj_return": float(ls["cost_adj_return"]),
         "ls_return": float(ls["mean_return"]),
         "ls_t": float(ls["ls_t"]),

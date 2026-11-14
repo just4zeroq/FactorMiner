@@ -22,7 +22,11 @@ from core.evaluation.significance import (
     deflated_sharpe_ratio,
     pvalue_from_t,
 )
-from core.evaluation.portfolio_eval import DEFAULT_LS_CFG, long_short_returns
+from core.evaluation.portfolio_eval import (
+    DEFAULT_LS_CFG,
+    long_short_returns,
+    timing_returns,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +68,9 @@ class ParallelEvaluator:
         # multiple-testing denominator for DSR (deflated Sharpe) so the bar rises
         # with every idea actually tried, not just with the ones finally saved.
         self.total_evaluated = 0
+        # Raw p-values of every successful candidate handed to this evaluator,
+        # used for cumulative BH-FDR. Cleared by the director once recorded.
+        self.run_p_values: List[float] = []
         configured_workers = self.config.get("evaluation", {}).get("max_workers", 8)
         if isinstance(configured_workers, bool):
             raise ValueError("evaluation.max_workers must be a positive integer")
@@ -222,6 +229,18 @@ class ParallelEvaluator:
             results = list(executor.map(safe_compute, candidates))
 
         feedback.results.extend(results)
+        # Phase P1 (cumulative FDR): keep the raw p-value of every candidate we
+        # actually looked at. Correcting only the handful that reach the short
+        # list is close to no correction at all.
+        for res in results:
+            p = (res.metrics or {}).get("p_value")
+            if res.status == "success" and p is not None:
+                try:
+                    pv = float(p)
+                except (TypeError, ValueError):
+                    continue
+                if np.isfinite(pv):
+                    self.run_p_values.append(pv)
         return feedback
 
     # ------------------------------------------------------------------ #
@@ -441,6 +460,10 @@ class ParallelEvaluator:
             "cost_adj_return": 0.0,
         }
         try:
+            if isinstance(factor_values, pd.Series) and isinstance(
+                returns, pd.Series
+            ):
+                return self._build_temporal_verdict(factor_values, returns, cfg)
             if not (
                 isinstance(factor_values, pd.DataFrame)
                 and isinstance(returns, pd.DataFrame)
@@ -467,7 +490,12 @@ class ParallelEvaluator:
             std_ic = float(ic_ts.std())
             ir = mean_ic / std_ic if std_ic > 0 else 0.0
             n_obs = int(ic_ts.size)
-            dsr = deflated_sharpe_ratio(sharpe=ir, n_obs=n_obs, n_trials=1)
+            # Phase P1 (magnitude-aware): DSR must deflate the Sharpe ratio of
+            # the *strategy*, not the information ratio of the IC series.
+            # IC-IR is scale-free, so it rewards "stable but tiny" factors and
+            # is blind to how much money the book actually makes. The strategy
+            # Sharpe is the quantity Bailey & Lopez de Prado actually deflate,
+            # and it is increasing in the size of the edge.
 
             # Phase P0.5 — return-denominated tradability.
             # `mean IC - cost` mixed an information coefficient with a trading
@@ -489,16 +517,29 @@ class ParallelEvaluator:
                     cfg.get("gate_rebalance_bars") or self.gate_rebalance_bars
                 ),
             )
+            str_sharpe = (
+                float(ls["cost_adj_return"]) / float(ls["std_return"])
+                if float(ls["std_return"]) > 0
+                else 0.0
+            )
+            dsr = deflated_sharpe_ratio(
+                sharpe=str_sharpe, n_obs=int(ls["n_obs"]), n_trials=1
+            )
             verdict.update({
                 "hac_t": float(hac_t),
                 "p_value": float(p_value),
                 "dsr": float(dsr),
                 "ir": float(ir),
                 "n_obs": n_obs,
+                # Strategy Sharpe used by DSR (per period, net of cost) and the
+                # observation count it was estimated on.
+                "sr": float(str_sharpe),
+                "sr_n_obs": int(ls["n_obs"]),
                 "cost_adj_return": float(ls["cost_adj_return"]),
                 "orientation": float(orientation),
                 # Return-space diagnostics (net of turnover cost).
                 "ls_return": float(ls["mean_return"]),
+                "ls_vol": float(ls["std_return"]),
                 "ls_sharpe": float(ls["sharpe"]),
                 "ls_hit": float(ls["hit_rate"]),
                 "ls_turnover": float(ls["turnover"]),
@@ -507,6 +548,96 @@ class ParallelEvaluator:
             })
         except Exception as exc:  # pragma: no cover - defensive
             logger.debug("verdict skipped: %s", exc)
+        return verdict
+
+    def _build_temporal_verdict(
+        self, factor_values: pd.Series, returns: pd.Series, cfg: Dict
+    ) -> Dict:
+        """Verdict for single-asset (sequential) factors.
+
+        There is no cross-section to rank, so a rank IC is not directly
+        tradable. What a single-asset factor actually trades is a *timing*
+        rule, so the verdict is built from that rule's return stream:
+        long when the factor is in its own trailing top quantile, short in the
+        bottom one, with turnover charged the same way as the panel book.
+
+        Until this existed, every sequential factor (RL / NN / single-coin GP)
+        received a neutral verdict (t=0, p=1) and therefore could never be
+        promoted, no matter how good it was.
+        """
+        verdict = {
+            "hac_t": 0.0,
+            "p_value": 1.0,
+            "dsr": 0.0,
+            "ir": 0.0,
+            "n_obs": 0,
+            "cost_adj_return": 0.0,
+            "mode": "temporal",
+        }
+        aligned = pd.DataFrame(
+            {
+                "f": factor_values.astype(float),
+                "r": returns.reindex(factor_values.index).astype(float),
+            }
+        ).dropna()
+        if aligned.shape[0] < 30:
+            return verdict
+
+        corr = aligned["f"].corr(aligned["r"], method="spearman")
+        if pd.isna(corr):
+            return verdict
+        orientation = 1.0 if corr >= 0 else -1.0
+
+        tm = timing_returns(
+            factor_values,
+            returns,
+            lookback=int(
+                cfg.get(
+                    "gate_temporal_lookback", DEFAULT_LS_CFG["temporal_lookback"]
+                )
+            ),
+            quantile=float(
+                cfg.get("gate_ls_quantile", DEFAULT_LS_CFG["quantile"])
+            ),
+            orientation=orientation,
+            cost_rate=float(cfg.get("gate_cost_rate", 0.0)),
+            annualisation=float(cfg.get("annualisation", 252.0)),
+            rebalance_bars=int(
+                cfg.get("gate_rebalance_bars") or self.gate_rebalance_bars
+            ),
+        )
+        if tm["n_obs"] < 10:
+            return verdict
+
+        hac_t = abs(float(tm["ls_t"]))
+        sr = (
+            float(tm["cost_adj_return"]) / float(tm["std_return"])
+            if float(tm["std_return"]) > 0
+            else 0.0
+        )
+        verdict.update({
+            "hac_t": hac_t,
+            "p_value": pvalue_from_t(hac_t),
+            "dsr": deflated_sharpe_ratio(
+                sharpe=sr, n_obs=int(tm["n_obs"]), n_trials=1
+            ),
+            # No IC information ratio exists in the time series; the strategy
+            # Sharpe is the risk-adjusted ratio that DSR deflates.
+            "ir": float(sr),
+            "n_obs": int(tm["n_obs"]),
+            "sr": float(sr),
+            "sr_n_obs": int(tm["n_obs"]),
+            "cost_adj_return": float(tm["cost_adj_return"]),
+            "orientation": float(orientation),
+            "ls_return": float(tm["mean_return"]),
+            "ls_vol": float(tm["std_return"]),
+            "ls_sharpe": float(tm["sharpe"]),
+            "ls_hit": float(tm["hit_rate"]),
+            "ls_turnover": float(tm["turnover"]),
+            "ls_cost": float(tm["cost"]),
+            "ls_t": float(tm["ls_t"]),
+            "ls_exposure": float(tm["exposure"]),
+        })
         return verdict
 
     @staticmethod

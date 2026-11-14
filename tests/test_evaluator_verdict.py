@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from core.evaluation.evaluator import ParallelEvaluator
+from core.evaluation.significance import deflated_sharpe_ratio
 
 
 def _panel(T, N, seed):
@@ -95,13 +96,15 @@ class BuildVerdictTest(unittest.TestCase):
             data_client=None, config={"fitness": {"gate_cost_rate": 0.02}}
         )._build_verdict(fdf, rdf, {})
 
-        # the statistical verdict is untouched by the cost assumption
+        # the IC-based statistics are untouched by the cost assumption
         self.assertAlmostEqual(cheap["hac_t"], pricey["hac_t"])
-        self.assertAlmostEqual(cheap["dsr"], pricey["dsr"])
+        self.assertAlmostEqual(cheap["ir"], pricey["ir"])
+        self.assertAlmostEqual(cheap["ls_return"], pricey["ls_return"])
         # only the economics change
         self.assertGreater(cheap["cost_adj_return"], 0.0)
         self.assertLess(pricey["cost_adj_return"], 0.0)
-        self.assertEqual(cheap["ls_return"], pricey["ls_return"])
+        # ... and because DSR deflates the *net* strategy Sharpe, it moves too
+        self.assertGreater(cheap["dsr"], pricey["dsr"])
 
     def test_verdict_reports_long_short_diagnostics(self):
         rng = np.random.default_rng(9)
@@ -118,19 +121,95 @@ class BuildVerdictTest(unittest.TestCase):
         self.assertGreater(v["ls_return"], 0.0)
         self.assertGreater(v["ls_turnover"], 0.0)
 
-    def test_sequential_mode_neutral(self):
-        rng = np.random.default_rng(5)
-        T = 200
+    def test_dsr_deflates_strategy_sharpe(self):
+        # Phase P1: DSR must be computed on the traded book's Sharpe (net of
+        # cost), not on the scale-free IC information ratio. This is what makes
+        # the gate magnitude-aware: a stable-but-tiny IC no longer scores as
+        # high as a strategy that actually earns money per unit of risk.
+        rng = np.random.default_rng(13)
+        T, N = 250, 30
         idx = pd.date_range("2020-01-01", periods=T, freq="D")
+        cols = [f"A{i}" for i in range(N)]
+        f = rng.standard_normal((T, N))
+        r = 0.002 * f + 0.01 * rng.standard_normal((T, N))
+        v = self.evalr._build_verdict(
+            pd.DataFrame(f, index=idx, columns=cols),
+            pd.DataFrame(r, index=idx, columns=cols),
+            {},
+        )
+        self.assertAlmostEqual(
+            v["sr"], v["cost_adj_return"] / v["ls_vol"], places=10
+        )
+        self.assertAlmostEqual(
+            v["dsr"],
+            deflated_sharpe_ratio(v["sr"], n_obs=v["sr_n_obs"], n_trials=1),
+            places=10,
+        )
+        # The IC IR and the strategy Sharpe are different quantities here.
+        self.assertNotAlmostEqual(v["ir"], v["sr"], places=3)
+
+    def test_sequential_mode_uses_timing_strategy(self):
+        # Single-asset factors cannot be ranked cross-sectionally, but they can
+        # be traded as a timing rule. They must therefore get a real verdict
+        # instead of the old neutral one (which made RL/NN/single-coin GP
+        # factors impossible to promote).
+        rng = np.random.default_rng(5)
+        T = 800
+        idx = pd.date_range("2018-01-01", periods=T, freq="D")
+        s = np.zeros(T)
+        for t in range(1, T):
+            s[t] = 0.98 * s[t - 1] + rng.standard_normal()
+        f = pd.Series(s, index=idx)
+        r = pd.Series(0.08 * s + 0.6 * rng.standard_normal(T), index=idx)
+
+        v = self.evalr._build_verdict(f, r, {})
+        self.assertEqual(v["mode"], "temporal")
+        self.assertGreater(v["hac_t"], 2.0)
+        self.assertLess(v["p_value"], 0.05)
+        self.assertGreater(v["cost_adj_return"], 0.0)
+        self.assertGreater(v["ls_exposure"], 0.0)
+        self.assertGreater(v["sr"], 0.0)
+
+    def test_sequential_noise_is_not_significant(self):
+        rng = np.random.default_rng(15)
+        T = 600
+        idx = pd.date_range("2018-01-01", periods=T, freq="D")
         f = pd.Series(rng.standard_normal(T), index=idx)
         r = pd.Series(rng.standard_normal(T), index=idx)
-        v = self.evalr._build_verdict(f, r, {"Turnover": 0.0, "oos_consistent": True})
-        # cross-section does not exist -> neutral verdict, factor not validated
+        v = self.evalr._build_verdict(f, r, {})
+        self.assertGreater(v["p_value"], 0.05)
+        # A lucky positive stretch is possible, which is exactly why the gate
+        # needs the t-stat / DSR and not just "net return > 0".
+        self.assertLess(v["dsr"], 0.9)
+
+    def test_sequential_too_short_is_neutral(self):
+        idx = pd.date_range("2020-01-01", periods=20, freq="D")
+        f = pd.Series(np.arange(20.0), index=idx)
+        r = pd.Series(np.arange(20.0), index=idx)
+        v = self.evalr._build_verdict(f, r, {})
         self.assertEqual(v["p_value"], 1.0)
         self.assertEqual(v["hac_t"], 0.0)
 
 
 class EvaluateOnVerdictIntegrationTest(unittest.TestCase):
+    def test_sequential_evaluate_on_sets_temporal_verdict(self):
+        rng = np.random.default_rng(21)
+        T = 700
+        idx = pd.date_range("2018-01-01", periods=T, freq="D")
+        s = np.zeros(T)
+        for t in range(1, T):
+            s[t] = 0.97 * s[t - 1] + rng.standard_normal()
+        f = pd.Series(s, index=idx)
+        r = pd.Series(0.08 * s + 0.6 * rng.standard_normal(T), index=idx)
+
+        evalr = ParallelEvaluator(data_client=None, config={})
+        expr = _FakeExpr(f)
+        feedback = evalr.evaluate_on([expr], f, r)
+        metrics = feedback.results[0].metrics
+        self.assertEqual(metrics.get("mode"), "temporal")
+        self.assertIn("ls_t", metrics)
+        self.assertLess(metrics["p_value"], 0.05)
+
     def test_verdict_merged_into_metrics(self):
         rng = np.random.default_rng(7)
         T, N = 250, 30

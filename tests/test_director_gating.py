@@ -47,6 +47,22 @@ class ApplyPromotionGatesTest(unittest.TestCase):
         # the lucky one's adjusted p should exceed its raw p (conservative)
         self.assertGreater(out[0]["p_adj"], 0.0001)
 
+    def test_cumulative_family_inflates_adjusted_p(self):
+        # Phase P1: the BH family must be every hypothesis tested, not just the
+        # short list. With 999 nulls already in the ledger, a p=0.001 stops
+        # being significant at q=0.05 (0.001 * 1000 / 1 = 1.0).
+        metrics = [{
+            "hac_t": 3.5, "p_value": 0.001, "dsr": 0.99,
+            "oos_consistent": True, "cost_adj_return": 0.05,
+        }]
+        alone = apply_promotion_gates(metrics)
+        family = apply_promotion_gates(
+            metrics, family_p_values=[0.001] + [0.5] * 999
+        )
+        self.assertAlmostEqual(alone[0]["p_adj"], 0.001, places=6)
+        self.assertGreater(family[0]["p_adj"], alone[0]["p_adj"])
+        self.assertEqual(family[0]["gate"]["fdr_pass"], False)
+
     def test_dsr_deflated_by_cumulative_trials(self):
         # Same factor, same Sharpe: the more ideas were tried, the harder the
         # DSR bar. This is what makes num_trials a real multiple-testing
