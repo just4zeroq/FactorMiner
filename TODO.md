@@ -1,6 +1,6 @@
 # FactorMiner V4 待办事项
 
-> 🚀 **项目状态**: V4 架构底层引擎已搭建完毕，成功跑通 GP、RL、NN、LLM 四大异构挖掘范式。评估引擎 (`ParallelEvaluator` + `custom_fitness` 钩子) 已通过沙盒与真实数据回测的闭环验证。统计闸门（NW-HAC t / BH-FDR / DSR / 一次性 holdout）、静态 AlphaPool 与加密原生特征（3A）均已落地；当前重心是**用未使用过的区间做严格 OOS 复验**，并补齐单标的时序闸门。
+> 🚀 **项目状态**: V4 架构底层引擎已搭建完毕，成功跑通 GP、RL、NN、LLM 四大异构挖掘范式。评估引擎 (`ParallelEvaluator` + `custom_fitness` 钩子) 已通过沙盒与真实数据回测的闭环验证。统计闸门（NW-HAC t / BH-FDR / DSR / 一次性 holdout）、静态 AlphaPool、加密原生特征（3A）、组合回测 Web 化与工程加固（任务持久化/取消、相关性软去重、评估超时、数据前置校验、假设预算）均已落地；当前重心是**用未使用过的区间做严格 OOS 复验**。
 
 ## 🔄 当前核心任务 (进行中)
 
@@ -9,11 +9,11 @@
 **说明**: 将 V4 强大的后台引擎接入 React 前端，抛弃纯 CLI 运行。
 - [x] **可视化 Config 生成**: 在前端增加配置面板，支持用户点选 Universe、Mine Period、Test Period 以及所需的行情特征列 (Features)。(通过直接解析工作区 Config JSON 实现)
 - [x] **范式动态切换**: 允许用户在界面上选择 `MyCustomGP` 或 `MyCustomRL`，并自动呈现对应的参数表单。
-- [x] **启停控制与后台任务池**: 将前端表单序列化下发至后台 `/api/launch`，后端以异步线程启动 `FactorMinerDirector`，并通过 WebSocket 将挖掘进度实时广播至前端 Drawer。
+- [x] **启停控制与后台任务池**: 将前端表单序列化下发至后台 `/api/launch`，后端以异步线程启动 `FactorMinerDirector`，并通过 WebSocket 将挖掘进度实时广播至前端 Drawer。**停止能力**：`POST /api/tasks/{id}/cancel` 置取消标志，挖掘在下一个 epoch 边界抛出 `MiningCancelled` 并落库为 `cancelled`；任务状态持久化到 `.workbuddy/tasks.json`，服务重启后原 `running` 任务降级为 `interrupted`，不再出现幽灵任务。
 - [x] **Research Dashboard 重构**: 首页改为由 `/api/dashboard` 驱动的研究指挥台，聚合真实任务状态、因子归档/审查覆盖、最高 fitness 候选、Miner 构成和近期执行记录，并提供至 Launchpad、Inspector 的行动跳转。
 - [x] **三语界面框架（第一批）**: 提供浏览器语言识别和本地偏好持久化，支持中文、English、Deutsch；已覆盖全局导航、Research Dashboard 与 Factor Inspector，研究工件保持原始文本。
 - [x] **README WebUI、概览与扩展教程**: 以当前实现重写项目简介、核心能力和目录地图；补充 Research Dashboard、Factor Inspector 的实机截图，并记录四大范式的结果契约、自定义算子接入方式和 Fitness Hook 配置范式。
-- [ ] **三语界面扩展（第二批）**: 将 Launchpad、Data Downloader 的配置表单、实时日志周边提示和后端错误消息映射补齐，继续保持 API 枚举及因子内容不随语言变化。
+- [ ] **三语界面扩展（第二批）**: 将 Launchpad、Data Downloader 的配置表单、实时日志周边提示和后端错误消息映射补齐，继续保持 API 枚举及因子内容不随语言变化。（组合回测页已按三语实现，可作为后续补齐的模板）
 
 ### 2. **算子与计算引擎扩展** (进行中)
 **优先级**: 中
@@ -36,12 +36,12 @@
 - [ ] **多交易所价差**: 需要第二交易所 OHLCV 与资金费，作为跨所基差特征。
 - [ ] **Point-in-time 资产池**: 上市/退市时间表，彻底消除幸存者偏差（当前以当期非空 + `min_assets` 近似）。
 
-### 3. **去重与评估执行能力补齐** (进行中)
+### 3. **去重与评估执行能力补齐** (完成)
 **优先级**: 中
-**现状**: `DiversityFilter` 已实现基于候选源代码 MD5 的全局硬去重；相关性软去重目前仍为占位逻辑。`ParallelEvaluator` 的线程数已配置化（`evaluation.max_workers`，1–64），但尚无单任务超时与异常回收。
-- [ ] **相关性软去重**: 计算候选因子面值的相关性，按阈值剔除高相关候选，并补充与历史因子库的正交性检查（可复用 `AlphaPool` 的 mutual-IC 实现，仅对通过初筛的候选计算以控成本）。
+**现状**: 两级去重均已落地——源码 MD5 硬去重 + 因子面值相关性软去重（`dedup_value_threshold` 默认 0.99，按截面 rank 展平后算 |Pearson|，反向信号同样视为冗余）。`ParallelEvaluator` 线程数可配置（1–64），单候选超时与超时回收已补齐。
+- [x] **相关性软去重**: `DiversityFilter` 新增面值签名层——候选先过 MD5，再与 archive（默认 40 个签名）比 |corr|，超阈值直接拦截。真实 20 币 2 代实测：**46 个候选被拦（约 30%），max_observed_corr=1.000**，即三分之一"新因子"其实是同一信号的不同写法。阈值设 0 可关闭。
 - [x] **可配置并行评估**: `max_workers` 已从 `evaluation.max_workers` 读取并校验（1–64），默认 8。
-- [ ] **评估超时与资源边界**: 为单候选评估加 timeout 与取消/回收，避免个别卡死因子拖住整轮。
+- [x] **评估超时与资源边界**: `evaluation.timeout_seconds`（默认 120s/候选）控制整批预算；超时候选标记 `status=timeout` 并继续整轮，`executor.shutdown(wait=False, cancel_futures=True)` 不再阻塞挖掘。
 - [ ] **分布式评估后端**: 评估并按需接入 Ray 或 Celery —— 当前明确暂缓（单机 20 标的规模不构成瓶颈，先完成统计闭环再谈横向扩展）。
 
 ### 3b. **统计验证闭环** (P0/P1)
@@ -55,6 +55,8 @@
 - [x] **全库重审**: `scripts/reaudit_factor_db.py` 重算 84 个存量因子 → **0 通过**，6 个旧 `INSPECTED` 全部降级为 `DISCOVERED_UNVERIFIED`（备份 `factor_db/metadata_pre_reaudit/`）。分母敏感性 84/20/6 均 0 通过、n_trials=1 仅 1/84 —— 主因是成本后为负。报告 `user_workspace/reports/factor_db_reaudit.md`。
 - [x] **累积 FDR**: `ParallelEvaluator.run_p_values` 累计所有成功评估候选的原始 p；新增 `FdrLedger`（`.fdr_ledger.jsonl`，按 run_id 幂等）；BH 作用于历史 + 本轮全部假设（冒烟校验 10 个假设时 p 0.000532 → p_adj 0.005321）。
 - [x] **DSR 真实多重检验分母**: 已修 `n_trials=1` 的空转问题 —— 评估器累计 `total_evaluated`，导演以 `trace.num_trials + 本轮评估数` 重算 DSR 并写回 `dsr/n_trials`（新增回归测试）。
+- [x] **假设预算上报**: `FdrLedger.budget_report()` 输出累计假设数 / 运行轮数 / 预算使用率 / 当前 DSR 门槛（`multiple_testing_bar`）。真实跑 2 代后打印：**99 tests → 基准 0.159 每期 SR（年化 2.52）**。预算达 80% 时告警，并提供 `GET /api/gates/budget`。
+- [x] **挖掘前数据质量闸门**: `core/data_feed/panel_validator.py` 在首次 `get_data()` 时校验重复时间戳、索引乱序、K 线缺口、覆盖率、全空/常数标的与极端收益。critical 默认告警，`data_quality.strict=true` 时直接拒跑——正是这条能挡住当初混进 holdout 的 31 根重复 K 线。真实 20 币面板实测通过（366 bars / 0 重复 / 0 缺口 / 覆盖率 100%）。
 
 ### 4. **Factor Inspector 审查台** (Phase II 完成)
 **优先级**: 高
@@ -64,7 +66,8 @@
 - [x] **审查状态流转**: 支持 `DISCOVERED`、`INSPECTED`、`PAPER_TRADING`、`LIVE`、`RETIRED` 的显式更新和持久化。
 - [x] **审查快照与 Tearsheet**: 因子入库时保存对齐的因子值、未来收益和数据血缘；据此提供真实滚动 IC、分位收益、换手率和数据范围。无快照档案明确要求重新挖掘，严禁模拟图表。
 - [x] **多因子比较与批量审查**: 支持选择 2–5 个有快照的因子比较滚动 IC，并可批量更新生命周期状态。
-- [ ] **高级归因与投资组合回测**: 在已保存快照之上增加 NN 特征归因、行业/市场中性化、分位组合净值与交易成本模型。
+- [x] **投资组合回测（从 Inspector 到净值曲线）**: 新增 `/api/backtest`、`/api/backtest/runs`、`/api/backtest/runs/{id}` 与 Web「组合回测」页。可点选因子、配置成本/持仓/调仓，异步跑 ml4t 事件驱动引擎，产出净值 + 回撤曲线与 8 项核心指标。**AlphaPool 权重贯通**：合成因子落库时写入 `member_factor_ids`，回测侧自动展开为成员并沿用拟合权重（此前被等权 `mean()` 抹平）。运行产物落在 `user_workspace/reports/backtest_runs/<run_id>/`，重启后仍可查。
+- [ ] **高级归因**: NN 特征归因、行业/市场中性化、因子暴露分解与 Brinson 归因（组合回测已就绪，归因层仍缺）。
 
 ---
 

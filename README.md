@@ -140,8 +140,9 @@ Windows PowerShell 用 `$env:FACTORMINER_PROXY="http://127.0.0.1:7897"`。配置
 WebUI 将“配置一次、执行可观测、产物可审查”串成研究闭环：
 
 - **Research Dashboard**（`/`）：引擎心跳、任务成功率、因子库存、Top 因子和范式分布。
-- **Mining Launchpad**（`/launchpad`）：选择范式与配置，发起任务，并从 Tracker 打开实时日志和结果。
+- **Mining Launchpad**（`/launchpad`）：选择范式与配置，发起任务，并从 Tracker 打开实时日志和结果；运行中可随时停止（在 epoch 边界优雅退出）。
 - **Factor Inspector**（`/inspector`）：浏览已持久化因子，审查逻辑、指标、来源和生命周期状态。
+- **Portfolio Backtest**（`/backtest`）：点选因子、配置成本与持仓，跑事件驱动多空组合，看净值、回撤与核心指标。存储的线性组合因子会自动展开为成员并沿用 AlphaPool 拟合权重。
 - **Data Center**（`/data`）：查看数据覆盖范围并下载数据。
 
 ![Research Dashboard（中文）](docs/assets/web-dashboard-zh.jpg)
@@ -223,6 +224,40 @@ factorminer inspect \
   --start 2025-08-01 --end 2025-12-31 --timeframe 5m
 ```
 审查结果包含 **有效数据覆盖率 (Coverage)**、**RankIC (Mean/Std/IR/t-stat)**、**Pearson IC**、**Lag 1~10 因子衰减**、**5-Quantile 分组收益与多空价差** 以及 **换手率 (Turnover)**。
+
+**4. 命令行组合回测 (ml4t-backtest)**
+把因子库里的候选按权重合成一个截面多空组合，用事件驱动引擎跑出净值、回撤与成本明细：
+```bash
+# 等权组合（不传 --factors 时自动使用库中所有带快照的因子）
+factorminer backtest --start 2024-01-01 --end 2024-12-31 \
+  --commission 0.0004 --slippage 0.0005 --funding 0.0001 \
+  --n-long 5 --n-short 5 --rebalance 5 \
+  --output user_workspace/reports/backtest_run
+
+# 显式权重；存储的线性组合因子会自动展开为成员并沿用 AlphaPool 拟合权重
+factorminer backtest --factors fac_a,fac_b,fac_c --weights "fac_a=0.5,fac_b=0.3,fac_c=0.2"
+
+# 严格 OOS：方向只在样本内学习，评估用留出区间的因子值
+factorminer backtest --db-root factor_db_oos --orientation-db-root factor_db \
+  --start 2025-01-01 --end 2025-06-30
+```
+产物包含 `equity.csv`（净值/累计收益/回撤）、`prices.csv`、`signals.csv` 与 `summary.csv`。
+
+### 评估与数据的关键配置项
+
+以下键位均在配置文件的 `evaluation` / `data_quality` 段生效，缺省即用默认值：
+
+| 配置 | 默认 | 作用 |
+|---|---|---|
+| `evaluation.max_workers` | 8 | 并行评估线程数（1–64） |
+| `evaluation.timeout_seconds` | 120 | 单候选评估预算；超时标记为 `timeout` 并继续整轮，设 0 关闭 |
+| `evaluation.gates.hypothesis_budget` | 不限制 | 累计假设预算上限，使用率 ≥80% 时告警 |
+| `dedup_value_threshold` | 0.99 | 因子面值相关性软去重阈值；**设 0 关闭**。实测 20 币 2 代可拦下约 30% 的"同信号不同写法"候选 |
+| `dedup_value_archive` | 40 | 软去重签名库容量，控制单代比较成本 |
+| `data_quality.strict` | false | 面板存在 critical 问题时是否直接拒跑（重复时间戳 / 索引乱序 / 收益率全空） |
+| `data_quality.min_coverage` | 0.90 | 面板覆盖率下限（warning） |
+| `data_quality.max_gap_ratio` | 0.05 | 允许的 K 线缺口比例（warning） |
+| `data_quality.max_abs_return` | 1.0 | 单期收益绝对值上限，超过视为脏数据（warning） |
 
 `MyCustomNN` 的一条训练结果不是普通公式：训练阶段先用 `channel=-1` 的临时模型组保持计算图，训练后再将最佳输出通道物化为因子。每个结果显示为 `NNModel(v=<weights-hash>) [Ch: <n>]`，带有独立的 IC/fitness；模型权重保存至 `factor_db/weights/`，通道元数据保存至 `factor_db/metadata/`。`sequential_single` 会逐一处理配置中的交易对；若某个交易对的本地训练切片为空，CLI 会记录警告并跳过该标的，不会伪造因子结果。
 
