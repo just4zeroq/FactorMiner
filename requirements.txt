@@ -19,11 +19,10 @@ pyarrow>=8.0.0
 feather-format>=0.4.1
 
 
-# Backtesting engine (core/backtest adapter -> ml4t.backtest)
-# NOTE: ml4t-backtest is currently installed as a LOCAL editable build from the
-# ml4t/backtest repo (imported as `ml4t.backtest`). The floor below matches its
-# declared >=0.1.0; for a fresh env install it from source if not on PyPI.
-ml4t-backtest>=0.1.0
+# Backtesting engine (core/backtest adapter -> ml4t.backtest).
+# Not on PyPI: installed straight from git at a pinned commit. Bump the SHA
+# deliberately — the adapter depends on the execution semantics of that build.
+ml4t-backtest @ git+https://github.com/just4zeroq/backtest.git@f0143a86813b65261f2123ea2175604042ad02be
 polars>=1.36.1
 
 

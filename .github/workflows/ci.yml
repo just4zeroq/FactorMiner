@@ -1,0 +1,64 @@
+name: CI
+
+# The suite exists to protect the two things that are expensive to get wrong:
+# statistical gates that decide what enters the library, and the data/backtest
+# plumbing everything else stands on.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Tests (Python 3.12)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Matches the interpreter the library was validated on (venv 3.12.1).
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # ml4t-backtest comes from git (see requirements.txt); the runner has git.
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Report environment
+        run: |
+          python -V
+          python -c "import ml4t.backtest as b; print('ml4t.backtest ->', b.__file__)"
+
+      - name: Run test suite
+        run: python -m pytest tests/ -q
+
+  frontend:
+    name: Build (Node 20)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      # tsc -b runs first inside this script, so type errors fail the job.
+      - run: npm run build

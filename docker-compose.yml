@@ -1,0 +1,40 @@
+# Local deployment: API in one container, built SPA in another.
+#
+# State that matters is bind-mounted, not baked into the image: the data library,
+# the factor archive, review reports and logs all stay on the host so a rebuild
+# never destroys research output.
+services:
+  api:
+    build:
+      context: .
+      target: api
+    image: factorminer-api:local
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./factor_db:/app/factor_db
+      - ./user_workspace:/app/user_workspace
+      - ./logs:/app/logs
+    environment:
+      # The default proxy in config/settings.py points at the host's 127.0.0.1,
+      # which is unreachable from inside the container. Set both lines below to
+      # reach an exchange through a host proxy instead of going direct.
+      FACTORMINER_NO_PROXY: "1"
+      # FACTORMINER_PROXY: "http://host.docker.internal:7890"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      target: web
+    image: factorminer-web:local
+    ports:
+      # 5173 keeps the URL identical to `npm run dev`, and the SPA's absolute
+      # API base (http://localhost:8000) keeps working unchanged.
+      - "5173:80"
+    depends_on:
+      - api
+    restart: unless-stopped

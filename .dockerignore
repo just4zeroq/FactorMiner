@@ -1,0 +1,20 @@
+# Keep the build context to source only. The data library alone is far larger
+# than the image, and none of it belongs in a layer.
+venv/
+.git/
+.github/
+node_modules/
+web/node_modules/
+web/dist/
+data/
+factor_db/
+factor_db_oos/
+factor_db_p0/
+factor_db_p0_oos/
+logs/
+user_workspace/reports/
+.pytest_cache/
+**/__pycache__/
+*.pyc
+*.feather
+*.parquet
