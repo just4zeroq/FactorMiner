@@ -55,7 +55,8 @@ class TestEmpiricalNullGate(unittest.TestCase):
             cfg={"empirical_p_max": 0.05},
             null_tstats=[np.full(100, 0.1)],
         )
-        self.assertEqual(out[0]["empirical_p"], 0.0)
+        # Continuity-corrected empirical p floors at 1/(n+1), not 0.0 (E-04).
+        self.assertAlmostEqual(out[0]["empirical_p"], 1.0 / 101.0, places=12)
         self.assertTrue(out[0]["gate"]["empirical_null_pass"])
         self.assertEqual(out[0]["status"], "INSPECTED")
 
@@ -67,7 +68,9 @@ class TestEmpiricalNullGate(unittest.TestCase):
         self.assertTrue(out[0]["gate"]["empirical_null_pass"])
 
     def test_empirical_p_is_one_sided(self):
-        self.assertAlmostEqual(empirical_p(2.5, [1.0, 2.0, 3.0, 4.0]), 0.5)
+        # Two of four nulls are >= 2.5 -> (2+1)/(4+1) = 0.6 with the
+        # Phipson-Smyth continuity correction (naive mean would be 0.5).
+        self.assertAlmostEqual(empirical_p(2.5, [1.0, 2.0, 3.0, 4.0]), 0.6)
 
     def test_promotion_gates_reports_new_key(self):
         g = promotion_gates({**strong_metrics()[0], "empirical_p": 0.9},

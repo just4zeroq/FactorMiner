@@ -10,6 +10,7 @@ from core.evaluation.significance import (
     target_permutation_tstats,
     random_formula_null,
     empirical_p,
+    pvalue_from_t,
     expected_max_sr,
     deflated_sharpe_ratio,
     promotion_gates,
@@ -97,9 +98,24 @@ class NullTest(unittest.TestCase):
         self.assertTrue(np.all(np.isfinite(null)))
 
     def test_empirical_p(self):
-        null = np.linspace(0, 5, 101)
-        self.assertAlmostEqual(empirical_p(2.5, null), 0.5, places=2)
-        self.assertAlmostEqual(empirical_p(10.0, null), 0.0, places=6)
+        # Continuity-corrected (Phipson-Smyth): p=(count+1)/(n+1), never 0.0.
+        null = np.linspace(0, 5, 101)  # n=101; 2.5..5 inclusive = 51 samples
+        self.assertAlmostEqual(empirical_p(2.5, null), 52.0 / 102.0, places=6)
+        # Exceeding every null sample must floor at 1/(n+1), NOT 0.0 (E-04).
+        self.assertAlmostEqual(empirical_p(10.0, null), 1.0 / 102.0, places=6)
+        self.assertGreater(empirical_p(10.0, null), 0.0)
+
+    def test_empirical_p_never_zero_and_monotone(self):
+        rng = np.random.default_rng(11)
+        null = rng.standard_normal(100)
+        vals = [100.0, np.max(null), np.median(null), np.min(null) - 5.0]
+        ps = [empirical_p(v, null) for v in vals]
+        self.assertTrue(all(p > 0.0 for p in ps), ps)
+        self.assertTrue(all(p <= 1.0 for p in ps), ps)
+        # stricter evidence (larger value) yields a SMALLER p-value
+        self.assertLessEqual(ps[0], ps[1])
+        self.assertLessEqual(ps[1], ps[2])
+        self.assertLessEqual(ps[2], ps[3])
 
     def test_empirical_p_nonfinite_returns_one(self):
         # A NaN/Inf statistic cannot reject the null; returning a spurious low
@@ -130,6 +146,33 @@ class NullTest(unittest.TestCase):
         gate = promotion_gates(metrics, cfg)
         self.assertFalse(gate["empirical_null_pass"])
         self.assertFalse(gate["pass"])
+
+
+class PValueFromTTest(unittest.TestCase):
+    """E-03: HAC t must use the Student-t tail, not N(0,1)."""
+
+    def test_student_t_tail_is_fatter_than_normal(self):
+        t = 2.4
+        p_norm = pvalue_from_t(t)                 # legacy normal tail
+        p_t59 = pvalue_from_t(t, df=59)           # finite-sample reference
+        self.assertGreater(p_t59, p_norm)         # t tail is more conservative
+        # magnitude sanity: N(0,1) gives ~0.0164 at t=2.4; t(59) ~0.0197
+        self.assertLess(p_t59, p_norm * 1.5)
+
+    def test_large_df_converges_to_normal(self):
+        t = 3.0
+        p_norm = pvalue_from_t(t)
+        p_big = pvalue_from_t(t, df=100000)
+        self.assertAlmostEqual(p_big, p_norm, places=4)
+
+    def test_small_df_is_clearly_looser(self):
+        # df=5 is a very heavy tail: p should be markedly larger than normal.
+        self.assertGreater(pvalue_from_t(2.0, df=5), pvalue_from_t(2.0) * 1.3)
+
+    def test_nonfinite_and_tiny_df_are_safe(self):
+        self.assertEqual(pvalue_from_t(float("nan"), df=30), 1.0)
+        self.assertEqual(pvalue_from_t(2.0, df=0), pvalue_from_t(2.0))  # fallback
+        self.assertLessEqual(pvalue_from_t(5.0, df=3), 1.0)
 
 
 class DSRTest(unittest.TestCase):

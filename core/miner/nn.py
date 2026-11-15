@@ -265,10 +265,11 @@ class NumpyMLPFactorModel:
         stale_epochs = 0
 
         for _ in range(max(1, int(epochs))):
+            # --- forward pass at the CURRENT (pre-update) parameters, used only
+            #     to obtain gradients ---------------------------------------
             channels = np.tanh(normalized @ self.W1 + self.b1)
             prediction = channels @ self.W2 + self.b2
             error = prediction - y
-            loss = float(np.mean(error ** 2))
 
             d_prediction = (2.0 / len(y)) * error
             dW2 = channels.T @ d_prediction + l2 * self.W2
@@ -289,6 +290,17 @@ class NumpyMLPFactorModel:
             self.b1 -= learning_rate * db1 * scale
             self.W2 -= learning_rate * dW2 * scale
             self.b2 -= learning_rate * db2 * scale
+
+            # --- M-05 fix: evaluate the loss at the UPDATED parameters, i.e.
+            #     the weights we would actually keep. The old code compared the
+            #     PRE-update loss against `best_loss` but snapshotted the
+            #     POST-update weights, so on restore the model held one epoch
+            #     of "future" weights whose loss had never been measured. That
+            #     silently moved the early-stopping point one step off and made
+            #     `best_loss` not correspond to the weights returned. ----------
+            channels_new = np.tanh(normalized @ self.W1 + self.b1)
+            prediction_new = channels_new @ self.W2 + self.b2
+            loss = float(np.mean((prediction_new - y) ** 2))
 
             if loss + 1e-12 < best_loss:
                 best_loss = loss

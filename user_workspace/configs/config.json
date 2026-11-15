@@ -9,6 +9,14 @@
 	"_comment_universe": "CRYPTO_PERP_TOP50 (目前仅作为元数据备注，实际下载和回测数据由下方 data_feeds.pairs 决定)",
 	"population_size": 100,
 	"max_iterations": 50,
+	"data_quality": {
+	  "check_on_load": true,
+	  "strict": true,
+	  "min_coverage": 0.90,
+	  "max_duplicate_ratio": 0.0,
+	  "max_abs_return": 1.0,
+	  "max_gap_ratio": 0.05
+	},
 	"data_feeds": {
 		"required_streams": [
 			"open",

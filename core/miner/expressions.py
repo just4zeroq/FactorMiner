@@ -251,6 +251,10 @@ class LinearCombinedFactor(FactorExpression):
             "type": "linear_combination",
             "weights": [float(w) for w in self.weights],
             "sub_asts": subs,
+            # Persist the member ids so a stored combination can be traced back
+            # to the factors it was built from (and recomputed) after a round
+            # trip. Without this, ``from_dict`` lost the lineage entirely.
+            "member_factor_ids": list(self._parent_ids),
         }
 
     @classmethod
@@ -261,7 +265,20 @@ class LinearCombinedFactor(FactorExpression):
                 subs.append(FactorExpressionAST(ast_dict=a))
             else:
                 subs.append(a)
-        return cls(sub_expressions=subs, weights=d.get("weights"))
+        # Restore member ids (accept the new key, or the legacy nested one).
+        members = d.get("member_factor_ids") or (
+            d.get("logic_reference") or {}
+        ).get("member_factor_ids")
+        return cls(
+            sub_expressions=subs,
+            weights=d.get("weights"),
+            parent_ids=list(members or []),
+        )
+
+    @property
+    def member_factor_ids(self) -> List[str]:
+        """Ids of the constituent factors (lineage), mirroring the stored dict."""
+        return list(self._parent_ids)
 
     def get_complexity(self) -> str:
         return f"LinearCombo(K={len(self.sub_expressions)})"

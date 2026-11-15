@@ -317,12 +317,30 @@ def guard(
         digest = result["context"]
         period_key = f"holdout_{lo}_{hi}" + (f"_{digest}" if digest else "")
         label = spec.get("label")
-        if spec.get("start") and lo < _normalise(spec["start"]):
-            logger.warning(
-                "Holdout guard: final window %s starts before the pre-registered "
-                "fresh window %s (%s). Registering anyway; confirm this is not "
-                "a re-used in-sample period.", lo, spec.get("start"), label,
-            )
+        # The window spec may declare a sentinel start ("auto"/"ledger"/"")
+        # meaning "anchor is derived from the ledger last-reveal day" (see
+        # core/experiment/windows.py). Those are NOT dates and must not be fed
+        # to _normalise(), which raises on unparseable input. Before this guard,
+        # every Web "strict OOS" backtest (which sets purpose="final") crashed
+        # here with "Invalid holdout window bound 'auto'". Only compare when the
+        # spec carries a concrete ISO date.
+        declared_start = spec.get("start")
+        is_sentinel = (
+            declared_start is None
+            or (isinstance(declared_start, str)
+                and declared_start.strip().lower() in ("", "auto", "ledger"))
+        )
+        if not is_sentinel:
+            try:
+                bound = _normalise(declared_start)
+            except ValueError:
+                bound = None
+            if bound and lo < bound:
+                logger.warning(
+                    "Holdout guard: final window %s starts before the pre-registered "
+                    "fresh window %s (%s). Registering anyway; confirm this is not "
+                    "a re-used in-sample period.", lo, declared_start, label,
+                )
         ledger.reveal(
             period_key,
             lo,

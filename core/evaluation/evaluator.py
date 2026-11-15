@@ -1,4 +1,5 @@
 import concurrent.futures
+import math
 import traceback
 import logging
 from typing import List, Dict, Any, Optional
@@ -180,7 +181,18 @@ class ParallelEvaluator:
         )
 
     def evaluate_final(self, candidates: List[FactorExpression]) -> EvaluationFeedback:
-        """One-shot OOS evaluation of a frozen shortlist (never used for search)."""
+        """One-shot OOS evaluation of a frozen shortlist (never used for search).
+
+        This is the **public** one-shot OOS entry point (library / CLI callers).
+        The director's in-pipeline equivalent, ``_attach_final_oos_metrics``,
+        calls the very same :meth:`_compute_oos_metrics` primitive on the same
+        split, so the two produce identical, *signed* ``RankIC_oos`` values.
+        They are intentionally two surfaces over one implementation rather than
+        two independent OOS code paths (see ``test_layer2_leaks``
+        ``test_two_oneshot_oos_paths_agree_on_signed_rankic``).
+
+        Reads ``get_test_data()`` / ``get_test_returns()`` exactly once per call.
+        """
         test_data = self.data_client.get_test_data()
         test_returns = self.data_client.get_test_returns()
         return self.evaluate_on(
@@ -245,7 +257,7 @@ class ParallelEvaluator:
                         metrics = {**in_metrics, "fitness_score": float(custom_score)}
                     # 仍附加 OOS 诊断字段（不覆盖用户的 fitness_score）
                     if oos_metrics is not None:
-                        metrics.setdefault("RankIC_oos", abs(float(oos_metrics.get("RankIC", 0.0))))
+                        metrics.setdefault("RankIC_oos", float(oos_metrics.get("RankIC", 0.0)))
                         metrics.setdefault("IC_oos", float(oos_metrics.get("IC", 0.0)))
                         metrics.setdefault("oos_consistent", True)
                 else:
@@ -522,6 +534,7 @@ class ParallelEvaluator:
 
         if use_oos:
             rankic_oos = abs(float(oos_metrics.get("RankIC", 0.0)))
+            rankic_oos_signed = float(oos_metrics.get("RankIC", 0.0))
             ic_oos = float(oos_metrics.get("IC", 0.0))
             in_sign = 1 if in_metrics.get("RankIC", 0) >= 0 else -1
             oos_sign = 1 if oos_metrics.get("RankIC", 0) >= 0 else -1
@@ -529,6 +542,7 @@ class ParallelEvaluator:
             cons_mult = 1.0 if consistent else float(cfg["consistency_penalty"])
         else:
             rankic_oos = rankic_in
+            rankic_oos_signed = float(in_metrics.get("RankIC", 0.0))
             ic_oos = ic_in
             consistent = True
             cons_mult = 1.0
@@ -575,7 +589,11 @@ class ParallelEvaluator:
 
         metrics = {
             **in_metrics,
-            "RankIC_oos": rankic_oos,
+            # OOS-04: report the *signed* OOS RankIC (matching the director's
+            # final-OOS path). The promotion gate already takes abs() where it
+            # needs magnitude, so this keeps the sign available for diagnosis
+            # and makes the two one-shot OOS surfaces agree numerically.
+            "RankIC_oos": rankic_oos_signed,
             "IC_oos": ic_oos,
             "oos_consistent": bool(consistent),
             "oos_enabled": bool(oos_enabled and oos_present),
@@ -634,7 +652,9 @@ class ParallelEvaluator:
             if ic_ts.size < 4:
                 return verdict
             hac_t = tstat_ic(f, r)
-            p_value = pvalue_from_t(hac_t)
+            # E-03: finite-sample HAC t has fat tails; use the Student-t
+            # reference law with df = (IC observations - 1), not N(0,1).
+            p_value = pvalue_from_t(hac_t, df=int(ic_ts.size) - 1)
             mean_ic = float(ic_ts.mean())
             # Orientation is part of the model and is learned in-sample (the
             # backtest does the same via infer_orientation). A factor with a
@@ -661,6 +681,7 @@ class ParallelEvaluator:
             # 50/50 dollar-neutral) on the oriented factor and charge the cost
             # of its turnover, so `cost_adj_return` is a per-period net return
             # that is directly comparable to a backtest.
+            horizon = max(1, int(cfg.get("gate_rebalance_bars") or self.gate_rebalance_bars))
             ls = long_short_returns(
                 factor_values,
                 returns,
@@ -672,17 +693,21 @@ class ParallelEvaluator:
                 annualisation=resolve_annualisation(
                     self.config, index=factor_values.index
                 ),
-                rebalance_bars=int(
-                    cfg.get("gate_rebalance_bars") or self.gate_rebalance_bars
-                ),
+                rebalance_bars=horizon,
             )
             str_sharpe = (
                 float(ls["cost_adj_return"]) / float(ls["std_return"])
                 if float(ls["std_return"]) > 0
                 else 0.0
             )
+            # M-08: with a multi-bar prediction horizon (h>1) the forward
+            # returns overlap by (h-1) bars, so consecutive observations are NOT
+            # independent: the true independent sample is ~T/h, not T. Feeding
+            # T into the DSR deflation overstates evidence by ~sqrt(h) and lets
+            # an h=5 factor clear a bar it should not. For h=1 this is a no-op.
+            dsr_obs = max(2, int(math.ceil(float(ls["n_obs"]) / float(horizon))))
             dsr = deflated_sharpe_ratio(
-                sharpe=str_sharpe, n_obs=int(ls["n_obs"]), n_trials=1,
+                sharpe=str_sharpe, n_obs=dsr_obs, n_trials=1,
                 # P1-M9: pass the empirical net-return moments so DSR is not
                 # optimistic on fat-tailed / negatively-skewed books.
                 skewness=float(ls.get("net_skew", 0.0)),
@@ -697,7 +722,7 @@ class ParallelEvaluator:
                 # Strategy Sharpe used by DSR (per period, net of cost) and the
                 # observation count it was estimated on.
                 "sr": float(str_sharpe),
-                "sr_n_obs": int(ls["n_obs"]),
+                "sr_n_obs": int(dsr_obs),
                 "cost_adj_return": float(ls["cost_adj_return"]),
                 "orientation": float(orientation),
                 # Return-space diagnostics (net of turnover cost).
@@ -755,6 +780,7 @@ class ParallelEvaluator:
             return verdict
         orientation = 1.0 if corr >= 0 else -1.0
 
+        horizon = max(1, int(cfg.get("gate_rebalance_bars") or self.gate_rebalance_bars))
         tm = timing_returns(
             factor_values,
             returns,
@@ -771,9 +797,7 @@ class ParallelEvaluator:
             annualisation=resolve_annualisation(
                 self.config, index=factor_values.index
             ),
-            rebalance_bars=int(
-                cfg.get("gate_rebalance_bars") or self.gate_rebalance_bars
-            ),
+            rebalance_bars=horizon,
         )
         if tm["n_obs"] < 10:
             return verdict
@@ -784,11 +808,14 @@ class ParallelEvaluator:
             if float(tm["std_return"]) > 0
             else 0.0
         )
+        # M-08: honour the h>1 overlap discount for the temporal path too.
+        dsr_obs_t = max(2, int(math.ceil(float(tm["n_obs"]) / float(horizon))))
         verdict.update({
             "hac_t": hac_t,
-            "p_value": pvalue_from_t(hac_t),
+            # E-03: Student-t tail with the traded book's observation count.
+            "p_value": pvalue_from_t(hac_t, df=int(tm["n_obs"]) - 1),
             "dsr": deflated_sharpe_ratio(
-                sharpe=sr, n_obs=int(tm["n_obs"]), n_trials=1,
+                sharpe=sr, n_obs=dsr_obs_t, n_trials=1,
                 # P1-M9: empirical net-return moments (see long_short_returns).
                 skewness=float(tm.get("net_skew", 0.0)),
                 kurtosis=float(tm.get("net_kurtosis", 3.0)),
@@ -798,7 +825,7 @@ class ParallelEvaluator:
             "ir": float(sr),
             "n_obs": int(tm["n_obs"]),
             "sr": float(sr),
-            "sr_n_obs": int(tm["n_obs"]),
+            "sr_n_obs": int(dsr_obs_t),
             "cost_adj_return": float(tm["cost_adj_return"]),
             "orientation": float(orientation),
             "ls_return": float(tm["mean_return"]),

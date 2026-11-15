@@ -218,10 +218,51 @@ class RealDataClient:
                 
         if sliced_dfs:
             final_df = pd.concat(sliced_dfs)
+            final_df = self._drop_unclosed_last_bar(final_df)
             final_df = self._attach_crypto_streams(final_df, pair)
             return final_df
             
         return pd.DataFrame()
+
+    def _drop_unclosed_last_bar(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Drop a trailing bar that has not finished forming yet (D-05).
+
+        The last bar in a freshly-refreshed file is frequently the *current,
+        still-forming* candle: its OHLCV is partial and its forward return is
+        undefined. Feeding it into mining lets a factor "see" a half-built bar
+        whose close will still move — a look-ahead-flavoured artifact. This
+        trims it at the DATA layer, once, so every caller (mining, backtest,
+        inspector) inherits the same guard instead of each script re-implementing
+        it. It is a no-op for historical data (all bars already closed).
+
+        A bar stamped ``t`` covers ``[t, t + timeframe)``; it is closed only when
+        ``t + timeframe <= now``. ``now`` is taken as UTC and the index is made
+        tz-naive to match the rest of the pipeline.
+        """
+        if df.empty or not isinstance(df.index, pd.DatetimeIndex):
+            return df
+        try:
+            from core.data_feed.crypto_streams import timeframe_to_timedelta
+
+            bar = timeframe_to_timedelta(self.timeframe)
+        except Exception:
+            bar = pd.Timedelta(days=1)
+        now = pd.Timestamp.now(tz="UTC").tz_convert(None)
+        last_start = df.index.max()
+        if pd.isna(last_start):
+            return df
+        if last_start + bar > now:
+            dropped = last_start
+            df = df[df.index != last_start]
+            logger.info(
+                "Dropping unclosed last bar %s (closes at %s, now %s) for %s/%s",
+                dropped,
+                last_start + bar,
+                now,
+                self.exchange,
+                self.timeframe,
+            )
+        return df
 
     def _attach_crypto_streams(self, df: pd.DataFrame, pair: str) -> pd.DataFrame:
         """Merge stored crypto streams as extra columns, aligned past-only.

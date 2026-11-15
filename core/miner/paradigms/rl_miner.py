@@ -154,14 +154,23 @@ class RLFactorMiner(BaseFactorMiner):
 
     def update_model(self, candidates: List[FactorExpression], feedback: EvaluationFeedback) -> None:
         logger.info("RL: REINFORCE update of policy logits...")
-        grad = np.zeros_like(self.policy_logits)
-        rewards = []
+        # G-01 fix: collect the WHOLE batch first, then use its mean as the
+        # baseline. The previous version computed
+        #     advantage = reward - mean(rewards_so_far)
+        # *inside* the loop as rewards arrived, so the first trajectory always
+        # saw advantage ≈ 0 (its own reward WAS the baseline) and every later
+        # one was pulled toward whichever rewards happened to arrive early.
+        # That is a biased gradient: the policy systematically under-credits
+        # early trajectories and over-credits late ones in the same batch.
+        batch = []  # (actions_idx, actions_probs, reward)
+        rewards: List[float] = []
         for expr in candidates:
             result = feedback.for_candidate(expr)
             if not result or not result.succeeded:
                 continue
             reward = float(expr.metrics.get("fitness_score", 0.0))
-            rewards.append(reward)
+            if not np.isfinite(reward):
+                continue
             actions_idx = getattr(expr, "_rl_actions", None)
             actions_probs = getattr(expr, "_rl_probs", None)
             if actions_idx is None or actions_probs is None:
@@ -169,20 +178,33 @@ class RLFactorMiner(BaseFactorMiner):
             if reward > self.best_reward:
                 self.best_reward = reward
                 self.best_expr = expr
-            advantages = reward - (np.mean(rewards) if rewards else 0.0)
+            batch.append((actions_idx, actions_probs, reward))
+            rewards.append(reward)
+
+        if not batch:
+            return
+
+        baseline = float(np.mean(rewards))
+        self.baseline = baseline  # exposed for logging / diagnostics
+
+        grad = np.zeros_like(self.policy_logits)
+        for actions_idx, actions_probs, reward in batch:
+            advantage = reward - baseline
             for a, p in zip(actions_idx, actions_probs):
                 # grad_log p_a = e_a - p  (REINFORCE)
                 g = -p.copy()
                 g[a] += 1.0
-                grad += advantages * g
-            # Entropy bonus to encourage exploration early on.
-            probs = self._policy_probs()
-            entropy_grad = (np.log(probs + 1e-12) + 1.0) * probs
-            grad -= self.entropy_coef * entropy_grad
+                grad += advantage * g
 
-        if rewards:
-            self.baseline = float(np.mean(rewards))
-        grad /= max(1, len(rewards))
+        # Normalise by the number of usable trajectories, then apply the entropy
+        # bonus ONCE per update. (It used to be subtracted inside the loop, i.e.
+        # N times, and then divided by N — numerically the same but fragile if
+        # the loop ever stopped dividing. Keeping it outside is the standard
+        # REINFORCE-with-entropy form.)
+        grad /= max(1, len(batch))
+        probs = self._policy_probs()
+        entropy_grad = (np.log(probs + 1e-12) + 1.0) * probs
+        grad -= self.entropy_coef * entropy_grad
         self.policy_logits += self.learning_rate * grad
         # Keep logits bounded for numerical stability.
         self.policy_logits = np.clip(self.policy_logits, -20.0, 20.0)

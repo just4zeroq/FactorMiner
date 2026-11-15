@@ -190,6 +190,37 @@ class BuildVerdictTest(unittest.TestCase):
         self.assertEqual(v["p_value"], 1.0)
         self.assertEqual(v["hac_t"], 0.0)
 
+    def test_horizon_overlap_discounts_dsr_observations(self):
+        """M-08: with horizon h>1 the forward returns overlap by h-1 bars.
+
+        The DSR observational count must shrink to ~T/h so an overlapping
+        h=5 factor is not credited with T independent observations. With the
+        default h=1 the discount is a no-op.
+        """
+        rng = np.random.default_rng(31)
+        T, N = 500, 30
+        idx = pd.date_range("2020-01-01", periods=T, freq="D")
+        cols = [f"A{i}" for i in range(N)]
+        f = rng.standard_normal((T, N))
+        r = 0.002 * f + 0.01 * rng.standard_normal((T, N))
+        fdf = pd.DataFrame(f, index=idx, columns=cols)
+        rdf = pd.DataFrame(r, index=idx, columns=cols)
+
+        h1 = ParallelEvaluator(
+            data_client=None, config={"fitness": {"gate_rebalance_bars": 1}}
+        )._build_verdict(fdf, rdf, {})
+        h5 = ParallelEvaluator(
+            data_client=None, config={"fitness": {"gate_rebalance_bars": 5}}
+        )._build_verdict(fdf, rdf, {})
+
+        # h=1: no discount -> sr_n_obs equals the traded-book obs count.
+        self.assertEqual(h1["sr_n_obs"], h1["n_obs"])
+        # h=5: independent obs approximate T/5 (ceil), far below raw T.
+        self.assertLess(h5["sr_n_obs"], h5["n_obs"])
+        self.assertAlmostEqual(h5["sr_n_obs"], int(np.ceil(h5["n_obs"] / 5.0)))
+        # DSR is deflated on the reduced count -> no more optimistic than h=1.
+        self.assertLessEqual(h5["dsr"], h1["dsr"] + 1e-12)
+
 
 class EvaluateOnVerdictIntegrationTest(unittest.TestCase):
     def test_sequential_evaluate_on_sets_temporal_verdict(self):

@@ -71,6 +71,66 @@ class A1SearchOosIsolationTests(unittest.TestCase):
     def test_config_default_is_fail_closed(self):
         self.assertFalse(DEFAULT_FITNESS_CFG["allow_oos_in_search"])
 
+    def test_two_oneshot_oos_paths_agree_on_signed_rankic(self):
+        """evaluate_final and the director's _attach_final_oos_metrics must
+        report the SAME signed OOS RankIC for the same factor/split.
+
+        Before the fix one path emitted ``abs(RankIC)`` and the other the
+        signed value; the promotion gate takes abs() so verdicts matched, but
+        stored metadata disagreed in sign. This pins the two surfaces together.
+        """
+        from core.miner.director import FactorMinerDirector
+        from core.miner.expressions import FactorExpressionAST
+
+        n = 120
+        idx = pd.date_range("2025-01-01", periods=n, freq="D")
+        rng = np.random.default_rng(7)
+        # A weak negative-IC factor so the *signed* OOS RankIC is negative and
+        # abs() would hide the sign.
+        factor_series = pd.Series(rng.standard_normal(n), index=idx)
+        returns_series = pd.Series(-0.2 * factor_series + rng.standard_normal(n) * 0.5,
+                                   index=idx)
+
+        class _SeriesClient:
+            def get_data(self):
+                return factor_series
+
+            def get_returns(self):
+                return returns_series
+
+            def get_test_data(self):
+                return factor_series
+
+            def get_test_returns(self):
+                return returns_series
+
+        class _ConstExpr(FactorExpressionAST):
+            def __init__(self, values):
+                super().__init__(ast_dict={"op": "add", "left": "close", "right": "close"})
+                self._values = values
+
+            def compute(self, data):
+                return self._values
+
+        expr = _ConstExpr(factor_series)
+
+        ev = ParallelEvaluator(_SeriesClient(), {})
+        final_fb = ev.evaluate_final([expr])
+        final_metrics = final_fb.for_candidate(expr).metrics
+        rk_final = final_metrics.get("RankIC_oos")
+
+        # Director path (unbound method reuse with a minimal stand-in self).
+        director = FactorMinerDirector.__new__(FactorMinerDirector)
+        director.data_client = _SeriesClient()
+        director.evaluator = ev
+        merged = director._attach_final_oos_metrics([expr], [{"RankIC": final_metrics.get("RankIC", 0.0)}])
+        rk_director = merged[0].get("RankIC_oos")
+
+        self.assertAlmostEqual(float(rk_final), float(rk_director), places=12)
+        # Both must preserve the sign (negative here), not abs it away.
+        self.assertLess(float(rk_final), 0.0)
+        self.assertLess(float(rk_director), 0.0)
+
 
 class A2CausalityTests(unittest.TestCase):
     def setUp(self):

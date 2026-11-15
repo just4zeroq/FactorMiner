@@ -217,9 +217,21 @@ def random_formula_null(
 def empirical_p(value: float, null_samples: Sequence[float]) -> float:
     """One-sided empirical p-value of ``value`` against a null distribution.
 
-    Returns the fraction of null samples that are at least as extreme as
-    ``value``. A non-finite ``value`` (e.g. a NaN Newey-West t-statistic when a
-    factor panel collapses) cannot reject the null, so it returns ``1.0`` rather
+    Uses the standard continuity-corrected Monte-Carlo p-value
+
+        p = (1 + #{null >= value}) / (1 + n)
+
+    rather than the naive ``mean(null >= value)``. The ``+1`` terms are the
+    "Phipson & Smyth (2010)" correction: they make the smallest attainable
+    p-value ``1/(n+1)`` instead of an impossible 0.0. Without it, a candidate
+    whose statistic exceeds all ``n`` permutation samples gets p=0.0, which
+    produces spurious certainty when combined with ``empirical_p_max`` gates —
+    with ``n_perm=100`` the naive estimate claims a 1-in-infinity event for
+    what is really a 1-in-101 event. The corrected value is always in
+    ``(0, 1]`` and is exact under exchangeability.
+
+    A non-finite ``value`` (e.g. a NaN Newey-West t-statistic when a factor
+    panel collapses) cannot reject the null, so it returns ``1.0`` rather
     than a spurious low p-value. This is what stops a ``hac_t=NaN`` candidate
     from **falsely passing** the empirical-null gate (see
     ``docs/reviews/system_code_review.md``, finding F5/C1).
@@ -227,9 +239,12 @@ def empirical_p(value: float, null_samples: Sequence[float]) -> float:
     if not np.isfinite(value):
         return 1.0
     null = np.asarray(null_samples, float)
-    if null.size == 0:
+    null = null[np.isfinite(null)]
+    n = int(null.size)
+    if n == 0:
         return 1.0
-    return float(np.mean(null >= value))
+    count = int(np.count_nonzero(null >= value))
+    return (count + 1.0) / (n + 1.0)
 
 
 # --------------------------------------------------------------------------- #
@@ -375,14 +390,50 @@ def _norm_cdf(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
 
-def pvalue_from_t(t: float) -> float:
-    """Two-sided p-value of a (HAC) t-statistic under the normal null.
+def _student_t_sf(abs_t: float, df: float) -> float:
+    """One-sided survival function of Student-t via the regularized beta.
 
-    The Newey-West t-stat is asymptotically standard normal, so this is the
-    per-factor raw p-value. The *family-wise* correction (BH-FDR / Holm) is
-    applied later across the whole trial set in :func:`apply_promotion_gates`.
+    Uses ``stats.t.sf`` from scipy when available; otherwise falls back to an
+    incomplete-beta implementation built on ``scipy.special`` if scipy is
+    present, and finally to the normal tail when neither is importable (with
+    the caller expected to pass a large ``df`` so the difference is negligible).
+    ``p_two_sided = 2 * I_{df/(df+t^2)}(df/2, 1/2)`` for ``t > 0``.
     """
-    return float(2.0 * (1.0 - _norm_cdf(abs(float(t)))))
+    abs_t = abs(float(abs_t))
+    df = float(df)
+    if not np.isfinite(abs_t) or not np.isfinite(df) or df <= 0:
+        return 1.0
+    try:
+        from scipy.stats import t as student_t  # type: ignore
+        return float(student_t.sf(abs_t, df))
+    except Exception:  # pragma: no cover - scipy absent
+        return float(1.0 - _norm_cdf(abs_t))
+
+
+def pvalue_from_t(t: float, df: Optional[int] = None) -> float:
+    """Two-sided p-value of a HAC t-statistic under the correct reference law.
+
+    A Newey-West HAC t-statistic is only *asymptotically* N(0,1). At the sample
+    sizes crypto factor IC series actually have (tens to a few hundred obs)
+    and with several Newey-West lags, its finite-sample distribution has much
+    fatter tails than the normal. Treating it as N(0,1) — the old behaviour —
+    systematically **understates** the p-value (e.g. t=2.4 gives p=0.016 under
+    N(0,1) but p≈0.021 with df=59), and BH-FDR cannot undo that bias because it
+    starts from an already-too-small raw p. This is finding E-03.
+
+    When ``df`` (the effective degrees of freedom, typically ``n_obs - 1``) is
+    supplied, the Student-t tail is used. When ``df`` is ``None`` the function
+    keeps the legacy normal tail for backward compatibility with callers that
+    have no sample-size information — **new code should always pass ``df``**.
+    The *family-wise* correction (BH-FDR / Holm) is applied later across the
+    whole trial set in :func:`apply_promotion_gates`.
+    """
+    t = float(t)
+    if not np.isfinite(t):
+        return 1.0
+    if df is not None and int(df) >= 2:
+        return float(min(1.0, 2.0 * _student_t_sf(abs(t), float(df))))
+    return float(2.0 * (1.0 - _norm_cdf(abs(t))))
 
 
 # --------------------------------------------------------------------------- #

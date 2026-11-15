@@ -78,6 +78,40 @@ class TestApiBacktestGuard(unittest.TestCase):
         self.assertEqual(status["status"], "completed")
         self.assertEqual(len(calls), 1, "clean window should reach run_backtest")
 
+    def test_oos_params_forwarded_to_engine(self):
+        """Web OOS controls must reach run_backtest (W-08 end-to-end wiring).
+
+        The Web form sends orientation_db_root / holdout_mode /
+        allow_holdout_reuse. If any of these is dropped en route, the backtest
+        silently falls back to 'explore' and the UI's 'strict OOS' promise is
+        a lie.
+        """
+        status, calls = self._execute_with_spy({
+            "factor_ids": ["fac_x"],
+            "start": "2023-01-01",
+            "end": "2024-01-01",
+            "db_root": "factor_db_oos",
+            "orientation_db_root": "factor_db",
+            "holdout_mode": "strict",
+            "allow_holdout_reuse": True,
+        })
+        self.assertEqual(status["status"], "completed")
+        self.assertEqual(len(calls), 1)
+        _args, kwargs = calls[0]
+        self.assertEqual(kwargs.get("db_root"), "factor_db_oos")
+        self.assertEqual(kwargs.get("orientation_db_root"), "factor_db")
+
+    def test_no_orientation_root_means_explore(self):
+        """Without orientation_db_root the call is an explore run (no strict OOS)."""
+        status, calls = self._execute_with_spy({
+            "factor_ids": ["fac_x"],
+            "start": "2023-01-01",
+            "end": "2024-01-01",
+        })
+        self.assertEqual(len(calls), 1)
+        _args, kwargs = calls[0]
+        self.assertIsNone(kwargs.get("orientation_db_root"))
+
 
 if __name__ == "__main__":
     unittest.main()

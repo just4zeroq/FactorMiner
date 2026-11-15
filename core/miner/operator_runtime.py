@@ -126,15 +126,38 @@ def _signed_power(series: Any, p: float = 2.0) -> Any:
 
 
 def _ts_decay_linear(series: Any, window: int = 20) -> Any:
+    """Linearly-weighted moving average that weights *recent* observations most.
+
+    The weight vector is ``[1, 2, ..., w]`` applied oldest→newest, so the most
+    recent observation gets weight ``w`` (WorldQuant ``ts_decay_linear``
+    convention).
+
+    M-04 fixes two bugs in the previous implementation:
+
+    * **Gap handling.** The numerator skipped NaN positions via ``nansum`` but
+      the denominator still summed the *full* weight set, so any window with a
+      gap had its output scaled down by (valid weight)/(total weight). The
+      denominator must sum only the weights of the positions actually present.
+    * **Partial-window alignment.** A not-yet-full window used
+      ``weights[-len(x):]`` — the *tail* (large-weight) segment. That makes the
+      first observations of a series carry the same weight as a mature window's
+      newest bar, so the warm-up shape is not comparable to the steady state.
+      A partial window must use ``weights[:len(x)]`` (the small-weight segment),
+      keeping "newest gets the largest *available* weight" consistent.
+    """
     w = int(window)
     weights = np.arange(1, w + 1, dtype=float)
 
     def _wmean(x: np.ndarray) -> float:
-        seg = weights[-len(x):]
-        denom = np.nansum(seg)
-        if denom == 0:
+        m = len(x)
+        seg = weights[:m]
+        finite = np.isfinite(x)
+        if not finite.any():
             return float("nan")
-        return float(np.nansum(x * seg) / denom)
+        wsum = float(np.sum(seg[finite]))
+        if wsum == 0:
+            return float("nan")
+        return float(np.nansum(x[finite] * seg[finite]) / wsum)
 
     return series.rolling(w, min_periods=_min_periods(w)).apply(_wmean, raw=True)
 

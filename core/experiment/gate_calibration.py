@@ -198,7 +198,8 @@ def candidate_metrics(
 
     metrics: Dict[str, Any] = {
         "hac_t": hac_t,
-        "p_value": pvalue_from_t(hac_t),
+        # E-03: finite-sample HAC t -> Student-t with df = n_obs - 1.
+        "p_value": pvalue_from_t(hac_t, df=n_obs - 1),
         "sr": sr,
         "sr_n_obs": n_obs,
         "dsr": float(base_dsr),

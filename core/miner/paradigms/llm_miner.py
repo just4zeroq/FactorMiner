@@ -105,6 +105,19 @@ class LLMFactorMiner(BaseFactorMiner):
             self.api_manager = None
             
         self.batch_size = self.config.get("batch_size", 5)
+        # G-02 fix: synthetic mock factors are now OPT-IN only. A missing or
+        # broken LLM backend used to silently inject two hardcoded expressions
+        # ("close.pct_change", "volume*close") that then went through the normal
+        # gate/storage path as if they had been model-generated. That is a
+        # fabricated-factor leak: the miner reported success while producing
+        # canned noise. Callers who genuinely want the mock (offline demo, unit
+        # test) must set ``llm_allow_mock: true`` explicitly.
+        self.allow_mock = bool(self.config.get("llm_allow_mock", False))
+        if not self.api_manager and not self.allow_mock:
+            logger.warning(
+                "LLM: no usable LLMAPIManager and llm_allow_mock is not enabled; "
+                "generate_candidates() will raise instead of injecting mock factors."
+            )
         
     def generate_candidates(self) -> List[FactorExpression]:
         logger.info("LLM: Generating candidates via LLMAPIManager...")
@@ -121,13 +134,35 @@ class LLMFactorMiner(BaseFactorMiner):
             # 真实请求大模型
             raw_responses = self.api_manager.batch_generate(prompts)
         else:
-            # Mock 模式（如果未配置 aiohttp 或 keys）
-            logger.warning("Using Mock LLM responses because LLMAPIManager is not initialized.")
+            # G-02: mock mode is explicit-only. Without it we refuse to fabricate
+            # factors — a broken backend must surface as an error (empty epoch is
+            # visible; a fake "successful" factor is not).
+            if not self.allow_mock:
+                raise RuntimeError(
+                    "LLMFactorMiner has no LLMAPIManager (missing/broken "
+                    "llm_api_config) and llm_allow_mock is not enabled. Refusing "
+                    "to emit mock factors. Configure llm_api_config.keys, or set "
+                    "llm_allow_mock=true for an offline demo."
+                )
+            logger.warning(
+                "Using Mock LLM responses (llm_allow_mock=true). These are NOT "
+                "model-generated factors and must not be promoted."
+            )
             raw_responses = [
                 "factor = df['close'].pct_change(1)",
                 "factor = df['volume'] * df['close']"
             ] * max(1, self.batch_size // 2)
 
+        # G-02: a batch where *every* request failed (returns None) used to pass
+        # silently, yielding an empty epoch that looked like "no candidates".
+        # Surface it explicitly so a dead API does not masquerade as a dry search.
+        if raw_responses and all(r is None for r in raw_responses):
+            raise RuntimeError(
+                "LLM batch generation failed: every request returned None "
+                "(check API keys / base_url / network). No candidates emitted."
+            )
+
+        mock_mode = self.api_manager is None and self.allow_mock
         for resp in raw_responses:
             if not resp:
                 continue
@@ -144,6 +179,9 @@ class LLMFactorMiner(BaseFactorMiner):
                     "model": self.config.get("llm_api_config", {}).get("model", ""),
                     "prompt_sha256": prompt_hash,
                     "iteration": getattr(self, "current_epoch", 0),
+                    # G-02: mark synthetic candidates so downstream gates/storage
+                    # can exclude them from any "real alpha" accounting.
+                    "synthetic_mock": bool(mock_mode),
                 },
             )
             candidates.append(expr)

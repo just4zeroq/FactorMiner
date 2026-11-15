@@ -23,6 +23,14 @@
         "horizon_bars": 5,
         "return_type": "simple"
     },
+    "data_quality": {
+      "check_on_load": true,
+      "strict": true,
+      "min_coverage": 0.90,
+      "max_duplicate_ratio": 0.0,
+      "max_abs_return": 1.0,
+      "max_gap_ratio": 0.05
+    },
     "data_feeds": {
         "required_streams": ["open", "high", "low", "close", "volume"],
         "exchange": "binance",

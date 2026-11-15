@@ -81,6 +81,65 @@ class TestLinearCombination(unittest.TestCase):
         out2 = back.compute(df).dropna()
         self.assertTrue(np.allclose(out1.values, out2.values, atol=1e-9))
 
+    def test_member_ids_survive_dict_roundtrip(self):
+        """from_dict must restore member_factor_ids (lineage), not drop them."""
+        a = self._ast("ts_ema", window=10)
+        b = self._ast("ts_ref", n=1)
+        combo = LinearCombinedFactor(
+            [a, b], weights=[0.5, 0.5], parent_ids=["fac_a", "fac_b"]
+        )
+        d = combo.to_dict()
+        self.assertEqual(d["member_factor_ids"], ["fac_a", "fac_b"])
+        back = LinearCombinedFactor.from_dict(d)
+        self.assertEqual(back.member_factor_ids, ["fac_a", "fac_b"])
+        self.assertEqual(back.to_dict()["member_factor_ids"], ["fac_a", "fac_b"])
+
+    def test_legacy_logic_reference_member_ids_are_read(self):
+        """Older stored rows nested the ids under logic_reference; still read."""
+        a = self._ast("ts_ema", window=10)
+        d = LinearCombinedFactor([a], weights=[1.0]).to_dict()
+        d.pop("member_factor_ids", None)
+        d["logic_reference"] = {"member_factor_ids": ["legacy_1"]}
+        back = LinearCombinedFactor.from_dict(d)
+        self.assertEqual(back.member_factor_ids, ["legacy_1"])
+
+    def test_stored_combination_recomputes_elementwise(self):
+        """Full storage round trip: save -> read metadata -> from_dict -> compute
+        must reproduce the ORIGINAL factor values element by element."""
+        import json
+        import tempfile
+        from core.miner.entities import FactorMetadata
+        from core.storage.factor_storage import LocalFactorStorage
+
+        df = self._data()
+        a = self._ast("ts_ema", window=10)
+        b = self._ast("ts_ref", n=1)
+        combo = LinearCombinedFactor([a, b], weights=[0.35, -0.65],
+                                     parent_ids=["fac_a", "fac_b"])
+        original = combo.compute(df)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            storage = LocalFactorStorage(db_root=tmp)
+            meta = FactorMetadata(factor_id="combo_1", miner_type="combination",
+                                  user_id="test")
+            logic = combo.to_dict()
+            storage.save_linear_combination_factor(logic, meta)
+
+            saved = json.loads(
+                open(os.path.join(tmp, "metadata", "combo_1.json"), encoding="utf-8").read()
+            )
+            # member ids were persisted into logic_reference
+            self.assertEqual(
+                saved["logic_reference"]["member_factor_ids"], ["fac_a", "fac_b"]
+            )
+            back = LinearCombinedFactor.from_dict(saved["logic_reference"])
+            self.assertEqual(back.member_factor_ids, ["fac_a", "fac_b"])
+
+        rebuilt = back.compute(df)
+        np.testing.assert_allclose(
+            rebuilt.dropna().values, original.dropna().values, atol=1e-9
+        )
+
     def test_insufficient_subs_falls_back_to_equal(self):
         df = self._data()
         a = self._ast("ts_mean", window=5)
