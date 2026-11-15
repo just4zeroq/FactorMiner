@@ -12,9 +12,12 @@ import pandas as pd
 
 from core.data_feed.crypto_streams import (
     CRYPTO_STREAM_NAMES,
+    _funding_settlement_interval,
+    _paginate,
     align_series_to_index,
     build_basis_frame,
     crypto_stream_path,
+    download_funding_rate,
     load_crypto_streams,
     materialize_crypto_streams,
     oi_period_for,
@@ -378,6 +381,93 @@ class TestRealClientAttach(unittest.TestCase):
         with mock.patch("core.data_feed.real_client.os.getcwd", return_value=str(tmp)):
             same = client._attach_crypto_streams(df.copy(), "BTC/USDT:USDT")
         self.assertNotIn("open_interest", same.columns)
+
+
+class TestFundingPagination(unittest.TestCase):
+    """Funding settles at exchange-specific intervals; the downloader must
+    capture *every* settlement regardless of the grid (1h/2h/4h/8h/12h)."""
+
+    @staticmethod
+    def _gen(start: pd.Timestamp, hours: int, interval_h: int = 1) -> pd.DataFrame:
+        times = [start + pd.Timedelta(hours=interval_h) * i for i in range(hours // interval_h + 1)]
+        return pd.DataFrame({
+            "timestamp": [int(pd.Timestamp(t).timestamp() * 1000) for t in times],
+            "fundingRate": [0.0001] * len(times),
+        })
+
+    def _make_exchange(self, rows, per_call_cap=None, with_market_info=None):
+        captured = []
+
+        def fetch(since, limit):
+            out = [r for r in rows if r["timestamp"] >= (since or 0)]
+            captured.append((since, limit))
+            if per_call_cap is not None:
+                return out[:per_call_cap]
+            return out[:limit]
+
+        class _Exch:
+            def fetch_funding_rate_history(self, symbol, since=None, limit=None):
+                return fetch(since, limit)
+
+            def market(self, symbol):
+                if with_market_info is None:
+                    raise KeyError("no market info (simulate unsupported exchange)")
+                return {"info": with_market_info}
+
+        return _Exch(), captured
+
+    def test_download_captures_all_1h_settlements(self):
+        start = pd.Timestamp("2025-01-01").tz_localize(None)
+        df = self._gen(start, hours=240, interval_h=1)  # 241 hourly settlements
+        exch, _ = self._make_exchange(df.to_dict("records"), per_call_cap=3)  # force many pages
+        out = download_funding_rate(exch, "BTC/USDT:USDT", start, start + pd.Timedelta(days=21), "1d")
+        self.assertEqual(len(out), 241)
+        diffs = out["date"].diff().dropna().dt.total_seconds() / 3600.0
+        self.assertTrue((diffs == 1.0).all(), "every 1h settlement present, no gap")
+
+    def test_download_captures_all_4h_settlements(self):
+        start = pd.Timestamp("2025-01-01").tz_localize(None)
+        df = self._gen(start, hours=240, interval_h=4)  # 61 four-hourly settlements
+        exch, _ = self._make_exchange(df.to_dict("records"), per_call_cap=3)
+        out = download_funding_rate(exch, "BTC/USDT:USDT", start, start + pd.Timedelta(days=21), "1d")
+        self.assertEqual(len(out), 61)
+        diffs = out["date"].diff().dropna().dt.total_seconds() / 3600.0
+        self.assertTrue((diffs == 4.0).all())
+
+    def test_old_8h_step_would_skip_rows(self):
+        # Demonstrates the bug the fix removes: a coarse 8h floor with a small
+        # per-call limit silently drops settlements that fall inside the jump.
+        start = pd.Timestamp("2025-01-01").tz_localize(None)
+        df = self._gen(start, hours=48, interval_h=1)  # 49 hourly settlements
+        rows = df.to_dict("records")
+
+        def fetch(since, limit):
+            return [r for r in rows if r["timestamp"] >= (since or 0)][:limit]
+
+        old = _paginate(fetch, start, start + pd.Timedelta(days=5), limit=3,
+                        step=pd.Timedelta(hours=8), label="old")
+        self.assertLess(len(old), 49, "old 8h floor skips settlements")
+
+        new = _paginate(fetch, start, start + pd.Timedelta(days=5), limit=3,
+                        step=pd.Timedelta(seconds=1), label="new")
+        self.assertEqual(len(new), 49, "1s floor captures every settlement")
+
+    def test_detected_interval_logged(self):
+        start = pd.Timestamp("2025-01-01").tz_localize(None)
+        df = self._gen(start, hours=24, interval_h=4)
+        # Binance exposes fundingIntervalHours=4 for some pairs.
+        exch, _ = self._make_exchange(df.to_dict("records"), with_market_info={"fundingIntervalHours": 4})
+        self.assertEqual(_funding_settlement_interval(exch, "X/Y:USDT"), pd.Timedelta(hours=4))
+        out = download_funding_rate(exch, "X/Y:USDT", start, start + pd.Timedelta(days=3), "1d")
+        self.assertEqual(len(out), 7)
+
+    def test_unsupported_exchange_has_no_interval(self):
+        start = pd.Timestamp("2025-01-01").tz_localize(None)
+        df = self._gen(start, hours=24, interval_h=1)
+        exch, _ = self._make_exchange(df.to_dict("records"))  # market() raises
+        self.assertIsNone(_funding_settlement_interval(exch, "X/Y:USDT"))
+        out = download_funding_rate(exch, "X/Y:USDT", start, start + pd.Timedelta(days=3), "1d")
+        self.assertEqual(len(out), 25)
 
 
 if __name__ == "__main__":

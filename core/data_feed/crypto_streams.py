@@ -19,7 +19,9 @@ Storage layout is deliberately parallel to OHLCV so the canonical
     data/<exchange>/<trade_type>/crypto_streams/<safe_symbol>-<timeframe>-<stream>.feather
 
 Each file stores a ``date`` column plus the canonical stream column.  Native
-frequencies differ (funding is 8h on Binance, OI has its own period grid), so
+frequencies differ (funding settles at exchange-specific intervals — 8h on most
+Binance pairs but 1h/4h/12h on others, and 1h/2h/4h on OKX/Hyperliquid/dYdX; OI
+has its own period grid), so
 files keep their *native* grid and alignment to the OHLCV bar index happens at
 load time via past-only forward fill (``method="ffill"``) — never backfill,
 which would leak future information.
@@ -222,6 +224,26 @@ def _frame_from_rows(rows: Iterable[dict], value_getter, column: str) -> pd.Data
 # --------------------------------------------------------------------------- #
 # Downloaders (network)
 # --------------------------------------------------------------------------- #
+def _funding_settlement_interval(exchange, symbol) -> Optional[pd.Timedelta]:
+    """Best-effort detection of a pair's funding settlement interval.
+
+    Returns the interval if the exchange exposes it (e.g. Binance linear
+    futures carry ``fundingIntervalHours`` in the market info), else ``None``.
+    Used only for logging; pagination correctness never depends on it.
+    """
+    try:
+        market = exchange.market(symbol)
+        info = (market or {}).get("info") or {}
+        raw = info.get("fundingIntervalHours")
+        if raw is None:
+            raw = info.get("fundingInterval")
+        if raw is not None:
+            return pd.Timedelta(hours=float(raw))
+    except Exception:  # noqa: BLE001 - many shapes of "unsupported"
+        pass
+    return None
+
+
 def download_funding_rate(
     exchange,
     symbol: str,
@@ -229,8 +251,27 @@ def download_funding_rate(
     end: pd.Timestamp,
     timeframe: str,
 ) -> pd.DataFrame:
-    """Fetch funding-rate history and return ``date, funding_rate``."""
-    step = pd.Timedelta(hours=8)  # Binance funding settles every 8h
+    """Fetch funding-rate history and return ``date, funding_rate``.
+
+    Funding settles at exchange-specific intervals — Binance uses 8h for most
+    pairs but 1h/4h/12h for others, while OKX/Hyperliquid/dYdX often settle
+    every 1h/2h/4h. The paginator must therefore not assume an 8h grid: it
+    advances strictly on the most recent *returned* timestamp, with a 1-second
+    floor that is smaller than every real settlement interval. That guarantees
+    no settlement is ever skipped, regardless of how often the pair settles.
+    """
+    detected = _funding_settlement_interval(exchange, symbol)
+    if detected is not None:
+        logger.info(
+            "funding_rate %s: detected settlement interval %s (paginating by returned timestamps)",
+            symbol,
+            detected,
+        )
+    # Floor far below any real settlement interval so ``last_ts + 1`` always
+    # dominates the cursor advance and we never jump past unsent rows. The page
+    # size is governed by ``limit`` (not this floor), so request volume is
+    # unchanged for dense history.
+    step = pd.Timedelta(seconds=1)
     try:
         rows = _retry(
             lambda: _paginate(
