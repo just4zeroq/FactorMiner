@@ -207,6 +207,22 @@ class MyCustomNNMiner(BaseFactorMiner):
         test_data: Any,
         test_returns: Any,
     ) -> List[FactorExpressionTensor]:
+        """Score the network's output channels on the MINING split only.
+
+        P0-e: this used to evaluate every head on ``test_data`` and install the
+        *test* metrics as ``head.metrics``, which ``update_model`` /
+        ``_select_diverse_heads`` then ranked by (``fitness_score``), and it
+        computed ``_selection_values`` on the test panel. That is a full
+        out-of-sample selection loop: the split the promotion gate treats as
+        untouched was in fact steering the population, exactly the A1 leak that
+        was removed from ``ParallelEvaluator``.
+
+        Selection now uses the mining split. When a disjoint test split exists it
+        is evaluated once per epoch for *diagnostics only* — the numbers are
+        stored under ``test_*`` keys, never as ``fitness_score``, and never used
+        for ranking or de-duplication. The one-shot out-of-sample verdict for a
+        frozen shortlist remains ``evaluate_final``.
+        """
         train_feedback = self.evaluator.evaluate_on(
             heads, train_data, train_returns
         )
@@ -214,6 +230,7 @@ class MyCustomNNMiner(BaseFactorMiner):
 
         has_test = self._has_split(test_data, test_returns)
         test_errors = []
+        test_metrics: dict = {}
         if has_test:
             for head in heads:
                 head.metrics = {}
@@ -221,22 +238,28 @@ class MyCustomNNMiner(BaseFactorMiner):
                 heads, test_data, test_returns
             )
             test_errors = test_feedback.execution_status
+            test_metrics = {id(head): dict(head.metrics) for head in heads if head.metrics}
+            for head in heads:
+                head.metrics = {}
 
         valid_heads = []
         for head in heads:
-            final_metrics = dict(head.metrics) if has_test else train_metrics.get(id(head), {})
+            final_metrics = dict(train_metrics.get(id(head), {}))
             if not final_metrics:
                 continue
-            train = train_metrics.get(id(head), {})
+            final_metrics["out_of_sample"] = 0.0
+            diagnostics = test_metrics.get(id(head), {})
             for key in ("IC", "RankIC", "Turnover", "coverage", "fitness_score"):
-                if key in train:
-                    final_metrics[f"train_{key}"] = float(train[key])
-            final_metrics["out_of_sample"] = 1.0 if has_test else 0.0
+                if key in diagnostics:
+                    # Namespaced so nothing downstream can mistake a test-split
+                    # number for the selection score.
+                    final_metrics[f"test_{key}"] = float(diagnostics[key])
+            final_metrics["test_split_used_for_selection"] = 0.0
             head.metrics = final_metrics
-            selection_data = test_data if has_test else train_data
-            head._selection_values = head.compute(selection_data)
-            head.evaluation_split = "test" if has_test else "mine"
-            head.evaluation_returns = test_returns if has_test else train_returns
+            # Diversity de-duplication must also use in-sample values only.
+            head._selection_values = head.compute(train_data)
+            head.evaluation_split = "mine"
+            head.evaluation_returns = train_returns
             head.evaluation_target = self.target_spec
             head.forward_return_definition = self.get_forward_return_definition()
             valid_heads.append(head)
@@ -338,13 +361,13 @@ class MyCustomNNMiner(BaseFactorMiner):
         best = self.state.population[0]
         logger.info(
             "MyCustomNN epoch %s: loss=%.8f, retained=%s, best_channel=%s, "
-            "fitness=%.6f, OOS=%s.",
+            "fitness=%.6f (in-sample), test_RankIC=%s.",
             self.epoch,
             loss,
             len(self.state.population),
             best.channel_idx,
             best.metrics.get("fitness_score", 0.0),
-            bool(best.metrics.get("out_of_sample")),
+            best.metrics.get("test_RankIC", "n/a"),
         )
         self.epoch += 1
 

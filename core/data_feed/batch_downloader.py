@@ -110,7 +110,12 @@ class SmartBatchDownloader(DataDownloader):
         try:
             # 设置交易类型属性
             self.trade_type = trade_type
-            self.exchange_id = exchange_id or "binance"
+            # P0-c: only override the configured exchange when the caller
+            # actually named one; defaulting to "binance" here sent the save
+            # path of a non-binance download into data/binance/...
+            self.exchange_id = (
+                exchange_id or getattr(self, "exchange_id", None) or "binance"
+            )
             data_filename(symbol, timeframe, trade_type)
             
             exchange = self.get_exchange_instance(config_id, exchange_id, trade_type=trade_type)
@@ -226,7 +231,17 @@ class SmartBatchDownloader(DataDownloader):
             
             # 保存数据
             save_result = self._save_data_with_merge(df_save, symbol, timeframe, start_date, end_date, download_mode)
-            
+
+            # P0-b: the caller must never be told "success" when the file was not
+            # written. The unattended updater only advances its watermark on
+            # success, so a swallowed write error used to look like a clean run.
+            if not save_result.get('success'):
+                error_msg = save_result.get('error') or '数据保存失败'
+                self.logger.error("%s: %s", symbol, error_msg)
+                if progress_callback:
+                    progress_callback(0, error_msg)
+                return {'success': False, 'error': error_msg}
+
             if progress_callback:
                 progress_callback(100, f"下载完成！{save_result.get('message', '数据已保存')}")
             
@@ -234,6 +249,7 @@ class SmartBatchDownloader(DataDownloader):
                 'success': True,
                 'data': df_save,
                 'total_records': len(df_save),
+                'file_path': save_result.get('file_path'),
                 'timeframe': timeframe,
                 'symbol': symbol,
                 'start_date': start_date,
@@ -298,9 +314,20 @@ class SmartBatchDownloader(DataDownloader):
                     df_save = combined_df
                     
                 except Exception as e:
-                    print(f"合并数据失败，将另存为新文件: {e}")
-                    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-                    save_path = save_path.with_name(f"{save_path.stem}-new-{ts}{save_path.suffix}")
+                    # P0-b: never fall through to "saved elsewhere". Writing
+                    # ``<name>-new-<ts>.feather`` left the canonical file stale
+                    # while the caller was told the download succeeded, and
+                    # nothing in the pipeline reads those orphans. Fail closed so
+                    # the operator can repair or move the unreadable file.
+                    print(f"合并数据失败: {e}")
+                    self.logger.error("合并 %s 失败，未写入任何文件: %s", save_path, e)
+                    return {
+                        'success': False,
+                        'error': (
+                            f"无法读取现有文件 {save_path}（{e}）。为避免覆盖历史数据，"
+                            "本次未写入；请检查或移走该文件后重试。"
+                        ),
+                    }
             elif download_mode == 'overwrite':
                 print("强制覆盖模式：忽略本地数据")
             

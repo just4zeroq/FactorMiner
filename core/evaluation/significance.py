@@ -153,26 +153,69 @@ def holm(pvals: Sequence[float]) -> np.ndarray:
 # --------------------------------------------------------------------------- #
 # Null distributions
 # --------------------------------------------------------------------------- #
+def _cross_section_permute(rng: np.random.Generator, panel: np.ndarray) -> np.ndarray:
+    """Shuffle each row's *assets* independently, keeping missing cells missing.
+
+    This is the only permutation that yields a valid null for a cross-sectional
+    IC: it keeps every period's cross-sectional return distribution intact
+    (so the test is conditional on what actually happened that day) while
+    breaking the factor->asset mapping. Missing cells are never moved, so the
+    null and the observed statistic are computed on the same sample.
+    """
+    panel = np.asarray(panel, dtype=float)
+    finite = np.isfinite(panel)
+    u = np.where(finite, rng.random(panel.shape), np.inf)
+    order = np.argsort(u, axis=1, kind="stable")
+    vals = np.take_along_axis(panel, order, axis=1)
+    out = np.full(panel.shape, np.nan, dtype=float)
+    rows, cols = np.nonzero(finite)
+    out[rows, cols] = vals[np.isfinite(vals)]
+    return out
+
+
 def target_permutation_tstats(
     factor_panel: np.ndarray,
     returns_panel: np.ndarray,
     n_perm: int = 100,
     seed: int = 0,
+    mode: str = "cross_section",
 ) -> np.ndarray:
-    """Empirical |t| distribution under *target permutation* for one factor.
+    """Empirical |t| distribution under target permutation for one factor.
 
-    Shuffling the return time-series breaks the factor->return link, so the
-    resulting |t| are what pure luck produces for this factor shape. A factor
-    whose real |t| sits above the bulk of this distribution is not explained by
-    chance.
+    ``mode="cross_section"`` (default, correct) permutes the assets *within*
+    each period: the factor's cross-section stays fixed, the returns it is
+    matched against are randomised. The resulting |t| are what pure luck
+    produces for a factor of this shape.
+
+    ``mode="time"`` is the original (biased) variant that permuted whole rows
+    across the time axis. It is kept only to reproduce historical numbers:
+    because it preserves every asset's unconditional drift, a factor that is
+    merely long the assets that trended up shows up *inside the null*, which
+    pushes the null |t| above the observed one and makes ``empirical_p``
+    saturate near 1.0. Measured on ``fac_4cf127fa`` (see
+    ``user_workspace/reports/production_gap_review_20261115.md`` §4):
+    ``corr(factor mean, asset drift) = 0.722``, null median |t| = 4.74 vs an
+    observed 3.46 -> p = 0.95, i.e. a strongly significant factor was rejected
+    as "worse than chance". Never use it for gating.
     """
+    if mode not in {"cross_section", "time"}:
+        raise ValueError("mode must be 'cross_section' or 'time'")
+    factor_panel = np.asarray(factor_panel, float)
+    returns_panel = np.asarray(returns_panel, float)
+    if factor_panel.shape != returns_panel.shape:
+        raise ValueError("factor_panel and returns_panel must share shape")
+
     rng = np.random.default_rng(seed)
-    T = returns_panel.shape[0]
     out = np.empty(n_perm, dtype=float)
     for i in range(n_perm):
-        perm = rng.permutation(T)
-        out[i] = abs(newey_west_tstat(ic_series(factor_panel, returns_panel[perm])))
+        if mode == "cross_section":
+            permuted = _cross_section_permute(rng, returns_panel)
+        else:  # legacy, biased: whole-row time permutation
+            perm = rng.permutation(returns_panel.shape[0])
+            permuted = returns_panel[perm]
+        out[i] = abs(newey_west_tstat(ic_series(factor_panel, permuted)))
     return out
+
 
 
 def random_formula_null(
@@ -191,10 +234,10 @@ def random_formula_null(
     randomly generating ``n_formulas`` expressions while *searching*.
 
     If ``n_perm_per > 0``, each formula's |t| is further maxed over that many
-    target permutations (more conservative).
+    target permutations (more conservative). Permutations are cross-sectional
+    (within-period), matching :func:`target_permutation_tstats`.
     """
     rng = np.random.default_rng(seed)
-    T = returns_panel.shape[0]
     out = np.empty(n_formulas, dtype=float)
     for i in range(n_formulas):
         expr = sampler()
@@ -206,8 +249,8 @@ def random_formula_null(
         if n_perm_per and n_perm_per > 0:
             best = t
             for _ in range(n_perm_per):
-                perm = rng.permutation(T)
-                best = max(best, abs(newey_west_tstat(ic_series(panel, returns_panel[perm]))))
+                permuted = _cross_section_permute(rng, returns_panel)
+                best = max(best, abs(newey_west_tstat(ic_series(panel, permuted))))
             out[i] = best
         else:
             out[i] = t

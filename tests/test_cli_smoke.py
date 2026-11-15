@@ -147,8 +147,11 @@ class CLISmokeTests(unittest.TestCase):
                 )
                 self.assertEqual(logic["model_format"], expected_format)
                 self.assertTrue((root / "factor_db" / "models" / logic["model_file"]).is_file())
-                self.assertEqual(metadata["metrics"]["out_of_sample"], 1.0)
-                self.assertEqual(metadata["data_lineage"]["evaluation_split"], "test")
+                # P0-e: NN heads are selected on the mining split, so the stored
+                # metrics must not claim to be out-of-sample. The test split (when
+                # configured) survives only as namespaced diagnostics.
+                self.assertEqual(metadata["metrics"]["out_of_sample"], 0.0)
+                self.assertEqual(metadata["data_lineage"]["evaluation_split"], "mine")
                 if miner == "MyTemporalNN":
                     expected_target = {
                         "type": "forward_return",

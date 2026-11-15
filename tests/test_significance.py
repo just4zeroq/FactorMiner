@@ -82,6 +82,69 @@ class NullTest(unittest.TestCase):
         # under the null, |t| should mostly sit below the 95% gaussian ~1.96
         self.assertLess(np.percentile(null, 95), 3.5)
 
+    def test_cross_section_null_centered_despite_asset_drift(self):
+        """A null must not inherit the assets' unconditional drift.
+
+        The legacy ``mode="time"`` shuffled whole time rows, which leaves each
+        asset's unconditional drift inside the null: a purely cross-sectional
+        "long the trending asset" exposure then shows up *as the null*, pushing
+        the null |t| above any real factor (measured on a live factor:
+        ``corr(factor, drift)=0.722``, null median |t|=4.74 -> p=0.95). The
+        cross-sectional permutation keeps each period's return distribution but
+        re-matches assets, so the null is centred near zero.
+        """
+        rng = np.random.default_rng(11)
+        T, N = 400, 25
+        drift = np.linspace(-0.004, 0.004, N)          # strong asset-level drift
+        r = drift[None, :] + 0.01 * rng.standard_normal((T, N))
+        # factor partially aligned with drift (the realistic case: a price
+        # trend / momentum factor is correlated with which assets trended up)
+        f = np.tile(drift, (T, 1)) + 0.01 * rng.standard_normal((T, N))
+
+        legacy = np.abs(target_permutation_tstats(f, r, n_perm=20, seed=3, mode="time"))
+        fixed = np.abs(
+            target_permutation_tstats(f, r, n_perm=20, seed=3, mode="cross_section")
+        )
+        self.assertGreater(np.median(legacy), 3.0)     # the bug: inflated null
+        self.assertLess(np.median(fixed), 1.5)         # fixed: centred on zero
+
+    def test_drift_beta_factor_is_not_rejected_by_cross_section_null(self):
+        """A factor that ranks assets by realised drift is a real signal."""
+        rng = np.random.default_rng(12)
+        T, N = 400, 25
+        drift = np.linspace(-0.004, 0.004, N)
+        r = drift[None, :] + 0.01 * rng.standard_normal((T, N))
+        f = np.tile(drift, (T, 1))                     # pure drift ranking
+
+        t_obs = abs(newey_west_tstat(ic_series(f, r)))
+        null = np.abs(
+            target_permutation_tstats(f, r, n_perm=40, seed=4, mode="cross_section")
+        )
+        self.assertGreater(t_obs, np.percentile(null, 95))
+        self.assertLessEqual(empirical_p(t_obs, null), 0.05)
+
+    def test_cross_section_permutation_keeps_missing_cells(self):
+        rng = np.random.default_rng(13)
+        panel = rng.standard_normal((30, 8))
+        panel[:, 2] = np.nan
+        panel[5, :] = np.nan
+        from core.evaluation.significance import _cross_section_permute
+
+        permuted = _cross_section_permute(rng, panel)
+        self.assertTrue(np.all(np.isnan(permuted[:, 2])))
+        self.assertTrue(np.all(np.isnan(permuted[5, :])))
+        # finite rows keep exactly the same multiset of values
+        for t in (0, 4, 29):
+            np.testing.assert_allclose(
+                np.sort(permuted[t][np.isfinite(permuted[t])]),
+                np.sort(panel[t][np.isfinite(panel[t])]),
+            )
+
+    def test_target_permutation_rejects_bad_mode(self):
+        panel = np.zeros((5, 3))
+        with self.assertRaises(ValueError):
+            target_permutation_tstats(panel, panel, n_perm=1, mode="rows")
+
     def test_random_formula_null_runs(self):
         rng = np.random.default_rng(6)
         T, N = 120, 20

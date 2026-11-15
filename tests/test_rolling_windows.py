@@ -74,7 +74,8 @@ class TestBarTimeline(unittest.TestCase):
             _write_tape(root, "A1/USDT:USDT", dates)
             _write_tape(root, "A2/USDT:USDT", dates.drop(dates[7]))
             timeline = windows.common_timeline(
-                _items(root), data_root=str(root), timeframe="1d"
+                _items(root), data_root=str(root), timeframe="1d",
+                now=pd.Timestamp("2030-01-01"),
             )
         self.assertEqual(timeline["n_files"], 3)
         self.assertEqual(timeline["n_common"], 39)
@@ -92,7 +93,8 @@ class TestBarTimeline(unittest.TestCase):
                  "timeframe": "1d", "stream": "funding_rate"},
             ]
             timeline = windows.common_timeline(
-                items, data_root=str(root), timeframe="1d"
+                items, data_root=str(root), timeframe="1d",
+                now=pd.Timestamp("2030-01-01"),
             )
         self.assertEqual(timeline["n_files"], 1)
 
@@ -122,7 +124,9 @@ class TestPlanWindows(unittest.TestCase):
         dates = pd.date_range("2026-11-14", periods=80, freq="D")
         plan = self._plan(dates)
         self.assertEqual(plan["anchor"]["start"], "2026-11-14")
-        self.assertEqual(plan["n_common_bars"], 80)
+        # 80 dates on disk, but the last one (2027-02-01 == "today") has not
+        # closed yet, so it is not an observation (P0-d).
+        self.assertEqual(plan["n_common_bars"], 79)
         self.assertEqual(len(plan["windows"]), 3)
         self.assertEqual(plan["n_ready"], 2)
         w1, w2, w3 = plan["windows"]
@@ -134,9 +138,9 @@ class TestPlanWindows(unittest.TestCase):
             (pd.Timestamp(w2["start"]) - pd.Timestamp(w1["end"])).days, 6
         )
         self.assertFalse(w3["ready"])
-        self.assertEqual(w3["n_bars"], 10)
-        self.assertEqual(plan["current"]["accumulated"], 10)
-        self.assertEqual(plan["current"]["remaining"], 20)
+        self.assertEqual(w3["n_bars"], 9)
+        self.assertEqual(plan["current"]["accumulated"], 9)
+        self.assertEqual(plan["current"]["remaining"], 21)
         self.assertEqual(plan["current"]["rolling"], True)
 
     def test_ready_unrevealed_window_is_surfaced(self):
@@ -166,7 +170,8 @@ class TestPlanWindows(unittest.TestCase):
             )
         # 79 real bars, not 80 calendar days; the first window ends one day
         # later because that bar is absent from one asset.
-        self.assertEqual(plan["n_common_bars"], 79)
+        # 80 dates minus the absent bar minus today's still-forming bar.
+        self.assertEqual(plan["n_common_bars"], 78)
         self.assertNotEqual(plan["windows"][0]["end"], "2026-12-13")
 
     def test_no_new_bars_yields_zero_progress(self):

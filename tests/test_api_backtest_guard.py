@@ -139,3 +139,31 @@ class TestApiBacktestGuard(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProductionGovernanceApiTests(unittest.TestCase):
+    """P1-c: the API must refuse a loosened guard in a production deployment."""
+
+    def test_audit_mode_is_rejected_before_the_run_is_queued(self):
+        from core.evaluation.experiment_trace import HoldoutReuseError
+
+        with mock.patch.dict(os.environ, {"FACTORMINER_PRODUCTION": "1"}):
+            with self.assertRaises(HoldoutReuseError):
+                br.start_run({
+                    "factor_ids": ["fac_x"],
+                    "start": "2023-01-01",
+                    "end": "2024-01-01",
+                    "holdout_mode": "audit",
+                })
+
+    def test_reuse_override_is_rejected_in_production(self):
+        from core.evaluation.experiment_trace import HoldoutReuseError
+
+        with mock.patch.dict(os.environ, {"FACTORMINER_PRODUCTION": "1"}):
+            with self.assertRaises(HoldoutReuseError):
+                br.start_run({
+                    "factor_ids": ["fac_x"],
+                    "start": "2023-01-01",
+                    "end": "2024-01-01",
+                    "allow_holdout_reuse": True,
+                })

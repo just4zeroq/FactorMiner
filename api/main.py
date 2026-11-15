@@ -908,10 +908,13 @@ async def run_batch_download_task_background(task_id: str, exchange: str, symbol
 async def create_backtest(req: BacktestRequest):
     """Queue an event-driven cross-sectional backtest over stored factors."""
     from api import backtest_runs
+    from core.evaluation.experiment_trace import HoldoutReuseError
 
     try:
         status = backtest_runs.start_run(req.model_dump())
-    except ValueError as exc:
+    except (ValueError, HoldoutReuseError) as exc:
+        # P1-c: a request that loosens the holdout guard (or reuses a burned
+        # window) is a client error, not a server fault.
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     return status
 

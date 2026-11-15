@@ -47,9 +47,18 @@ class DataDownloader:
         """
         try:
             if config_id is None:
-                # 使用指定的 exchange_id，或者默认的 Binance 配置
-                target_exchange = exchange_id if exchange_id else 'binance'
-                self.exchange_id = target_exchange
+                # P0-c: do NOT mutate ``self.exchange_id`` here. This method is
+                # also called by internal helpers (gap filling) that only want a
+                # client; rewriting the attribute silently redirected the later
+                # save/merge step into ``data/binance/...`` even when the caller
+                # was downloading another exchange, so one exchange's bars were
+                # merged into another's file. Fall back to the instance's
+                # already-configured exchange instead.
+                target_exchange = (
+                    exchange_id
+                    or getattr(self, "exchange_id", None)
+                    or "binance"
+                )
                 exchange_class = getattr(ccxt, target_exchange)
 
                 # Setup CCXT options

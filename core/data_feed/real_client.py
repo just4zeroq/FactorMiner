@@ -235,34 +235,24 @@ class RealDataClient:
         inspector) inherits the same guard instead of each script re-implementing
         it. It is a no-op for historical data (all bars already closed).
 
-        A bar stamped ``t`` covers ``[t, t + timeframe)``; it is closed only when
-        ``t + timeframe <= now``. ``now`` is taken as UTC and the index is made
-        tz-naive to match the rest of the pipeline.
+        The rule itself lives in :mod:`core.data_feed.bar_clock` so the holdout
+        window planner and the freshness report stay on the same definition.
         """
         if df.empty or not isinstance(df.index, pd.DatetimeIndex):
             return df
-        try:
-            from core.data_feed.crypto_streams import timeframe_to_timedelta
+        from core.data_feed.bar_clock import bar_delta, drop_unclosed_last_bar
 
-            bar = timeframe_to_timedelta(self.timeframe)
-        except Exception:
-            bar = pd.Timedelta(days=1)
-        now = pd.Timestamp.now(tz="UTC").tz_convert(None)
-        last_start = df.index.max()
-        if pd.isna(last_start):
-            return df
-        if last_start + bar > now:
-            dropped = last_start
-            df = df[df.index != last_start]
+        trimmed = drop_unclosed_last_bar(df, self.timeframe)
+        if len(trimmed) != len(df):
             logger.info(
                 "Dropping unclosed last bar %s (closes at %s, now %s) for %s/%s",
-                dropped,
-                last_start + bar,
-                now,
+                df.index.max(),
+                df.index.max() + bar_delta(self.timeframe),
+                pd.Timestamp.now(tz="UTC").tz_convert(None),
                 self.exchange,
                 self.timeframe,
             )
-        return df
+        return trimmed
 
     def _attach_crypto_streams(self, df: pd.DataFrame, pair: str) -> pd.DataFrame:
         """Merge stored crypto streams as extra columns, aligned past-only.

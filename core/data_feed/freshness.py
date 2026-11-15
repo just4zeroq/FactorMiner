@@ -45,8 +45,21 @@ def display_symbol(safe_name: str, trade_type: str) -> str:
     return safe_name
 
 
-def _read_last_date(path: str) -> Optional[tuple]:
-    """Return (first, last, rows) for a canonical feather file."""
+def _read_last_date(
+    path: str,
+    timeframe: Optional[str] = None,
+    *,
+    is_bar: bool = True,
+    now: Optional[pd.Timestamp] = None,
+) -> Optional[tuple]:
+    """Return (first, last, rows) for a canonical feather file.
+
+    With ``timeframe`` given, a trailing bar whose window has not closed yet is
+    excluded from ``last``/``rows`` (review P0-d): the forming candle is not an
+    observation, and counting it made a pre-registered window look complete one
+    bar early. ``is_bar=False`` treats the timestamps as point stamps (funding
+    settlements, OI snapshots), where only "in the future" is invalid.
+    """
     try:
         frame = pd.read_feather(path, columns=["date"])
     except Exception:
@@ -60,6 +73,17 @@ def _read_last_date(path: str) -> Optional[tuple]:
     dates = pd.to_datetime(frame["date"], errors="coerce").dropna()
     if dates.empty:
         return None
+    if timeframe:
+        from core.data_feed.bar_clock import bar_is_closed, point_is_known
+
+        if is_bar:
+            keep = [bar_is_closed(ts, timeframe, now=now) for ts in dates]
+        else:
+            keep = [point_is_known(ts, now=now) for ts in dates]
+        dates = dates[pd.Series(keep, index=dates.index).to_numpy(dtype=bool)]
+        if dates.empty:
+            return None
+        return dates.min(), dates.max(), int(len(dates))
     return dates.min(), dates.max(), int(len(frame))
 
 
@@ -93,13 +117,20 @@ def _candidate_files(data_root: str):
                         yield path, exchange, market, sub
 
 
-def scan_library(data_root: str = "data") -> tuple:
+def scan_library(
+    data_root: str = "data", now: Optional[pd.Timestamp] = None
+) -> tuple:
     """Return ``(items, skipped)`` for the whole library.
 
     ``skipped`` matters as much as ``items``: a file that exists but cannot be
     read or has no timestamp column is worse than a missing one, because nothing
     downstream notices. Hiding those was how 30 MB of untimestamped 1m data sat
     in the library while every report said it was fine.
+
+    A still-forming trailing bar is not counted (review P0-d), so ``last`` and
+    ``rows`` describe observations that actually exist. Stream files hold point
+    stamps (funding settlements, OI snapshots) rather than intervals, so they
+    are only checked against "in the future".
     """
     items: List[Dict[str, Any]] = []
     skipped: List[Dict[str, Any]] = []
@@ -113,7 +144,9 @@ def scan_library(data_root: str = "data") -> tuple:
         except ValueError as exc:
             skipped.append({"path": path, "reason": f"non-canonical name ({exc})"})
             continue
-        summary = _read_last_date(path)
+        summary = _read_last_date(
+            path, timeframe, is_bar=not stream, now=now
+        )
         if summary is None:
             skipped.append({"path": path, "reason": "no readable 'date' column"})
             continue

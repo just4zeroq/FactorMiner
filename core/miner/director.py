@@ -114,8 +114,15 @@ class FactorMinerDirector:
         """Per-candidate target-permutation |t| nulls for the P2 empirical gate.
 
         Returns ``None`` when the feature is off, so every existing run keeps
-        its verdicts. Panels are nan-to-num'd on both sides so the null and the
-        observed HAC t are computed under the same convention.
+        its verdicts.
+
+        NaN policy: panels are passed through **with** their missing cells and
+        the permutation never moves them, so the null and the observed HAC t
+        are computed on exactly the same set of valid (t, asset) pairs. The
+        earlier version ran ``nan_to_num(nan=0.0)`` on both sides, which
+        silently turned a 3% warm-up gap into a zero-filled cross-section and
+        put the null on a different sample than the statistic it was compared
+        against.
         """
         cfg = gate_cfg or {}
         n_perm = int(cfg.get("null_n_perm", 0) or 0)
@@ -133,7 +140,7 @@ class FactorMinerDirector:
                 arr = np.asarray(arr, dtype=float)
                 if arr.ndim == 1:
                     arr = arr.reshape(-1, 1)
-                return np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
+                return arr
 
             returns = _array(self.data_client.get_returns())
             data = self.data_client.get_data()

@@ -724,6 +724,11 @@ class ParallelEvaluator:
                 "hac_t": float(hac_t),
                 "p_value": float(p_value),
                 "dsr": float(dsr),
+                # P1-b: provenance. This DSR is deflated for exactly one trial;
+                # the promotion gate re-deflates it with the cumulative trial
+                # count (see apply_promotion_gates). Keeping the denominator
+                # explicit stops an audit from reading 1.0 here as evidence.
+                "dsr_n_trials": 1,
                 "ir": float(ir),
                 "n_obs": n_obs,
                 # Strategy Sharpe used by DSR (per period, net of cost) and the
@@ -823,6 +828,7 @@ class ParallelEvaluator:
             "hac_t": hac_t,
             # E-03: Student-t tail with the traded book's observation count.
             "p_value": pvalue_from_t(hac_t, df=int(tm["n_obs"]) - 1),
+            "dsr_n_trials": 1,
             "dsr": deflated_sharpe_ratio(
                 sharpe=sr, n_obs=dsr_obs_t, n_trials=1,
                 # P1-M9: empirical net-return moments (see long_short_returns).

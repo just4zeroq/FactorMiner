@@ -161,6 +161,15 @@ def start_run(payload: dict) -> dict:
     if not factor_ids:
         raise ValueError("Select at least one factor with a stored snapshot")
 
+    # P1-c: fail fast (HTTP 422) when the request asks for a loosened guard that
+    # this deployment forbids, instead of queueing a run that dies in a thread.
+    from core.evaluation.holdout_guard import enforce_governance, resolve_mode
+
+    enforce_governance(
+        resolve_mode(explicit=payload.get("holdout_mode")),
+        allow_reuse=bool(payload.get("allow_holdout_reuse", False)),
+    )
+
     run_id = _new_run_id()
     directory = _run_dir(run_id)
     os.makedirs(directory, exist_ok=True)

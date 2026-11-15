@@ -138,7 +138,13 @@ class NNMinerTests(unittest.TestCase):
             before.to_numpy(), registry_after.to_numpy(), rtol=0, atol=0
         )
 
-    def test_sequential_miner_uses_train_scaler_and_oos_metrics(self):
+    def test_sequential_miner_uses_train_scaler_and_insample_selection(self):
+        """P0-e: the scaler and the selection metrics both come from the mine split.
+
+        This test used to assert ``out_of_sample == 1.0`` and ``train_IC`` — i.e.
+        it encoded the leak (heads ranked by test-split fitness). Selection is now
+        in-sample; the test split survives only as namespaced diagnostics.
+        """
         split = self._sequential_split()
         client = SplitDataClient(*split)
         miner, factors = self._mine(client, "sequential_single")
@@ -146,8 +152,8 @@ class NNMinerTests(unittest.TestCase):
         expected_mean = split[0][["close", "volume"]].to_numpy().mean(axis=0)
         np.testing.assert_allclose(miner.model.feature_mean, expected_mean)
         self.assertTrue(factors)
-        self.assertTrue(all(factor.metrics["out_of_sample"] == 1.0 for factor in factors))
-        self.assertTrue(all("train_IC" in factor.metrics for factor in factors))
+        self.assertTrue(all(factor.metrics["out_of_sample"] == 0.0 for factor in factors))
+        self.assertTrue(all("test_IC" in factor.metrics for factor in factors))
         self.assertTrue(all(factor.model_version_id.startswith("nn_") for factor in factors))
 
     def test_cross_asset_adapter_and_miner_restore_dataframes(self):
@@ -301,6 +307,124 @@ class NNMinerTests(unittest.TestCase):
             ),
             0.0,
         )
+
+
+class _Head:
+    """Minimal stand-in for a network output channel."""
+
+    def __init__(self, channel_idx: int):
+        self.channel_idx = channel_idx
+        self.metrics = {}
+        self.logic_hash = f"h{channel_idx}"
+        self.evaluation_split = None
+        self.evaluation_returns = None
+        self.evaluation_target = None
+        self.forward_return_definition = None
+
+    def compute(self, data):
+        signal = data["close"] if isinstance(data, dict) else data
+        return (signal * 1.0).astype(float)
+
+
+class _SelectionEvaluator:
+    """Scores by split: mining split -> positive, test split -> negative.
+
+    If the miner ever ranks heads on the test split, the selected best head's
+    fitness flips sign, which is what this test detects.
+    """
+
+    def __init__(self):
+        self.calls = []
+
+    def evaluate_on(self, candidates, data, returns):
+        index = data["close"].index if isinstance(data, dict) else data.index
+        self.calls.append(index)
+        is_train = index[0].year == 2024 and index[0].month == 1
+        for i, cand in enumerate(candidates):
+            cand.metrics = {
+                "RankIC": 0.10 if is_train else -0.10,
+                "IC": 0.10 if is_train else -0.10,
+                "fitness_score": 10.0 - i if is_train else -10.0 + i,
+            }
+
+        class _Feedback:
+            execution_status = []
+
+        return _Feedback()
+
+
+def _split_frames():
+    def make(start, periods):
+        index = pd.date_range(start, periods=periods, freq="D")
+        # Cross-asset shape ({feature: DataFrame} + DataFrame returns) so
+        # ``_has_split`` recognises a real, disjoint test split.
+        return (
+            {"close": pd.DataFrame({"A": np.linspace(1.0, 2.0, periods)},
+                                   index=index)},
+            pd.DataFrame({"A": np.linspace(0.01, 0.02, periods)}, index=index),
+        )
+
+    return (*make("2024-01-01", 30), *make("2024-03-01", 20))
+
+
+class HeadSelectionLeakTests(unittest.TestCase):
+    """P0-e: NN head selection must not touch the held-out test split."""
+
+    def _miner(self):
+        from core.evaluation.targets import ForwardReturnTarget
+
+        miner = MyCustomNNMiner.__new__(MyCustomNNMiner)
+        miner.config = {"top_k_factors": 3, "max_corr": 0.9999}
+        miner.min_samples = 10
+        miner.target_spec = ForwardReturnTarget()
+        miner.evaluator = _SelectionEvaluator()
+        miner._head_archive = {}
+        return miner
+
+    def test_selection_uses_mining_split_metrics(self):
+        train_data, train_returns, test_data, test_returns = _split_frames()
+        miner = self._miner()
+        heads = [_Head(0), _Head(1)]
+
+        scored = miner._score_heads(
+            heads, train_data, train_returns, test_data, test_returns
+        )
+        self.assertEqual(len(scored), 2)
+        for head in scored:
+            # fitness_score is the mining-split number, never the test one
+            self.assertGreater(head.metrics["fitness_score"], 0.0)
+            self.assertEqual(head.metrics["out_of_sample"], 0.0)
+            self.assertEqual(head.metrics["test_split_used_for_selection"], 0.0)
+            # the test split is still visible as a diagnostic, namespaced
+            self.assertLess(head.metrics["test_fitness_score"], 0.0)
+            # diversity values come from the mining panel
+            self.assertEqual(head.evaluation_split, "mine")
+            self.assertTrue(
+                head._selection_values.index.equals(train_data["close"].index)
+            )
+
+    def test_population_is_ranked_by_mining_fitness(self):
+        train_data, train_returns, test_data, test_returns = _split_frames()
+        miner = self._miner()
+        heads = [_Head(0), _Head(1), _Head(2)]
+        scored = miner._score_heads(
+            heads, train_data, train_returns, test_data, test_returns
+        )
+        population = miner._select_diverse_heads(list(scored))
+        fitness = [h.metrics["fitness_score"] for h in population]
+        self.assertEqual(fitness, sorted(fitness, reverse=True))
+        # channel 0 has the highest mining fitness (10.0) in the fake evaluator
+        self.assertEqual(population[0].channel_idx, 0)
+
+    def test_without_a_test_split_nothing_changes(self):
+        train_data, train_returns, _, _ = _split_frames()
+        miner = self._miner()
+        scored = miner._score_heads(
+            [_Head(0)], train_data, train_returns, None, None
+        )
+        self.assertEqual(len(scored), 1)
+        self.assertGreater(scored[0].metrics["fitness_score"], 0.0)
+        self.assertNotIn("test_fitness_score", scored[0].metrics)
 
 
 if __name__ == "__main__":

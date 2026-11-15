@@ -298,3 +298,65 @@ class LedgerEnvOverrideTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProductionGovernanceTests(unittest.TestCase):
+    """P1-c: a deployment must not be able to loosen its own holdout guard.
+
+    ``audit`` / ``off`` and ``allow_reuse`` exist so research can move; in a
+    production pipeline they would let the single-use holdout be re-read, which
+    invalidates every published number downstream. ``FACTORMINER_PRODUCTION``
+    turns all three into hard errors, enforced inside ``guard`` so the CLI, the
+    experiment pipeline and the Web backtest inherit it from one place.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        patcher = mock.patch(
+            "core.evaluation.holdout_guard.default_workspace_path",
+            side_effect=lambda name: os.path.join(self.tmp.name, name),
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.ledger_path = os.path.join(self.tmp.name, "ledger.json")
+        HoldoutLedger(self.ledger_path).reveal(*BURNED, note="bootstrap")
+
+    def _guard(self, **kw):
+        return holdout_guard.guard(
+            "2025-07-01", "2026-11-13", ledger_path=self.ledger_path,
+            source="test", **kw
+        )
+
+    def test_production_refuses_audit_mode(self):
+        with mock.patch.dict(os.environ, {holdout_guard.PRODUCTION_ENV_VAR: "1"}):
+            with self.assertRaises(HoldoutReuseError) as ctx:
+                self._guard(mode="audit")
+        self.assertIn("strict", str(ctx.exception))
+
+    def test_production_refuses_off_mode(self):
+        with mock.patch.dict(os.environ, {holdout_guard.PRODUCTION_ENV_VAR: "true"}):
+            with self.assertRaises(HoldoutReuseError):
+                self._guard(mode="off")
+
+    def test_production_refuses_reuse_override(self):
+        with mock.patch.dict(os.environ, {holdout_guard.PRODUCTION_ENV_VAR: "yes"}):
+            with self.assertRaises(HoldoutReuseError) as ctx:
+                self._guard(allow_reuse=True)
+        self.assertIn("allow_holdout_reuse", str(ctx.exception))
+
+    def test_production_still_allows_a_clean_strict_run(self):
+        with mock.patch.dict(os.environ, {holdout_guard.PRODUCTION_ENV_VAR: "1"}):
+            out = holdout_guard.guard(
+                "2023-01-01", "2023-12-31",
+                ledger_path=self.ledger_path, source="test",
+            )
+        self.assertTrue(out["allowed"])
+        self.assertEqual(out["mode"], "strict")
+
+    def test_without_the_flag_nothing_changes(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(holdout_guard.PRODUCTION_ENV_VAR, None)
+            out = self._guard(mode="audit")
+        self.assertTrue(out["allowed"])
+        self.assertEqual(out["mode"], "audit")

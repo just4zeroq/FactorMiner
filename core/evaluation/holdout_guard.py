@@ -44,7 +44,7 @@ import os
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Dict, Mapping, Optional, Sequence
 import hashlib
 
 import pandas as pd
@@ -60,6 +60,11 @@ logger = logging.getLogger(__name__)
 VALID_MODES = ("strict", "audit", "off")
 VALID_PURPOSES = ("explore", "final")
 MODE_ENV_VAR = "FACTORMINER_HOLDOUT_MODE"
+# Set this in a deployed/automated environment. It turns the "audit"/"off"
+# modes and the reuse override into hard errors: those switches exist to make
+# research convenient, and a production pipeline that silently loosens them
+# turns the single-use holdout into a reusable validation set.
+PRODUCTION_ENV_VAR = "FACTORMINER_PRODUCTION"
 
 ACCESS_LOG_NAME = "reports/holdout_access.jsonl"
 OVERRIDE_LOG_NAME = "reports/holdout_overrides.jsonl"
@@ -97,6 +102,45 @@ def resolve_mode(config: Optional[Dict] = None, explicit: Optional[str] = None) 
         if candidate and str(candidate).lower() in VALID_MODES:
             return str(candidate).lower()
     return "strict"
+
+
+def is_production(environ: Optional[Mapping[str, str]] = None) -> bool:
+    """True when ``FACTORMINER_PRODUCTION`` is set to a truthy value."""
+    source = os.environ if environ is None else environ
+    return str(source.get(PRODUCTION_ENV_VAR, "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def enforce_governance(
+    mode: str,
+    *,
+    allow_reuse: bool = False,
+    environ: Optional[Mapping[str, str]] = None,
+) -> None:
+    """Refuse holdout settings that defeat the single-use discipline.
+
+    Research convenience (``audit`` / ``off`` / ``allow_reuse``) is available
+    everywhere except in a deployment marked with ``FACTORMINER_PRODUCTION``,
+    where silently re-reading a burned window would invalidate every published
+    number downstream. Called from :func:`guard` so the CLI, the experiment
+    pipeline and the Web backtest all inherit the same rule.
+    """
+    if not is_production(environ):
+        return
+    if str(mode).lower() != "strict":
+        raise HoldoutReuseError(
+            f"holdout_mode={mode!r} is not allowed when {PRODUCTION_ENV_VAR} is set. "
+            "Production runs must use 'strict'."
+        )
+    if allow_reuse:
+        raise HoldoutReuseError(
+            "allow_holdout_reuse is not allowed when "
+            f"{PRODUCTION_ENV_VAR} is set."
+        )
 
 
 def _normalise(value: Any) -> Optional[str]:
@@ -201,6 +245,8 @@ def guard(
         raise ValueError(f"purpose must be one of {VALID_PURPOSES}, got {purpose!r}")
 
     resolved_mode = resolve_mode(config, mode)
+    # P1-c: a deployment must not be able to loosen its own guard.
+    enforce_governance(resolved_mode, allow_reuse=allow_reuse)
     norm_start = _normalise(start)
     norm_end = _normalise(end)
     result: Dict[str, Any] = {

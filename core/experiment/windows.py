@@ -146,12 +146,18 @@ def _file_dates(path: Path) -> List[pd.Timestamp]:
 def common_timeline(items: Iterable[Dict[str, Any]],
                     *,
                     data_root: str = "data",
-                    timeframe: str = "1d") -> Dict[str, Any]:
+                    timeframe: str = "1d",
+                    now: Optional[pd.Timestamp] = None) -> Dict[str, Any]:
     """Intersection of timestamps across every non-stream OHLCV file.
 
     Using the intersection (rather than the shortest tape's last date) makes
     the bar count exact even when a symbol has gaps: a window is available only
     when *all* assets actually have those bars.
+
+    Unclosed bars are removed (review P0-d): the newest bar in a just-refreshed
+    file is still forming, and counting it let a window look ``ready`` one bar
+    early — revealing it burned a holdout window on a partial candle whose
+    close (and therefore its forward return) would still change.
     """
     paths: List[Path] = []
     for item in items:
@@ -175,10 +181,17 @@ def common_timeline(items: Iterable[Dict[str, Any]],
     for s in series[1:]:
         common &= set(s)
     dates = sorted(common)
+
+    from core.data_feed.bar_clock import closed_only
+
+    closed = closed_only(dates, timeframe, now=now)
+    dropped = len(dates) - len(closed)
+    dates = closed
     return {
         "dates": dates,
         "n_files": len(paths),
         "n_common": len(dates),
+        "n_dropped_unclosed": dropped,
         "last": dates[-1].strftime("%Y-%m-%d") if dates else None,
     }
 
@@ -195,10 +208,19 @@ def plan_windows(
     items: Optional[Iterable[Dict[str, Any]]] = None,
     revealed: Optional[Sequence[Dict[str, str]]] = None,
     today: Optional[datetime.date] = None,
+    now: Optional[pd.Timestamp] = None,
 ) -> Dict[str, Any]:
-    """Plan rolling windows from the real bar timeline. Read-only."""
+    """Plan rolling windows from the real bar timeline. Read-only.
+
+    ``now`` (default: today at 00:00 UTC) is what decides whether the newest bar
+    in the library has closed; a window is never ``ready`` on a forming bar.
+    """
     spec = spec or {}
     today = today or datetime.date.today()
+    if now is None:
+        # Conservative: treating "today" as its 00:00 means the current day's
+        # bar is never counted as finished, regardless of the wall clock.
+        now = pd.Timestamp(today)
     timeframe = str(spec.get("timeframe", "1d"))
     window_bars = max(1, int(spec.get("window_bars", DEFAULT_WINDOW_BARS)))
     embargo_bars = max(0, int(spec.get("embargo_bars", DEFAULT_EMBARGO_BARS)))
@@ -207,8 +229,10 @@ def plan_windows(
 
     if items is None:
         from core.data_feed.freshness import scan_library
-        items = scan_library(data_root)[0]
-    timeline = common_timeline(items, data_root=data_root, timeframe=timeframe)
+        items = scan_library(data_root, now=now)[0]
+    timeline = common_timeline(
+        items, data_root=data_root, timeframe=timeframe, now=now
+    )
     dates = [d for d in timeline["dates"] if d >= pd.Timestamp(anchor["start"])]
 
     windows: List[Dict[str, Any]] = []
