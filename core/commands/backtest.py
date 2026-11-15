@@ -174,7 +174,7 @@ def parse_args():
     parser.add_argument("--commission", type=float, default=None, help="Taker commission (fraction of trade value)")
     parser.add_argument("--slippage", type=float, default=None, help="Slippage (fraction of price)")
     parser.add_argument("--funding", type=float, default=None, help="Daily perpetual funding rate (fraction)")
-    parser.add_argument("--real-funding", action="store_true", help="Charge the real 8h funding history from crypto_streams instead of a constant grid")
+    parser.add_argument("--constant-funding", action="store_true", help="Force the constant funding grid instead of the real crypto_streams history (real funding is used by default)")
     parser.add_argument("--rebalance", type=int, default=None, help="Bars between rebalances")
     parser.add_argument("--n-long", type=int, default=None, help="Number of long positions")
     parser.add_argument("--n-short", type=int, default=None, help="Number of short positions")
@@ -296,7 +296,7 @@ def run_backtest_cmd(args):
         n_short=n_short,
         rebalance_every=rebalance_every,
         weights=weights,
-        use_real_funding=bool(getattr(args, "real_funding", False)),
+        use_real_funding=not bool(getattr(args, "constant_funding", False)),
         resolve_combinations=not bool(getattr(args, "no_expand_combinations", False)),
     )
     summary = out["summary"]

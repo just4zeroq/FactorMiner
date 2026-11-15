@@ -80,7 +80,7 @@ def setup_parser():
     bt_parser.add_argument("--commission", type=float, default=None, help="Taker commission (fraction of trade value)")
     bt_parser.add_argument("--slippage", type=float, default=None, help="Slippage (fraction of price)")
     bt_parser.add_argument("--funding", type=float, default=None, help="Daily perpetual funding rate (fraction)")
-    bt_parser.add_argument("--real-funding", action="store_true", help="Charge the real 8h funding history from crypto_streams instead of a constant grid")
+    bt_parser.add_argument("--constant-funding", action="store_true", help="Force the constant funding grid instead of the real crypto_streams history (real funding is used by default)")
     bt_parser.add_argument("--rebalance", type=int, default=None, help="Bars between rebalances")
     bt_parser.add_argument("--n-long", type=int, default=None, help="Number of long positions")
     bt_parser.add_argument("--n-short", type=int, default=None, help="Number of short positions")

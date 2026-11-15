@@ -593,7 +593,7 @@ def run_backtest(
     rebalance_every: int = 5,
     min_assets: Optional[int] = None,
     weights: Optional[Mapping[str, float] | Sequence[float]] = None,
-    use_real_funding: bool = False,
+    use_real_funding: bool = True,
     allow_inferred_orientation: bool = False,
     resolve_combinations: bool = True,
 ) -> dict:
@@ -607,6 +607,11 @@ def run_backtest(
     Returns a dict with ``result`` (ml4t Result), ``metrics``, ``summary``,
     and the source ``prices``/``signals``/``funding`` frames for downstream
     export or analysis.
+
+    ``use_real_funding`` defaults to True: the real per-settlement history from
+    ``crypto_streams`` is charged when present, and the constant ``funding_rate``
+    is only the fallback for assets/periods lacking a stream file. Pass
+    ``--constant-funding`` (CLI) to opt out.
     """
     signals = load_factor_signals(
         factor_ids,

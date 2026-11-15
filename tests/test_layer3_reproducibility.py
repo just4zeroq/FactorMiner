@@ -380,7 +380,7 @@ class OperationalTruthTests(unittest.TestCase):
                 start="2026-01-01", end="2026-02-01",
                 exchange="binance", timeframe="1d", trade_type="futures",
                 db_root="factor_db", orientation_db_root=None, data_root="data",
-                commission=0.1, slippage=None, funding=None, real_funding=False,
+                commission=0.1, slippage=None, funding=None, constant_funding=False,
                 rebalance=None, n_long=None, n_short=None, initial_cash=None,
                 output=os.path.join(tmp, "out"),
                 allow_holdout_reuse=False, holdout_mode=None,

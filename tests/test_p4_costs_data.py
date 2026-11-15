@@ -140,13 +140,17 @@ class TestRLTerminals(unittest.TestCase):
 
 
 class TestCLIFlag(unittest.TestCase):
-    def test_real_funding_flag_registered(self):
+    def test_constant_funding_flag_registered(self):
         from core.cli import setup_parser
 
-        args = setup_parser().parse_args([
-            "backtest", "--factors", "fac_x", "--real-funding"
+        # Real funding is the default; --constant-funding opts out.
+        args_default = setup_parser().parse_args(["backtest", "--factors", "fac_x"])
+        self.assertFalse(getattr(args_default, "constant_funding", False))
+
+        args_optout = setup_parser().parse_args([
+            "backtest", "--factors", "fac_x", "--constant-funding"
         ])
-        self.assertTrue(args.real_funding)
+        self.assertTrue(args_optout.constant_funding)
 
 
 class TestCostSingleSourceOfTruth(unittest.TestCase):
