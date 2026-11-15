@@ -356,8 +356,36 @@ class LocalFactorStorage(FactorStorageInterface):
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8-sig") as f:
                 data = json.load(f)
-            return FactorMetadata(**data)
+            return self._coerce_metadata(data, factor_id)
         return None
+
+    @staticmethod
+    def _coerce_metadata(data: Dict[str, Any], factor_id: str) -> FactorMetadata:
+        """Build a ``FactorMetadata`` from stored JSON without dropping the row.
+
+        ``list_metadata`` used to skip any record that did not match the
+        dataclass exactly (e.g. one missing ``user_id``), logging a warning and
+        continuing. Discovery-driven callers — the backtest's auto-discovery,
+        ``factor-db``, the Inspector catalog — then silently saw a *smaller*
+        library than exists. A missing identity field must not make a factor
+        invisible; unknown keys (written by a different version) are dropped
+        instead of raising.
+        """
+        import dataclasses
+
+        payload = dict(data or {})
+        payload.setdefault("factor_id", factor_id)
+        payload.setdefault("miner_type", "unknown")
+        payload.setdefault("user_id", "unknown")
+        allowed = {field.name for field in dataclasses.fields(FactorMetadata)}
+        dropped = sorted(set(payload) - allowed)
+        if dropped:
+            logger.debug(
+                "Dropping unknown metadata key(s) for %s: %s",
+                factor_id, ", ".join(dropped),
+            )
+            payload = {k: v for k, v in payload.items() if k in allowed}
+        return FactorMetadata(**payload)
 
     def list_metadata(self) -> List[FactorMetadata]:
         """Return every readable factor record for the Inspector catalog."""

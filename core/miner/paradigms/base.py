@@ -289,7 +289,6 @@ class BaseFactorMiner(ABC):
             self.current_epoch = epoch
             # 1. 提案
             raw_candidates = self.generate_candidates()
-            
             # 1.5 拦截过滤：不过滤上一代保留的种群精英，只去重全新生成的表达式
             preserved = getattr(self.state, "population", None)
             candidates = div_filter.filter_redundant(
@@ -324,7 +323,22 @@ class BaseFactorMiner(ABC):
             if progress_callback:
                 best_factor = self._get_best_factors()[0] if self._get_best_factors() else None
                 progress_callback(epoch + 1, n_iterations, best_factor)
-            
+
+            # E4: stop conditions (candidate budget / wall clock). Checked at an
+            # epoch boundary so the population is never left half-evaluated; the
+            # run then finishes normally (finalize + gates + report) instead of
+            # being killed mid-flight.
+            stop_check = getattr(self, "stop_check", None)
+            if callable(stop_check):
+                try:
+                    reason = stop_check()
+                except Exception:  # pragma: no cover - a stop probe must not fail a run
+                    reason = None
+                if reason:
+                    logger.warning("Mining stopped early: %s", reason)
+                    self.stop_reason = str(reason)
+                    break
+
         dedup_report = div_filter.summary()
         if dedup_report["value_rejected"] or dedup_report["value_threshold"] > 0:
             logger.info(

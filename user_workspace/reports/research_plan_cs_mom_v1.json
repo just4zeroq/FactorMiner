@@ -1,0 +1,56 @@
+{
+  "plan_id": "cs_mom_v1",
+  "declared_at": "2026-11-15",
+  "status": "DRAFT_NOT_EXECUTED",
+  "note": "Research pre-registration, NOT a runnable FactorMiner config. The CLI does not read this file. Its purpose is to freeze the universe / cost / trial-family choices BEFORE any experiment so they cannot be chosen after seeing results. Once committed to git, changes require a new plan_id.",
+  "objective": "Cross-sectional multi-factor portfolio over a few hundred crypto perpetual pairs, with promotion decided only by the existing gate layer (BH-FDR + DSR on real n_trials + empirical null + one-shot holdout).",
+  "evidence_basis": [
+    "user_workspace/reports/pool_cost_baseline.json (2026-11-15, 84 rows)",
+    "docs/reviews/cross_section_roadmap.md",
+    "docs/reviews/mining_production_readiness.md",
+    "docs/reviews/crypto_factor_stack_survey.md"
+  ],
+  "universe": {
+    "source_snapshot": "user_workspace/universes/binance_futures_usdt_1d.json",
+    "snapshot_caveat": "755 still-listed contracts as of 2026-11-15; delisted contracts absent. All conclusions are EXPLORATORY until a delisting table exists.",
+    "pit_policy": "re-rank every bar by trailing-90-bar median quote volume (close*volume); asset eligible only after >=30 bars of history",
+    "primary_pool": "pit_top60",
+    "control_pools": ["pit_top20", "pit_top150", "pit_all"],
+    "static_pools": "FORBIDDEN for any headline result; forward-looking, kept only as a diagnostic contrast",
+    "pool_id_must_be_in": ["run manifest", "trial_family key"],
+    "why_top60": "only pool with stable positive net Sharpe across all three cost scenarios in the baseline (mom20 rb5: 0.743/0.669/0.668; mom60 rb5: 0.834/0.784/0.784)"
+  },
+  "cost": {
+    "production_basis": "core/experiment/costs.py must stop using a single global 18bp round-trip",
+    "model": "per-asset, per-bar round-trip = 2*(4bp taker fee + slip_i(t)); slip_i(t) = clip(5bp*sqrt(QV_top20_median(t)/QV_i(t)), 5bp, cap)",
+    "scenarios": { "mild_cap_per_side": 0.0015, "harsh_cap_per_side": 0.0050 },
+    "headline_scenario": "harsh_cap_per_side",
+    "identity_invariant": "gate_cost_rate must equal the turnover-weighted effective cost; the existing gate == 2*(commission+slippage) identity must still hold under tiering",
+    "caveat": "square-root impact is a sensitivity assumption, not measured spread/impact"
+  },
+  "trial_families": [
+    { "key": "cs_mom_v1__pit_top60__h5", "pool": "pit_top60", "horizon_bars": 5, "budget": 3000 },
+    { "key": "cs_mom_v1__pit_top60__h1", "pool": "pit_top60", "horizon_bars": 1, "budget": 3000 },
+    { "key": "cs_mom_v1__pit_top150__h5", "pool": "pit_top150", "horizon_bars": 5, "budget": 3000 },
+    { "key": "cs_mom_v1__pit_all__h5", "pool": "pit_all", "horizon_bars": 5, "budget": 2000 }
+  ],
+  "trial_family_rule": "n_trials counted PER FAMILY, not globally. Different pool / horizon / paradigm are independent families. Budgets above are ceilings declared before seeing any result; exceeding requires a new plan_id.",
+  "rebalance_bars": "MUST be re-measured under the PIT pool before changing from 1; the readiness report's '5-bar is 3x better' was measured on a fixed 20-coin pool and does not reproduce under pit_top60 (rb1 0.967 vs rb5 0.784).",
+  "gates": {
+    "source": "core/evaluation/significance.py:485 apply_promotion_gates",
+    "unchanged": true,
+    "rule": "No external IC / Sharpe feedback (Qlib, RD-Agent, skfolio, alphalens) may decide promotion."
+  },
+  "preconditions_before_first_experiment": [
+    "P0-A1 PIT pool definition landed + doctor check 'PIT pool declared' passing",
+    "P0-A2 tiered cost landed + gate identity invariant tested",
+    "P0-A3 per-asset coverage floor configurable as critical",
+    "P0-A4 N(t)-aware cross-sectional operators and reporting",
+    "trial family accounting in core/experiment/budget.py landed",
+    "this plan committed to git",
+    "baseline script re-run under PIT accounting with pit_top60 mom60 net Sharpe still > 0",
+    "full pytest suite green (baseline 697 passed)"
+  ],
+  "first_run_command": "venv/Scripts/python.exe -m core.cli experiment --config <preflighted-config> --preflight",
+  "acceptance": "A factor is a result only if it passes apply_promotion_gates on the declared family and survives the one-shot holdout reveal. Net SR from the diagnostic baseline is NOT evidence of alpha (no multiple-testing correction, no DSR, no holdout, no funding cost)."
+}

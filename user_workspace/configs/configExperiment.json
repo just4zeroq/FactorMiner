@@ -1,13 +1,19 @@
 {
-  "_comment": "P5 端到端实验配置：训练延伸到最新（2023-04→2026-06），OOS 用 burn 前最近窗口 2026-H2 初段（2026-07-01→2026-09-13）；一次性严格 holdout 锁最后 60 根 1d bar（2026-09-16→2026-11-15，末端=最新真实 bar，<=当前时间）。每次运行前先刷新数据到最新（见 scripts/run_mine.py）。",
+  "_comment": "P5 端到端实验配置。经济口径按实测校准：horizon=5 + 5 bar 再平衡（同一 mom60 信号在 1 bar 再平衡下净年化 SR 0.223，5 bar 下 0.675，差别全部来自 18bp 往返成本的摊薄）；turnover_max=0.15 在粗筛阶段直接淘汰成本结构上必然亏损的候选；crypto_streams 接入 funding_rate/basis（本地 758 个 symbol 覆盖 2023-01 至今，此前只用于回测成本、完全没进搜索空间）。open_interest 本地只有 2026-10-21 之后的 25 根 bar，落在 mining 窗口之外，故暂不启用，需先回补历史。一次性严格 holdout 锁最后 60 根 1d bar（2026-09-16→2026-11-15，末端=最新真实 bar）。每次运行前先刷新数据到最新。",
   "population_size": 40,
   "max_iterations": 3,
   "survival_count": 20,
+  "rebalance_every": 5,
   "gp": {
     "max_depth": 4,
     "crossover_prob": 0.75,
     "mutation_prob": 0.3,
-    "elite_count": 6
+    "elite_count": 6,
+    "seed_from_db": true,
+    "seed_top_k": 20,
+    "seed_db_ratio": 0.25,
+    "seed_db_root": "factor_db",
+    "crypto_seed_ratio": 0.3
   },
   "search_space": {
     "allowed_operators": [
@@ -49,18 +55,25 @@
   "fitness": {
     "gate_cost_rate": 0.0018,
     "turnover_penalty": 0.0,
-    "coverage_floor": 0.2
+    "turnover_max": 0.15,
+    "coverage_floor": 0.2,
+    "prefilter_enabled": true,
+    "prefilter_min_abs_rankic": 0.01,
+    "prefilter_min_cost_adj": 0.0,
+    "prefilter_coverage_floor": 0.5,
+    "prefilter_keep": 32
   },
   "target": {
     "type": "forward_return",
-    "horizon_bars": 1,
+    "horizon_bars": 5,
     "entry_price": "next_close"
   },
   "storage": {
     "db_root": "factor_db"
   },
   "evaluation": {
-    "max_workers": 8,
+    "max_workers": 1,
+    "cache": true,
     "gates": {
       "holdout_mode": "strict",
       "hac_t_min": 2.0,
@@ -89,6 +102,10 @@
       "low",
       "close",
       "volume"
+    ],
+    "crypto_streams": [
+      "funding_rate",
+      "basis"
     ],
     "exchange": "binance",
     "instrument_type": "futures",
@@ -137,12 +154,16 @@
   "experiment": {
     "seed": 20261114,
     "user_dir": "user_workspace",
+    "trial_family": "crypto_1d_top20_h5_v1",
+    "family_declared_at": "2026-11-15",
+    "family_budget": 5000,
     "walk_forward": {
       "n_folds": 5,
       "embargo_bars": 5,
       "min_train_frac": 0.4,
       "ridge_alpha": 5.0,
-      "cost_rate": 0.0018
+      "cost_rate": 0.0018,
+      "scope": "promoted"
     }
   }
 }

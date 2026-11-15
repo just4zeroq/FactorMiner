@@ -91,6 +91,15 @@ refresh → doctor（FATAL 则中止）→ experiment → 写 summary
   在开跑前中止并返回 1（summary 里写 `stale`）。默认关闭——保留"用本地最新数据继续跑"的旧纪律。
 - `--fail-if-no-promotion`：闸门没有晋升任何因子时返回 1 —— 给告警用；
   **默认关闭**，因为"0 晋升"在信号弱的阶段是正常结果，不是故障。
+- `--set path=value`：点号路径覆盖配置（可重复），**在算 config hash 之前**生效，
+  所以 manifest 记录的永远是实际跑的那份配置。
+- `--wf-scope promoted|all`：walk-forward 默认只验证过了闸门的因子；0 晋升时该阶段
+  记录为 `skipped` 而不是让整轮失败。
+- `--stop-after-candidates N` / `--max-wallclock 秒`：在 epoch 边界停下并正常收尾
+  （写报告、关 stage），不会留下半代种群。
+- `--max-mem-mb`：单候选内存上限，超限标 `resource` 并跳过，不拖垮整轮。
+- `--stop-after-promoted N`：sweep 模式下累计晋升达到 N 就不再调度后续 cell。
+- `--webhook URL`：结束时把 summary JSON POST 过去（失败只告警，不改退出码）。
 - 每次运行都会写 `user_workspace/reports/pipeline_<UTC时间戳>.json`：
   `stages[]{stage,exit_code,detail}`、`doctor` 全量结果、`run_id`、`candidates`、
   `promoted`、`exit_code`。告警系统读这个文件比抓 stdout 稳。
@@ -110,8 +119,19 @@ venv/Scripts/python.exe -m core.cli factors --run-id <id> --show-rejects --json
 ```
 
 输出：候选数 / 通过数、各生命周期状态、**按闸门统计的失败次数**（例如
-`dsr_pass=71, empirical_null_pass=66`）、按 fitness 排序的明细。
-`--json` 给出每个因子的 HAC t / p_adj / DSR / empirical_p / 失败项，供告警或看板消费。
+`dsr_pass=71, empirical_null_pass=66`）、**Stage-A 漏斗**（多少候选进了置换零分布、
+各被哪条粗筛拦下）、按 fitness 排序的明细，并带一列 **`expression`**（AST 直接渲染，
+不再需要翻 metadata）：
+
+```
+factor_id      status                  gate    hac_t    p_adj      dsr    emp_p      fit  expression
+fac_86485292   DISCOVERED_UNVERIFIED   FAIL    6.854 2.864e-10 8.9e-09  0.01639    2.401  log1p_abs(ts_ema(ts_corr(add(close, high...
+```
+
+- `--expr-width N`：表达式列宽（0 = 不截断）。
+- `--json`：每个因子的 HAC t / p_adj / DSR / empirical_p / 失败项 / 完整表达式。
+- `--compare runA,runB`：跨 run 并排比较，输出 `newly_passing / newly_failing /
+  appeared / disappeared`（按 logic_hash 对齐，改名但等价的表达式仍能认出来）。
 
 ## 6. `promote` — 把通过的因子发布到生产库
 
@@ -123,7 +143,12 @@ venv/Scripts/python.exe -m core.cli factors --run-id <id> --show-rejects --json
 venv/Scripts/python.exe -m core.cli promote --run-id <id> --factor-id fac_xxxx \
   --db-root factor_db --dry-run          # 先看会复制哪些文件
 venv/Scripts/python.exe -m core.cli promote --run-id <id> --factor-id fac_xxxx
+venv/Scripts/python.exe -m core.cli promote --run-id <id> --all-inspected --json
 ```
+
+`--all-inspected` 批量发布该 run 里所有 `INSPECTED + gate_pass` 的因子：
+逐个执行同一套校验，**任一失败不影响其他**，最后汇总 `promoted / failed`；
+全部失败时退出码 1，部分成功时 0（看 `--json` 的 `failed` 数组）。
 
 安全规则：
 
@@ -131,6 +156,65 @@ venv/Scripts/python.exe -m core.cli promote --run-id <id> --factor-id fac_xxxx
 - 目标已存在同 id 一律拒绝（含 `--force` 时也不覆盖）；
 - `--force` 只用于绕过闸门状态检查，会在 lineage 与审计里记 `forced=true`；
 - `metadata.data_lineage.promotion` 记下 run_id / 源库 / 时间 / 闸门指标。
+
+## 6b. `factor-db` — 生产库本身的管理面
+
+发布/回测之间原来没有任何命令能回答「库里现在有什么」，这正是空库连续三轮无人察觉的原因。
+
+```bash
+venv/Scripts/python.exe -m core.cli factor-db list                       # 库里有什么
+venv/Scripts/python.exe -m core.cli factor-db show fac_xxxx              # 元数据+快照统计
+venv/Scripts/python.exe -m core.cli factor-db corr --threshold 0.7        # 冗余对
+venv/Scripts/python.exe -m core.cli factor-db combine --method hrp --dry-run
+venv/Scripts/python.exe -m core.cli factor-db export --out exports --format parquet
+venv/Scripts/python.exe -m core.cli factor-db decay --window 90 --apply   # 衰减标记
+venv/Scripts/python.exe -m core.cli factor-db rm fac_xxxx --dry-run       # 软删除预览
+```
+
+- `list`：总数 / `gate_pass` 数 / 有值快照数、状态分布、每行的 `expression` 与覆盖期、
+  所属 `run_id`。
+- `corr`：在**截面 rank** 上算 Spearman/Pearson，列出 `|ρ| ≥ threshold` 的冗余对。
+  组合前不做这一步，等于把同一个信号加权 N 次。
+- `combine --method equal|ic_weight|ridge|hrp`：拟合成员权重（单成员上限 `--max-weight`，
+  不可行时按 `1/n` 放宽并说明），`--dry-run` 只给权重；否则写一条
+  `type=linear_combination` 的因子 metadata + 加权快照，可直接 `backtest`。
+- `decay`：用快照里的 `factor` vs `forward_return` 算最近 N 个观测的 trailing RankIC，
+  `≤ --threshold` 标 `DECAYED`（`--apply` 才写回，`previous_lifecycle_status` 留痕）。
+- `rm`：**只做软删除** —— 把 metadata/values/源码/权重移进库内 `_deleted_<日期>/`，
+  必须显式 `--yes`；不提供硬删除。
+
+## 6c. `experiment --dry-run` / `--sweep` / `--shard` — 规模化
+
+```bash
+# 跑之前先看会产多少候选、要多久、DSR 门槛在哪
+venv/Scripts/python.exe -m core.cli experiment --config <cfg> --dry-run
+
+# 声明一次多假设扫描，并按 shard 切给多个进程
+venv/Scripts/python.exe -m core.cli experiment --config <cfg> \
+  --sweep sweep.json --shard 1/4 --dry-run
+venv/Scripts/python.exe -m core.cli experiment --config <cfg> --sweep sweep.json --shard 1/4
+```
+
+`sweep.json`：
+
+```json
+{
+  "name": "h5",
+  "grid": {"target.horizon_bars": [5, 20], "rebalance_every": [1, 5]},
+  "seeds": [20261114],
+  "set": ["fitness.turnover_max=0.15"]
+}
+```
+
+- 笛卡尔积展开，每个 cell 独立 run 目录、独立 `trial_family`（`<family>:<dims>`），
+  互不稀释 DSR 分母。
+- `--shard i/n` 按 `position % n == i-1` 切片；每个分片是独立进程，共享同一份
+  append-only 账本（已有跨进程文件锁）。
+- `--dry-run` 会逐个 cell 打印候选数/耗时/DSR 门槛与告警，不启动挖掘。
+- `--stop-after-promoted N`：累计晋升达到 N 就停掉后续 cell。
+
+**判定口径仍是「总时长 ÷ 分片数」以外的东西**：单机并行天花板只有约 1.7x，
+真正的吞吐来自「少算」（Stage-A 漏斗）与「切片」（shard），不是线程。
 
 ## 7. `holdout plan|reveal` — 一次性确认窗口
 
@@ -148,6 +232,54 @@ venv/Scripts/python.exe -m core.cli holdout reveal --window 1
   且只应用于复算已发布结果（会写审计）。
 - 账本 key 用 `rolling_<start>_<end>`，因此揭示**不会**移动预注册锚点。
 - `FACTORMINER_PRODUCTION=1` 时禁止 `audit/off` 与 reuse 覆盖。
+
+## 7b. 一轮实验内部：漏斗、缓存、断点、指标
+
+`experiment` 的挖掘阶段现在分三层，成本和统计量级都要按这个读：
+
+| 层 | 内容 | 成本 | 谁进来 |
+|---|---|---|---|
+| Stage A 粗筛 | IC / 多空净收益 / 换手上限 / 覆盖率，全部已算好 | ~0（<50ms） | 全部候选 |
+| Stage B 精算 | 目标置换零分布（`null_n_perm`） | ~4.6s/候选（97.8%） | 过粗筛的，最多 `fitness.prefilter_keep` |
+| Stage C 全闸门 | HAC t / BH-FDR / DSR / OOS 强度 / 成本 | ms | Stage B 的幸存者 |
+
+- 被 Stage A 拦下的候选**仍然入库**（可审计），但 `gate_pass=false` 且
+  `metrics.prefilter_reject` 写明原因（`turnover_above_cap` / `rankic_below_floor` /
+  `cost_adj_negative` / `coverage_below_floor` / `rank_cut`）。
+  它们**不会**被闸门判为"empirical 未计算=通过"。
+- `fitness.turnover_max`（默认 0）是**硬约束**：多空账本平均换手超过它就 fitness 归零；
+  0.15 对应"18bp 往返下必然亏损"的那条线。
+- `evaluation.max_workers > 1` 会被降为 1 并 WARN：实测线程池 0.58x（更慢）。
+  要吞吐请用漏斗 + shard。
+- `evaluation.cache: true` 打开跨 run 评估缓存（`user_workspace/.eval_cache/`），
+  key = 表达式 + 面板指纹 + 经济口径指纹；面板或成本变了就是 miss，不会复用旧判定。
+  实测第二轮 32/41 命中，挖矿 41s → 27s。
+- 每个 run 写两份审计：`evaluations.jsonl`（每个候选一行，含 cache hit/miss）与
+  `metrics.jsonl`（每个 stage 的耗时/候选数/晋升数），可被外部采集。
+- `--wf-scope promoted`（默认）：walk-forward 只验证过了闸门的因子；0 晋升时该 stage
+  记录 `skipped + reason`，不会把整轮判失败。
+
+### 试验族（trial family）
+
+`experiment.trial_family` 是多重检验的**分区键**，必须在看数据之前写进配置并提交：
+
+```json
+"experiment": {
+  "trial_family": "crypto_1d_top20_h5_v1",
+  "family_declared_at": "2026-11-15",
+  "family_budget": 5000
+}
+```
+
+同一 family 共享 `n_trials` 与 BH 家族；不同 family（不同 horizon / universe / 范式）
+独立计数。它写进 manifest（`trial_family` / `family_declared_at` / `family_budget`），
+事后不能改 —— 否则就是 p-hacking。未声明时退回旧的全局单调分母。
+
+### 增量挖掘
+
+`gp.seed_from_db: true` + `gp.seed_top_k: 20`（+ `gp.seed_db_root: factor_db`）会把
+生产库里 fitness 最高的已晋升 AST 注入第一代种群，而不是每次都从零开始。
+种子只来自已过闸门的 in-sample 产物，不构成 holdout 泄漏。
 
 ## 8. 生产环境开关
 

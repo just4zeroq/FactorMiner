@@ -1,5 +1,5 @@
-import concurrent.futures
 import math
+import time
 import traceback
 import logging
 from typing import List, Dict, Any, Optional
@@ -33,6 +33,17 @@ from core.evaluation.portfolio_eval import (
 
 logger = logging.getLogger(__name__)
 
+
+def _short_source(expr: Any) -> str:
+    """Readable one-line identity of a candidate, for the evaluation journal."""
+    try:
+        if callable(getattr(expr, "to_display_string", None)):
+            return str(expr.to_display_string(max_length=120))
+        source = expr.get_source() if callable(getattr(expr, "get_source", None)) else expr
+        return str(source)[:120]
+    except Exception:  # pragma: no cover - diagnostics only
+        return type(expr).__name__
+
 # Default fitness hyper-parameters. Every knob is overridable under
 # config["fitness"] so behavior stays backward compatible when test_period is
 # absent (out_of_sample auto-disables, shrinkage ~ 1 for large samples, etc.).
@@ -60,6 +71,22 @@ DEFAULT_FITNESS_CFG = {
     # promotion gate. Multiply fitness by this floor so the director stops
     # favouring un-tradeable factors.
     "tradeable_floor": 0.1,
+    # L1.4: hard turnover ceiling (mean portfolio turnover per rebalance bar,
+    # 0.5*sum|Δw|). Measured: a 60-day momentum book rebalanced every 5 bars
+    # turns over ~4.4%/bar and earns +0.00056/bar net; a 1-bar rebalance turns
+    # over ~19%/bar and earns +0.00018. Above ~15%/bar the 18bp round trip eats
+    # the whole gross edge, so those candidates are structurally unprofitable
+    # no matter how good their IC is. 0.0 disables the check.
+    "turnover_max": 0.0,
+    # L1.1 staged funnel. Stage A is the cheap screen (IC + long/short net
+    # return + turnover + coverage, all already computed with the metrics);
+    # Stage B is the 4.6s/candidate target-permutation null. Only Stage-A
+    # survivors get Stage B, which is where 98% of the runtime lives.
+    "prefilter_enabled": True,
+    "prefilter_min_abs_rankic": 0.01,   # below this the book cannot clear cost
+    "prefilter_min_cost_adj": 0.0,      # net-of-cost book return must be positive
+    "prefilter_coverage_floor": 0.5,    # share of finite (t, asset) cells
+    "prefilter_keep": 32,               # cap on candidates promoted to Stage B
 }
 
 
@@ -97,6 +124,19 @@ class ParallelEvaluator:
             raise ValueError(
                 "evaluation.max_workers must be an integer between 1 and 64"
             )
+        # P0-3: see evaluate_on() — threading this workload is measurably
+        # slower (0.58x). Honour the request as 1 and say so, rather than
+        # burning 72% extra wall clock in silence.
+        if self.max_workers > 1:
+            logger.warning(
+                "evaluation.max_workers=%d requested, but this workload is "
+                "GIL-bound: a thread pool measured 0.58x (slower than serial) on "
+                "4 candidates. Running serially. Scale throughput with the staged "
+                "funnel (fitness.prefilter_*) or by sharding whole runs "
+                "(`experiment --sweep ... --shard i/n`) instead.",
+                self.max_workers,
+            )
+            self.max_workers = 1
         # Per-candidate wall-clock budget. A pathological factor (infinite loop in
         # the sandbox, a pandas op that explodes on a sparse panel) used to hang
         # the whole round. Set to 0 to wait forever (legacy behaviour).
@@ -112,6 +152,35 @@ class ParallelEvaluator:
         self.gate_rebalance_bars = self._resolve_gate_rebalance_bars()
         fitness_cfg = self.config.get("fitness", {}) or {}
         self.allow_oos_in_search = bool(fitness_cfg.get("allow_oos_in_search", False))
+
+        # E1/E2: cross-run metric cache + append-only evaluation journal.
+        # Off by default (a stale cache would silently replay a verdict on
+        # different data); the experiment pipeline turns it on with a per-run
+        # journal path.
+        from core.evaluation.cache import EvaluationCache, economics_fingerprint
+
+        eval_cfg = self.config.get("evaluation", {}) or {}
+        self.cache = EvaluationCache(
+            enabled=bool(eval_cfg.get("cache", False)),
+            root=eval_cfg.get("cache_root"),
+            journal_path=eval_cfg.get("journal_path"),
+        )
+        self._economics_fp = economics_fingerprint(self.config, self.gate_rebalance_bars)
+        # E5: optional per-candidate memory ceiling. A single candidate that
+        # materialises an enormous intermediate (e.g. a full T x T correlation
+        # matrix) can OOM the whole process, killing every other result in the
+        # batch. When a limit is set the candidate is measured and abandoned
+        # instead of dragging the run down with it.
+        try:
+            self.max_mem_mb = float(eval_cfg.get("max_mem_mb") or 0.0)
+        except (TypeError, ValueError):
+            self.max_mem_mb = 0.0
+        self.over_budget = 0
+        if self.max_mem_mb > 0:
+            import tracemalloc
+
+            if not tracemalloc.is_tracing():
+                tracemalloc.start()
 
     def _resolve_gate_rebalance_bars(self) -> int:
         """Trading frequency used by the return-denominated gate.
@@ -220,6 +289,12 @@ class ParallelEvaluator:
             return feedback
         self.total_evaluated += len(candidates)
 
+        panel_fp = ""
+        if self.cache.enabled or self.cache.journal_path:
+            from core.evaluation.cache import panel_fingerprint
+
+            panel_fp = panel_fingerprint(data, returns)
+
         # 提取用户配置的自定义打分钩子
         fitness_hook_name = self.config.get("fitness", {}).get("hook")
         fitness_func = None
@@ -227,6 +302,42 @@ class ParallelEvaluator:
             fitness_func = EvaluatorRegistry._registry.get(fitness_hook_name)
 
         def safe_compute(expr: FactorExpression) -> CandidateEvaluation:
+            cache_key = None
+            if self.cache.enabled:
+                cache_key = self.cache.key_for(
+                    expr, panel_fp, self._economics_fp
+                )
+                cached = self.cache.get(cache_key)
+                if cached is not None:
+                    expr.metrics = dict(cached)
+                    if self.cache.journal_path:
+                        self.cache.journal({
+                            "event": "evaluated",
+                            "candidate": cache_key,
+                            "expression": _short_source(expr),
+                            "status": "success",
+                            "cache": "hit",
+                            "fitness_score": cached.get("fitness_score"),
+                        })
+                    return CandidateEvaluation(
+                        candidate=expr, status="success", metrics=dict(cached)
+                    )
+            result = _compute_uncached(expr)
+            if cache_key and result.status == "success" and result.metrics:
+                self.cache.put(cache_key, result.metrics)
+            if self.cache.journal_path:
+                self.cache.journal({
+                    "event": "evaluated",
+                    "candidate": cache_key or _short_source(expr),
+                    "expression": _short_source(expr),
+                    "status": result.status,
+                    "cache": "miss",
+                    "fitness_score": (result.metrics or {}).get("fitness_score"),
+                    "error": result.error_message,
+                })
+            return result
+
+        def _compute_uncached(expr: FactorExpression) -> CandidateEvaluation:
             try:
                 factor_values = expr.compute(data)
 
@@ -288,35 +399,28 @@ class ParallelEvaluator:
                 )
 
         worker_count = min(self.max_workers, len(candidates))
-        executor = concurrent.futures.ThreadPoolExecutor(
-            max_workers=worker_count,
-            thread_name_prefix="factor-evaluator",
-        )
-        futures = {executor.submit(safe_compute, cand): cand for cand in candidates}
         results_by_id: Dict[int, CandidateEvaluation] = {}
         budget = self.timeout_per_candidate * len(candidates) if self.timeout_per_candidate else None
-        try:
-            for future in concurrent.futures.as_completed(futures, timeout=budget):
-                candidate = futures[future]
-                try:
-                    results_by_id[id(candidate)] = future.result()
-                except Exception as exc:  # cancelled or executor failure
-                    results_by_id[id(candidate)] = CandidateEvaluation(
-                        candidate=candidate,
-                        status="error",
-                        error_type=type(exc).__name__,
-                        error_message=str(exc),
-                    )
-        except (TimeoutError, concurrent.futures.TimeoutError):
-            logger.warning(
-                "Evaluation budget of %.1fs exhausted after %d/%d candidates; "
-                "the rest are recorded as timeouts and the round continues.",
-                budget, len(results_by_id), len(candidates),
-            )
-        finally:
-            # Never block the miner on a stuck worker. Running threads keep
-            # burning until they finish, but the round moves on.
-            executor.shutdown(wait=False, cancel_futures=True)
+
+        # P0-3 (measured): a ThreadPoolExecutor over numpy/pandas candidates is
+        # a *negative* optimisation. 4 candidates took 10.1s serially and 17.5s
+        # with 4 threads (0.58x) because the inner loops contend on the GIL, so
+        # ``evaluation.max_workers = 8`` was voluntarily paying 72% more wall
+        # clock. Real throughput has to come from the staged funnel (which
+        # removes 98% of the permutation work) and from sharding whole runs,
+        # not from threading a single batch. Serial is therefore the only
+        # supported in-process backend; asking for more workers is honoured as
+        # 1 with an explicit warning instead of silently running slower.
+        started_at = time.monotonic()
+        for cand in candidates:
+            if budget is not None and (time.monotonic() - started_at) > budget:
+                logger.warning(
+                    "Evaluation budget of %.1fs exhausted after %d/%d candidates; "
+                    "the rest are recorded as timeouts and the round continues.",
+                    budget, len(results_by_id), len(candidates),
+                )
+                break
+            results_by_id[id(cand)] = self._compute_with_timeout(safe_compute, cand)
 
         results: List[CandidateEvaluation] = []
         for candidate in candidates:
@@ -348,6 +452,90 @@ class ParallelEvaluator:
                 if np.isfinite(pv):
                     self.run_p_values.append(pv)
         return feedback
+
+    def _compute_with_timeout(self, compute: Any, cand: Any) -> CandidateEvaluation:
+        """Run one candidate, enforcing the per-candidate wall-clock budget.
+
+        Execution is serial (see ``evaluate_on``: threading this workload is
+        0.58x), but a *single pathological candidate* must still not stall the
+        round. When a budget is configured each candidate runs in its own
+        throwaway thread: the main thread walks away at the deadline and marks
+        it ``timeout``, while the abandoned worker burns out on its own. That
+        keeps the protection without paying a thread pool for the normal path.
+        """
+        budget = float(self.timeout_per_candidate or 0.0)
+        if budget <= 0 and self.max_mem_mb <= 0:
+            return compute(cand)
+        import concurrent.futures as _cf
+
+        if budget <= 0:
+            # Only a memory ceiling is configured: still run in a worker so the
+            # peak allocation can be attributed to this candidate, but wait for
+            # it without a deadline.
+            executor = _cf.ThreadPoolExecutor(max_workers=1, thread_name_prefix="factor-budget")
+            if self.max_mem_mb > 0:
+                import tracemalloc
+
+                tracemalloc.reset_peak()
+            try:
+                result = executor.submit(compute, cand).result()
+            finally:
+                executor.shutdown(wait=True)
+            return self._check_memory(cand, result)
+
+        executor = _cf.ThreadPoolExecutor(max_workers=1, thread_name_prefix="factor-timeout")
+        if self.max_mem_mb > 0:
+            import tracemalloc as _tm
+
+            _tm.reset_peak()
+        future = executor.submit(compute, cand)
+        try:
+            result = future.result(timeout=budget)
+        except (_cf.TimeoutError, TimeoutError):
+            executor.shutdown(wait=False, cancel_futures=True)
+            self.timed_out += 1
+            return CandidateEvaluation(
+                candidate=cand,
+                status="timeout",
+                error_type="EvaluationTimeout",
+                error_message=(
+                    f"No result within the {budget:.0f}s per-candidate budget"
+                ),
+            )
+        except Exception as exc:  # pragma: no cover - executor failure only
+            executor.shutdown(wait=False, cancel_futures=True)
+            return CandidateEvaluation(
+                candidate=cand,
+                status="error",
+                error_type=type(exc).__name__,
+                error_message=str(exc),
+            )
+        executor.shutdown(wait=True)
+        return self._check_memory(cand, result)
+
+    def _check_memory(self, cand: Any, result: CandidateEvaluation) -> CandidateEvaluation:
+        """Abandon a candidate whose peak allocation exceeds ``max_mem_mb``."""
+        if self.max_mem_mb <= 0:
+            return result
+        try:
+            import tracemalloc
+
+            _current, peak = tracemalloc.get_traced_memory()
+        except Exception:  # pragma: no cover - optional dependency behaviour
+            return result
+        peak_mb = peak / (1024.0 * 1024.0)
+        if peak_mb <= self.max_mem_mb:
+            return result
+        self.over_budget += 1
+        return CandidateEvaluation(
+            candidate=cand,
+            status="resource",
+            error_type="MemoryBudgetExceeded",
+            error_message=(
+                f"peak allocation {peak_mb:.0f} MB exceeded the "
+                f"{self.max_mem_mb:.0f} MB per-candidate budget"
+            ),
+        )
 
     # ------------------------------------------------------------------ #
     # Metric helpers
@@ -587,6 +775,22 @@ class ParallelEvaluator:
 
         fitness_score = 100.0 * blended * tradeable_mult * cons_mult * shrink * tp * penalty
 
+        # L1.4 hard turnover ceiling. The soft ``turnover_penalty`` above is off
+        # by default and can only *nudge* fitness; a book that trades more than
+        # the cost budget allows is not a worse factor, it is a losing one. Zero
+        # its fitness so the search stops breeding that region, and flag it so
+        # the funnel/gate can report "cost-structural" instead of "weak signal".
+        turnover_blocked = False
+        tmax = float(cfg.get("turnover_max", 0.0) or 0.0)
+        if tmax > 0:
+            try:
+                to_val = float(in_metrics.get("ls_turnover", 0.0) or 0.0)
+            except (TypeError, ValueError):
+                to_val = 0.0
+            if to_val > tmax:
+                turnover_blocked = True
+                fitness_score = 0.0
+
         metrics = {
             **in_metrics,
             # OOS-04: report the *signed* OOS RankIC (matching the director's
@@ -600,6 +804,7 @@ class ParallelEvaluator:
             "shrinkage": shrink,
             "coverage": coverage,
             "turnover_penalty": tp,
+            "turnover_blocked": bool(turnover_blocked),
             "fitness_score": float(fitness_score),
         }
         return metrics

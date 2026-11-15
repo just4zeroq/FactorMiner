@@ -24,6 +24,16 @@ def parse_args():
 def run_miner(args):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger("FactorMinerCLI")
+
+    # E6: ``mine`` is a debug bypass. It writes into the shared/default
+    # factor_db, does not create a run directory, does not write a manifest and
+    # therefore produces factors that no audit trail can reproduce or promote.
+    # Say so loudly instead of letting it look like a production run.
+    logger.warning(
+        "`mine` is NOT an audited run: no run directory, no manifest, no "
+        "promotion gates report. It is for debugging a paradigm only. "
+        "Use `experiment` (or `pipeline`) for anything whose results matter."
+    )
     
     # 1. 解析配置文件
     if not os.path.exists(args.config):

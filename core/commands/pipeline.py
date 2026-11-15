@@ -52,6 +52,18 @@ def _experiment_namespace(args: argparse.Namespace) -> argparse.Namespace:
         # doctor step validates a directory the experiment never opens.
         data_root=getattr(args, "data_root", None),
         preflight=False,
+        # Pass-throughs added for the scale-up workflow (F7/F8/E3/E4). They are
+        # read with getattr downstream, so a missing value is harmless.
+        overrides=getattr(args, "overrides", None),
+        stop_after_candidates=getattr(args, "stop_after_candidates", None),
+        max_wallclock=getattr(args, "max_wallclock", None),
+        max_mem_mb=getattr(args, "max_mem_mb", None),
+        stop_after_promoted=getattr(args, "stop_after_promoted", None),
+        wf_scope=getattr(args, "wf_scope", None),
+        sweep=None,
+        shard=None,
+        json=False,
+        dry_run=False,
     )
 
 
@@ -80,6 +92,29 @@ def _write_summary(summary: Dict[str, Any], directory: str) -> Optional[str]:
         return path
     except Exception:
         return None
+
+
+def _post_webhook(url: Optional[str], payload: Dict[str, Any]) -> None:
+    """Best-effort POST of the run summary (O4 alerting hook).
+
+    Alerting must never change the run's verdict, so every failure here is a
+    warning: a scheduler that cannot reach the webhook still gets the exit code
+    and the summary file.
+    """
+    if not url:
+        return
+    try:
+        import urllib.request
+
+        body = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
+        request = urllib.request.Request(
+            url, data=body, headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=10) as response:
+            print(f"webhook: {response.status}", flush=True)
+    except Exception as exc:
+        print(f"webhook: delivery failed ({exc})", flush=True)
 
 
 def _resolve_root(args: argparse.Namespace) -> str:
@@ -175,6 +210,7 @@ def run_pipeline_cmd(args: argparse.Namespace) -> int:
             path = _write_summary(summary, args.summary_dir)
             if path:
                 print(f"summary: {path}", flush=True)
+            _post_webhook(getattr(args, "webhook", None), summary)
             return 1
         stale_rows = [r["detail"] for r in rows if r["check"] == "freshness" and r["status"] == doctor_cmd.WARN]
         if stale_rows and getattr(args, "stale_is_fatal", False):
@@ -187,6 +223,7 @@ def run_pipeline_cmd(args: argparse.Namespace) -> int:
         path = _write_summary(summary, args.summary_dir)
         if path:
             print(f"summary: {path}", flush=True)
+        _post_webhook(getattr(args, "webhook", None), summary)
         return 0
 
     # 3. experiment --------------------------------------------------------
@@ -199,6 +236,7 @@ def run_pipeline_cmd(args: argparse.Namespace) -> int:
         summary["finished_at"] = datetime.datetime.now().isoformat(timespec="seconds")
         summary["exit_code"] = code
         _write_summary(summary, args.summary_dir)
+        _post_webhook(getattr(args, "webhook", None), summary)
         return code
 
     state = (result or {}).get("state", {}) if isinstance(result, dict) else {}
@@ -237,6 +275,7 @@ def run_pipeline_cmd(args: argparse.Namespace) -> int:
     path = _write_summary(summary, args.summary_dir)
     if path:
         print(f"  summary      {path}")
+    _post_webhook(getattr(args, "webhook", None), summary)
     return exit_code
 
 
@@ -268,6 +307,34 @@ def add_parser(subparsers) -> None:
         help="Refresh OHLCV but not data_feeds.crypto_streams",
     )
     parser.add_argument("--skip-doctor", action="store_true", help="Do not preflight")
+    parser.add_argument(
+        "--set", dest="overrides", action="append", default=None, metavar="PATH=VALUE",
+        help="Override a config value before the run (F7)",
+    )
+    parser.add_argument(
+        "--wf-scope", default=None, choices=["promoted", "all"],
+        help="Walk-forward only the promoted factors (default) or all candidates",
+    )
+    parser.add_argument(
+        "--stop-after-candidates", type=int, default=None,
+        help="Stop mining after this many evaluated candidates",
+    )
+    parser.add_argument(
+        "--max-wallclock", type=int, default=None, metavar="SECONDS",
+        help="Stop mining after this many seconds and finish normally",
+    )
+    parser.add_argument(
+        "--max-mem-mb", type=float, default=None,
+        help="Per-candidate memory ceiling (an over-budget candidate is abandoned)",
+    )
+    parser.add_argument(
+        "--stop-after-promoted", type=int, default=None,
+        help="In a sweep, stop scheduling further cells after N promotions",
+    )
+    parser.add_argument(
+        "--webhook", default=None,
+        help="POST the pipeline summary JSON to this URL when the run ends (O4)",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",

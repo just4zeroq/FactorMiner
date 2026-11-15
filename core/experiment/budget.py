@@ -37,7 +37,29 @@ class BudgetSnapshotError(RuntimeError):
 
 
 def _empty() -> Dict[str, Any]:
-    return {"n_trials": 0, "p_values": [], "runs": 0, "updated_at": None}
+    return {"n_trials": 0, "p_values": [], "runs": 0, "updated_at": None, "families": {}}
+
+
+def _family_block(data: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    data = data if isinstance(data, dict) else {}
+    try:
+        n = int(data.get("n_trials", 0) or 0)
+    except (TypeError, ValueError):
+        n = 0
+    pvals: List[float] = []
+    for x in data.get("p_values", []) or []:
+        try:
+            v = float(x)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(v):
+            pvals.append(v)
+    return {
+        "n_trials": n,
+        "p_values": pvals[-MAX_PVALUES:],
+        "runs": int(data.get("runs", 0) or 0),
+        "updated_at": data.get("updated_at"),
+    }
 
 
 def load(path: Optional[Path] = None) -> Dict[str, Any]:
@@ -46,11 +68,18 @@ def load(path: Optional[Path] = None) -> Dict[str, Any]:
         return _empty()
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
+        families_raw = data.get("families") or {}
+        families = {
+            str(name): _family_block({**block, "updated_at": block.get("updated_at")})
+            for name, block in families_raw.items()
+            if isinstance(block, dict)
+        } if isinstance(families_raw, dict) else {}
         return {
             "n_trials": int(data.get("n_trials", 0) or 0),
             "p_values": [float(x) for x in data.get("p_values", [])],
             "runs": int(data.get("runs", 0) or 0),
             "updated_at": data.get("updated_at"),
+            "families": families,
         }
     except (OSError, ValueError, TypeError) as exc:
         # X-05: silently returning an empty snapshot let ``sync`` rebuild the
@@ -67,8 +96,17 @@ def sync(
     *,
     path: Optional[Path] = None,
     increment_runs: bool = False,
+    family: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Write the snapshot, keeping the maximum of stored and observed values."""
+    """Write the snapshot, keeping the maximum of stored and observed values.
+
+    ``family`` partitions the hypothesis budget (L1.3). A *family* is declared
+    before any data is looked at (``experiment.trial_family``) and is the unit
+    multiple-testing correction should be applied to: searching five universes
+    is five research programmes, not five times the depth of one. Without a
+    family the legacy global denominator is used unchanged, so existing runs
+    and existing snapshots keep their meaning.
+    """
     p = _path(path)
     prior = load(p)
     if prior.get("corrupt"):
@@ -77,16 +115,27 @@ def sync(
             "refusing to overwrite it with a lower trial count. Repair or "
             "delete the file explicitly."
         )
-    family = list(prior["p_values"])
-    family.extend(float(x) for x in p_values if x is not None)
+    family_values = list(prior["p_values"])
+    family_values.extend(float(x) for x in p_values if x is not None)
     # Keep the newest values when the family grows beyond the cap.
-    family = [float(x) for x in family[-MAX_PVALUES:]]
+    family_values = [float(x) for x in family_values[-MAX_PVALUES:]]
+    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     payload = {
         "n_trials": max(int(prior["n_trials"]), int(n_trials)),
-        "p_values": family,
+        "p_values": family_values,
         "runs": int(prior["runs"]) + (1 if increment_runs else 0),
-        "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "updated_at": now,
+        "families": dict(prior.get("families") or {}),
     }
+    if family:
+        block = _family_block(payload["families"].get(family))
+        merged = block["p_values"] + [float(x) for x in p_values if x is not None]
+        payload["families"][family] = {
+            "n_trials": max(int(block["n_trials"]), int(n_trials)),
+            "p_values": [float(x) for x in merged[-MAX_PVALUES:]],
+            "runs": int(block["runs"]) + (1 if increment_runs else 0),
+            "updated_at": now,
+        }
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(p.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -100,33 +149,55 @@ def resolve(
     run_p_values: Sequence[float],
     *,
     path: Optional[Path] = None,
+    family: Optional[str] = None,
 ) -> Tuple[int, List[float], Dict[str, Any]]:
     """Return (n_trials_denominator, BH family, snapshot) for a new run.
 
     ``trace_num_trials`` already includes the local cross-run trace but NOT the
     candidates about to be evaluated this run; callers add those themselves.
+
+    When ``family`` is given, the denominator and the BH family come from that
+    partition only. ``snapshot["global_n_trials"]`` still carries the
+    all-families total so reports can show the full research effort.
     """
     snap = load(path)
-    base = max(int(trace_num_trials), int(snap["n_trials"]))
-    # A4 / X-05: the old ``local_family if local_family else snapshot`` used
-    # ``or`` and DISCARDED the entire historical snapshot whenever the local
-    # ledger was non-empty (394 local p-values hid 310 historical ones). The
-    # BH family must be the union of all three sources, while the DSR
-    # denominator ``n_trials`` uses max() in the same function.
-    family = (
-        list(fdr_cumulative)
-        + list(snap["p_values"])
-        + list(run_p_values)
-    )
+    families = snap.get("families") or {}
+    # A declared-but-never-synced family has no block yet; falling back to the
+    # global denominator is correct (nothing was recorded under that name), but
+    # an unknown name must not read as "zero trials so far".
+    scope = _family_block(families[family]) if family and family in families else None
+    if scope is not None:
+        base = max(int(trace_num_trials), int(scope["n_trials"]))
+        # A4 / X-05: the old ``local_family if local_family else snapshot`` used
+        # ``or`` and DISCARDED the entire historical snapshot whenever the local
+        # ledger was non-empty (394 local p-values hid 310 historical ones). The
+        # BH family must be the union of all three sources, while the DSR
+        # denominator ``n_trials`` uses max() in the same function.
+        pooled = (
+            list(fdr_cumulative)
+            + list(scope["p_values"])
+            + list(run_p_values)
+        )
+    else:
+        base = max(int(trace_num_trials), int(snap["n_trials"]))
+        pooled = (
+            list(fdr_cumulative)
+            + list(snap["p_values"])
+            + list(run_p_values)
+        )
     clean: List[float] = []
-    for x in family:
+    for x in pooled:
         try:
             v = float(x)
         except (TypeError, ValueError):
             continue
         if math.isfinite(v):
             clean.append(v)
-    return base, clean, snap
+    out = dict(snap)
+    out["family"] = family
+    out["scope_n_trials"] = int(base)
+    out["global_n_trials"] = int(snap["n_trials"])
+    return base, clean, out
 
 
 def status(path: Optional[Path] = None) -> Dict[str, Any]:
@@ -137,4 +208,13 @@ def status(path: Optional[Path] = None) -> Dict[str, Any]:
         "n_p_values": len(snap["p_values"]),
         "runs": snap["runs"],
         "updated_at": snap["updated_at"],
+        "families": {
+            name: {
+                "n_trials": block["n_trials"],
+                "n_p_values": len(block["p_values"]),
+                "runs": block["runs"],
+                "updated_at": block["updated_at"],
+            }
+            for name, block in (snap.get("families") or {}).items()
+        },
     }

@@ -157,12 +157,25 @@ def _check_coverage(config: Dict[str, Any], coverage: Dict[str, Any], now):
     if not coverage:
         return [_result("coverage", FATAL, "no readable pair to measure")]
 
+    # ``all_pairs`` (default) demands a balanced panel: every configured pair
+    # must span the whole window. That is the right requirement for a hand-picked
+    # universe, and the wrong one for a full-exchange universe where listings
+    # arrive continuously — a pair listed in 2025 cannot cover 2023, and dropping
+    # it would throw away most of today's cross-section. ``panel`` therefore
+    # requires a *minimum number of assets on every bar* instead, and reports
+    # staggered listings as information rather than as a blocker.
+    policy = str(feeds.get("coverage_policy") or "all_pairs").strip().lower()
+    min_assets = int(feeds.get("min_assets_per_bar") or 20)
+
     results = []
     for label, start, end in periods:
         try:
             lo, hi = pd.Timestamp(start), pd.Timestamp(end)
         except Exception:
             results.append(_result("coverage", FATAL, f"{label} '{start}..{end}' is not a date"))
+            continue
+        if policy == "panel":
+            results.append(_panel_coverage(label, start, end, lo, hi, coverage, min_assets))
             continue
         gaps = []
         for pair, dates in coverage.items():
@@ -201,6 +214,37 @@ def _check_coverage(config: Dict[str, Any], coverage: Dict[str, Any], now):
         )
     )
     return results
+
+
+def _panel_coverage(label: str, start: str, end: str, lo, hi, coverage, min_assets: int):
+    """Coverage for a staggered-listing universe: width per bar, not balance."""
+    import pandas as pd
+
+    width: Dict[pd.Timestamp, int] = {}
+    late = 0
+    for dates in coverage.values():
+        if dates.min() > lo:
+            late += 1
+        for stamp in dates[(dates >= lo) & (dates <= hi)]:
+            width[pd.Timestamp(stamp).normalize()] = width.get(pd.Timestamp(stamp).normalize(), 0) + 1
+    if not width:
+        return _result("coverage", FATAL, f"{label} {start}..{end}: no bar in the window")
+    series = pd.Series(width).sort_index()
+    thin = series[series < min_assets]
+    detail = (
+        f"{label} {start}..{end}: {len(series)} bar(s), assets/bar "
+        f"min {int(series.min())} / median {int(series.median())} / max {int(series.max())}"
+        f"; {late} pair(s) listed after window start (allowed by coverage_policy=panel)"
+    )
+    if len(thin):
+        first, last = thin.index.min().date(), thin.index.max().date()
+        return _result(
+            "coverage",
+            FATAL,
+            f"{detail}; {len(thin)} bar(s) below min_assets_per_bar={min_assets} "
+            f"({first}..{last}, worst {int(thin.min())})",
+        )
+    return _result("coverage", OK, detail)
 
 
 def _check_streams(config: Dict[str, Any], data_root: str):

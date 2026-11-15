@@ -1,0 +1,4580 @@
+{
+ "0G/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "1000000MOG/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "1000BONK/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "1000CAT/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "1000CHEEMS/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "1000FLOKI/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "1000LUNC/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "1000PEPE/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "1000RATS/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "1000SATS/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "1000SHIB/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.7
+ },
+ "1000XEC/USDT:USDT": {
+  "ok": true,
+  "rows": 4791,
+  "error": null,
+  "secs": 2.4
+ },
+ "1INCH/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.5
+ },
+ "1MBABYDOGE/USDT:USDT": {
+  "ok": true,
+  "rows": 4739,
+  "error": null,
+  "secs": 2.6
+ },
+ "2Z/USDT:USDT": {
+  "ok": true,
+  "rows": 2454,
+  "error": null,
+  "secs": 1.7
+ },
+ "4/USDT:USDT": {
+  "ok": true,
+  "rows": 2417,
+  "error": null,
+  "secs": 1.5
+ },
+ "A/USDT:USDT": {
+  "ok": true,
+  "rows": 3216,
+  "error": null,
+  "secs": 1.9
+ },
+ "AAOI/USDT:USDT": {
+  "ok": true,
+  "rows": 481,
+  "error": null,
+  "secs": 0.8
+ },
+ "AAPL/USDT:USDT": {
+  "ok": true,
+  "rows": 710,
+  "error": null,
+  "secs": 0.7
+ },
+ "AAVE/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.4
+ },
+ "ABBV/USDT:USDT": {
+  "ok": true,
+  "rows": 61,
+  "error": null,
+  "secs": 0.5
+ },
+ "ACE/USDT:USDT": {
+  "ok": true,
+  "rows": 6634,
+  "error": null,
+  "secs": 3.9
+ },
+ "ACH/USDT:USDT": {
+  "ok": true,
+  "rows": 4087,
+  "error": null,
+  "secs": 2.3
+ },
+ "ACN/USDT:USDT": {
+  "ok": true,
+  "rows": 147,
+  "error": null,
+  "secs": 0.6
+ },
+ "ACT/USDT:USDT": {
+  "ok": true,
+  "rows": 4402,
+  "error": null,
+  "secs": 2.7
+ },
+ "ACU/USDT:USDT": {
+  "ok": true,
+  "rows": 1786,
+  "error": null,
+  "secs": 1.1
+ },
+ "ADA/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "ADBE/USDT:USDT": {
+  "ok": true,
+  "rows": 472,
+  "error": null,
+  "secs": 0.6
+ },
+ "AERO/USDT:USDT": {
+  "ok": true,
+  "rows": 4264,
+  "error": null,
+  "secs": 2.1
+ },
+ "AEVO/USDT:USDT": {
+  "ok": true,
+  "rows": 5860,
+  "error": null,
+  "secs": 3.0
+ },
+ "AGLD/USDT:USDT": {
+  "ok": true,
+  "rows": 3618,
+  "error": null,
+  "secs": 2.0
+ },
+ "AGPU/USDT:USDT": {
+  "ok": true,
+  "rows": 175,
+  "error": null,
+  "secs": 0.6
+ },
+ "AGT/USDT:USDT": {
+  "ok": true,
+  "rows": 3263,
+  "error": null,
+  "secs": 2.6
+ },
+ "AIA/USDT:USDT": {
+  "ok": true,
+  "rows": 3310,
+  "error": null,
+  "secs": 2.4
+ },
+ "AIGENSYN/USDT:USDT": {
+  "ok": true,
+  "rows": 1198,
+  "error": null,
+  "secs": 1.3
+ },
+ "AIN/USDT:USDT": {
+  "ok": true,
+  "rows": 2957,
+  "error": null,
+  "secs": 2.8
+ },
+ "AIO/USDT:USDT": {
+  "ok": true,
+  "rows": 2753,
+  "error": null,
+  "secs": 1.7
+ },
+ "AIOT/USDT:USDT": {
+  "ok": true,
+  "rows": 3382,
+  "error": null,
+  "secs": 2.3
+ },
+ "AIXBT/USDT:USDT": {
+  "ok": true,
+  "rows": 4167,
+  "error": null,
+  "secs": 2.2
+ },
+ "AKAM/USDT:USDT": {
+  "ok": true,
+  "rows": 121,
+  "error": null,
+  "secs": 0.6
+ },
+ "AKE/USDT:USDT": {
+  "ok": true,
+  "rows": 2516,
+  "error": null,
+  "secs": 1.7
+ },
+ "AKT/USDT:USDT": {
+  "ok": true,
+  "rows": 4361,
+  "error": null,
+  "secs": 2.4
+ },
+ "ALAB/USDT:USDT": {
+  "ok": true,
+  "rows": 438,
+  "error": null,
+  "secs": 1.0
+ },
+ "ALCH/USDT:USDT": {
+  "ok": true,
+  "rows": 4061,
+  "error": null,
+  "secs": 2.5
+ },
+ "ALGO/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.5
+ },
+ "ALICE/USDT:USDT": {
+  "ok": true,
+  "rows": 5084,
+  "error": null,
+  "secs": 2.8
+ },
+ "ALL/USDT:USDT": {
+  "ok": true,
+  "rows": 1398,
+  "error": null,
+  "secs": 1.8
+ },
+ "ALLO/USDT:USDT": {
+  "ok": true,
+  "rows": 2213,
+  "error": null,
+  "secs": 1.8
+ },
+ "ALPINE/USDT:USDT": {
+  "ok": true,
+  "rows": 3347,
+  "error": null,
+  "secs": 2.1
+ },
+ "ALT/USDT:USDT": {
+  "ok": true,
+  "rows": 6148,
+  "error": null,
+  "secs": 3.2
+ },
+ "AMAT/USDT:USDT": {
+  "ok": true,
+  "rows": 486,
+  "error": null,
+  "secs": 0.7
+ },
+ "AMC/USDT:USDT": {
+  "ok": true,
+  "rows": 175,
+  "error": null,
+  "secs": 1.2
+ },
+ "AMD/USDT:USDT": {
+  "ok": true,
+  "rows": 580,
+  "error": null,
+  "secs": 0.7
+ },
+ "AMGN/USDT:USDT": {
+  "ok": true,
+  "rows": 51,
+  "error": null,
+  "secs": 0.6
+ },
+ "AMZN/USDT:USDT": {
+  "ok": true,
+  "rows": 846,
+  "error": null,
+  "secs": 0.7
+ },
+ "ANET/USDT:USDT": {
+  "ok": true,
+  "rows": 175,
+  "error": null,
+  "secs": 0.7
+ },
+ "ANIME/USDT:USDT": {
+  "ok": true,
+  "rows": 4243,
+  "error": null,
+  "secs": 2.6
+ },
+ "ANKR/USDT:USDT": {
+  "ok": true,
+  "rows": 5001,
+  "error": null,
+  "secs": 2.7
+ },
+ "ANTHROPIC/USDT:USDT": {
+  "ok": true,
+  "rows": 499,
+  "error": null,
+  "secs": 0.6
+ },
+ "APE/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.5
+ },
+ "API3/USDT:USDT": {
+  "ok": true,
+  "rows": 8222,
+  "error": null,
+  "secs": 4.1
+ },
+ "APLD/USDT:USDT": {
+  "ok": true,
+  "rows": 175,
+  "error": null,
+  "secs": 1.3
+ },
+ "APP/USDT:USDT": {
+  "ok": true,
+  "rows": 385,
+  "error": null,
+  "secs": 1.0
+ },
+ "APR/USDT:USDT": {
+  "ok": true,
+  "rows": 2328,
+  "error": null,
+  "secs": 1.7
+ },
+ "APT/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "AR/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.5
+ },
+ "ARB/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "ARC/USDT:USDT": {
+  "ok": true,
+  "rows": 4000,
+  "error": null,
+  "secs": 3.7
+ },
+ "ARIA/USDT:USDT": {
+  "ok": true,
+  "rows": 2742,
+  "error": null,
+  "secs": 2.4
+ },
+ "ARK/USDT:USDT": {
+  "ok": true,
+  "rows": 5633,
+  "error": null,
+  "secs": 2.8
+ },
+ "ARKM/USDT:USDT": {
+  "ok": true,
+  "rows": 3621,
+  "error": null,
+  "secs": 2.7
+ },
+ "ARM/USDT:USDT": {
+  "ok": true,
+  "rows": 519,
+  "error": null,
+  "secs": 0.9
+ },
+ "ARPA/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.8
+ },
+ "ARX/USDT:USDT": {
+  "ok": true,
+  "rows": 871,
+  "error": null,
+  "secs": 0.7
+ },
+ "ASML/USDT:USDT": {
+  "ok": true,
+  "rows": 477,
+  "error": null,
+  "secs": 0.9
+ },
+ "ASR/USDT:USDT": {
+  "ok": true,
+  "rows": 3347,
+  "error": null,
+  "secs": 2.2
+ },
+ "ASTER/USDT:USDT": {
+  "ok": true,
+  "rows": 2531,
+  "error": null,
+  "secs": 1.9
+ },
+ "ASTR/USDT:USDT": {
+  "ok": true,
+  "rows": 4114,
+  "error": null,
+  "secs": 2.9
+ },
+ "ASTS/USDT:USDT": {
+  "ok": true,
+  "rows": 502,
+  "error": null,
+  "secs": 0.7
+ },
+ "AT/USDT:USDT": {
+  "ok": true,
+  "rows": 2291,
+  "error": null,
+  "secs": 1.6
+ },
+ "ATH/USDT:USDT": {
+  "ok": true,
+  "rows": 3550,
+  "error": null,
+  "secs": 2.7
+ },
+ "ATOM/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "AUCTION/USDT:USDT": {
+  "ok": true,
+  "rows": 6456,
+  "error": null,
+  "secs": 5.3
+ },
+ "AVA/USDT:USDT": {
+  "ok": true,
+  "rows": 4210,
+  "error": null,
+  "secs": 4.0
+ },
+ "AVAAI/USDT:USDT": {
+  "ok": true,
+  "rows": 4000,
+  "error": null,
+  "secs": 3.3
+ },
+ "AVAX/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "AVGO/USDT:USDT": {
+  "ok": true,
+  "rows": 650,
+  "error": null,
+  "secs": 1.0
+ },
+ "AVNT/USDT:USDT": {
+  "ok": true,
+  "rows": 2590,
+  "error": null,
+  "secs": 2.7
+ },
+ "AWE/USDT:USDT": {
+  "ok": true,
+  "rows": 3258,
+  "error": null,
+  "secs": 3.7
+ },
+ "AXL/USDT:USDT": {
+  "ok": true,
+  "rows": 6622,
+  "error": null,
+  "secs": 4.9
+ },
+ "AXS/USDT:USDT": {
+  "ok": true,
+  "rows": 5304,
+  "error": null,
+  "secs": 5.7
+ },
+ "AXTI/USDT:USDT": {
+  "ok": true,
+  "rows": 481,
+  "error": null,
+  "secs": 0.9
+ },
+ "AZTEC/USDT:USDT": {
+  "ok": true,
+  "rows": 1780,
+  "error": null,
+  "secs": 1.9
+ },
+ "B/USDT:USDT": {
+  "ok": true,
+  "rows": 3250,
+  "error": null,
+  "secs": 3.4
+ },
+ "B2/USDT:USDT": {
+  "ok": true,
+  "rows": 3346,
+  "error": null,
+  "secs": 4.0
+ },
+ "BABA/USDT:USDT": {
+  "ok": true,
+  "rows": 645,
+  "error": null,
+  "secs": 1.0
+ },
+ "BABY/USDT:USDT": {
+  "ok": true,
+  "rows": 3580,
+  "error": null,
+  "secs": 3.6
+ },
+ "BAC/USDT:USDT": {
+  "ok": true,
+  "rows": 76,
+  "error": null,
+  "secs": 0.6
+ },
+ "BAN/USDT:USDT": {
+  "ok": true,
+  "rows": 4381,
+  "error": null,
+  "secs": 3.3
+ },
+ "BANANA/USDT:USDT": {
+  "ok": true,
+  "rows": 5088,
+  "error": null,
+  "secs": 3.9
+ },
+ "BANANAS31/USDT:USDT": {
+  "ok": true,
+  "rows": 3623,
+  "error": null,
+  "secs": 2.8
+ },
+ "BAND/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.2
+ },
+ "BANK/USDT:USDT": {
+  "ok": true,
+  "rows": 3556,
+  "error": null,
+  "secs": 3.4
+ },
+ "BARD/USDT:USDT": {
+  "ok": true,
+  "rows": 3189,
+  "error": null,
+  "secs": 2.8
+ },
+ "BAS/USDT:USDT": {
+  "ok": true,
+  "rows": 2674,
+  "error": null,
+  "secs": 2.9
+ },
+ "BASED/USDT:USDT": {
+  "ok": true,
+  "rows": 1379,
+  "error": null,
+  "secs": 1.7
+ },
+ "BAT/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.9
+ },
+ "BB/USDT:USDT": {
+  "ok": true,
+  "rows": 5494,
+  "error": null,
+  "secs": 5.2
+ },
+ "BBX/USDT:USDT": {
+  "ok": true,
+  "rows": 502,
+  "error": null,
+  "secs": 1.1
+ },
+ "BCH/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.5
+ },
+ "BE/USDT:USDT": {
+  "ok": true,
+  "rows": 519,
+  "error": null,
+  "secs": 0.9
+ },
+ "BEAMX/USDT:USDT": {
+  "ok": true,
+  "rows": 6563,
+  "error": null,
+  "secs": 5.3
+ },
+ "BEAT/USDT:USDT": {
+  "ok": true,
+  "rows": 2543,
+  "error": null,
+  "secs": 2.5
+ },
+ "BEL/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.8
+ },
+ "BERA/USDT:USDT": {
+  "ok": true,
+  "rows": 3880,
+  "error": null,
+  "secs": 2.6
+ },
+ "BICO/USDT:USDT": {
+  "ok": true,
+  "rows": 3433,
+  "error": null,
+  "secs": 2.6
+ },
+ "BIGTIME/USDT:USDT": {
+  "ok": true,
+  "rows": 6778,
+  "error": null,
+  "secs": 4.4
+ },
+ "BILL/USDT:USDT": {
+  "ok": true,
+  "rows": 1152,
+  "error": null,
+  "secs": 1.3
+ },
+ "BIO/USDT:USDT": {
+  "ok": true,
+  "rows": 4896,
+  "error": null,
+  "secs": 5.0
+ },
+ "BIRB/USDT:USDT": {
+  "ok": true,
+  "rows": 1854,
+  "error": null,
+  "secs": 2.4
+ },
+ "BITO/USDT:USDT": {
+  "ok": true,
+  "rows": 333,
+  "error": null,
+  "secs": 1.3
+ },
+ "BLESS/USDT:USDT": {
+  "ok": true,
+  "rows": 2507,
+  "error": null,
+  "secs": 8.4
+ },
+ "BLUAI/USDT:USDT": {
+  "ok": true,
+  "rows": 2339,
+  "error": null,
+  "secs": 4.8
+ },
+ "BLUR/USDT:USDT": {
+  "ok": true,
+  "rows": 4620,
+  "error": null,
+  "secs": 7.1
+ },
+ "BMNR/USDT:USDT": {
+  "ok": true,
+  "rows": 472,
+  "error": null,
+  "secs": 1.0
+ },
+ "BMT/USDT:USDT": {
+  "ok": true,
+  "rows": 3748,
+  "error": null,
+  "secs": 4.1
+ },
+ "BNB/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "BNC/USDT:USDT": {
+  "ok": true,
+  "rows": 387,
+  "error": null,
+  "secs": 1.1
+ },
+ "BNT/USDT:USDT": {
+  "ok": true,
+  "rows": 3583,
+  "error": null,
+  "secs": 5.8
+ },
+ "BOME/USDT:USDT": {
+  "ok": true,
+  "rows": 5844,
+  "error": null,
+  "secs": 9.2
+ },
+ "BOT/USDT:USDT": {
+  "ok": true,
+  "rows": 387,
+  "error": null,
+  "secs": 2.6
+ },
+ "BR/USDT:USDT": {
+  "ok": true,
+  "rows": 3622,
+  "error": null,
+  "secs": 5.3
+ },
+ "BRETT/USDT:USDT": {
+  "ok": true,
+  "rows": 4901,
+  "error": null,
+  "secs": 6.7
+ },
+ "BREV/USDT:USDT": {
+  "ok": true,
+  "rows": 1919,
+  "error": null,
+  "secs": 3.5
+ },
+ "BRKB/USDT:USDT": {
+  "ok": true,
+  "rows": 544,
+  "error": null,
+  "secs": 1.0
+ },
+ "BROCCOLI714/USDT:USDT": {
+  "ok": true,
+  "rows": 3659,
+  "error": null,
+  "secs": 4.3
+ },
+ "BROCCOLIF3B/USDT:USDT": {
+  "ok": true,
+  "rows": 4757,
+  "error": null,
+  "secs": 5.8
+ },
+ "BSB/USDT:USDT": {
+  "ok": true,
+  "rows": 1409,
+  "error": null,
+  "secs": 2.9
+ },
+ "BSP/USDT:USDT": {
+  "ok": true,
+  "rows": 408,
+  "error": null,
+  "secs": 1.7
+ },
+ "BSV/USDT:USDT": {
+  "ok": true,
+  "rows": 6731,
+  "error": null,
+  "secs": 15.9
+ },
+ "BTC/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "BTCDOM/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 5.9
+ },
+ "BTR/USDT:USDT": {
+  "ok": true,
+  "rows": 2687,
+  "error": null,
+  "secs": 3.8
+ },
+ "BTW/USDT:USDT": {
+  "ok": true,
+  "rows": 982,
+  "error": null,
+  "secs": 2.3
+ },
+ "BULLA/USDT:USDT": {
+  "ok": true,
+  "rows": 3174,
+  "error": null,
+  "secs": 7.1
+ },
+ "BWET/USDT:USDT": {
+  "ok": true,
+  "rows": 142,
+  "error": null,
+  "secs": 3.8
+ },
+ "BX/USDT:USDT": {
+  "ok": true,
+  "rows": 491,
+  "error": null,
+  "secs": 1.1
+ },
+ "BYD/USDT:USDT": {
+  "ok": true,
+  "rows": 433,
+  "error": null,
+  "secs": 3.1
+ },
+ "BZ/USDT:USDT": {
+  "ok": true,
+  "rows": 1374,
+  "error": null,
+  "secs": 8.9
+ },
+ "C/USDT:USDT": {
+  "ok": true,
+  "rows": 3055,
+  "error": null,
+  "secs": 6.2
+ },
+ "C98/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 8.7
+ },
+ "CAKE/USDT:USDT": {
+  "ok": true,
+  "rows": 6652,
+  "error": null,
+  "secs": 13.0
+ },
+ "CAP/USDT:USDT": {
+  "ok": true,
+  "rows": 846,
+  "error": null,
+  "secs": 2.0
+ },
+ "CARV/USDT:USDT": {
+  "ok": true,
+  "rows": 2788,
+  "error": null,
+  "secs": 4.3
+ },
+ "CAT/USDT:USDT": {
+  "ok": true,
+  "rows": 478,
+  "error": null,
+  "secs": 1.6
+ },
+ "CATI/USDT:USDT": {
+  "ok": true,
+  "rows": 4721,
+  "error": null,
+  "secs": 8.1
+ },
+ "CBRS/USDT:USDT": {
+  "ok": true,
+  "rows": 541,
+  "error": null,
+  "secs": 1.6
+ },
+ "CC/USDT:USDT": {
+  "ok": true,
+  "rows": 2280,
+  "error": null,
+  "secs": 6.3
+ },
+ "CEG/USDT:USDT": {
+  "ok": true,
+  "rows": 76,
+  "error": null,
+  "secs": 0.9
+ },
+ "CELO/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 6.7
+ },
+ "CELR/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 7.3
+ },
+ "CETUS/USDT:USDT": {
+  "ok": true,
+  "rows": 4432,
+  "error": null,
+  "secs": 8.0
+ },
+ "CFG/USDT:USDT": {
+  "ok": true,
+  "rows": 1462,
+  "error": null,
+  "secs": 1.8
+ },
+ "CFX/USDT:USDT": {
+  "ok": true,
+  "rows": 4093,
+  "error": null,
+  "secs": 46.5
+ },
+ "CGPT/USDT:USDT": {
+  "ok": true,
+  "rows": 4167,
+  "error": null,
+  "secs": 2.7
+ },
+ "CHILLGUY/USDT:USDT": {
+  "ok": true,
+  "rows": 4306,
+  "error": null,
+  "secs": 4.2
+ },
+ "CHIP/USDT:USDT": {
+  "ok": true,
+  "rows": 1278,
+  "error": null,
+  "secs": 1.0
+ },
+ "CHR/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.1
+ },
+ "CHZ/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.4
+ },
+ "CIEN/USDT:USDT": {
+  "ok": true,
+  "rows": 438,
+  "error": null,
+  "secs": 0.6
+ },
+ "CKB/USDT:USDT": {
+  "ok": true,
+  "rows": 4069,
+  "error": null,
+  "secs": 2.4
+ },
+ "CL/USDT:USDT": {
+  "ok": true,
+  "rows": 1374,
+  "error": null,
+  "secs": 1.0
+ },
+ "CLANKER/USDT:USDT": {
+  "ok": true,
+  "rows": 2207,
+  "error": null,
+  "secs": 1.4
+ },
+ "CLO/USDT:USDT": {
+  "ok": true,
+  "rows": 2487,
+  "error": null,
+  "secs": 1.7
+ },
+ "COAI/USDT:USDT": {
+  "ok": true,
+  "rows": 3286,
+  "error": null,
+  "secs": 2.5
+ },
+ "COHR/USDT:USDT": {
+  "ok": true,
+  "rows": 519,
+  "error": null,
+  "secs": 0.6
+ },
+ "COIN/USDT:USDT": {
+  "ok": true,
+  "rows": 846,
+  "error": null,
+  "secs": 0.9
+ },
+ "COLLECT/USDT:USDT": {
+  "ok": true,
+  "rows": 1912,
+  "error": null,
+  "secs": 1.1
+ },
+ "COMP/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.3
+ },
+ "COOKIE/USDT:USDT": {
+  "ok": true,
+  "rows": 4061,
+  "error": null,
+  "secs": 2.7
+ },
+ "COPPER/USDT:USDT": {
+  "ok": true,
+  "rows": 1530,
+  "error": null,
+  "secs": 1.1
+ },
+ "COST/USDT:USDT": {
+  "ok": true,
+  "rows": 483,
+  "error": null,
+  "secs": 0.7
+ },
+ "COTI/USDT:USDT": {
+  "ok": true,
+  "rows": 5202,
+  "error": null,
+  "secs": 3.1
+ },
+ "COW/USDT:USDT": {
+  "ok": true,
+  "rows": 4432,
+  "error": null,
+  "secs": 2.9
+ },
+ "CRCL/USDT:USDT": {
+  "ok": true,
+  "rows": 846,
+  "error": null,
+  "secs": 0.7
+ },
+ "CRDO/USDT:USDT": {
+  "ok": true,
+  "rows": 481,
+  "error": null,
+  "secs": 0.7
+ },
+ "CRM/USDT:USDT": {
+  "ok": true,
+  "rows": 509,
+  "error": null,
+  "secs": 0.6
+ },
+ "CRML/USDT:USDT": {
+  "ok": true,
+  "rows": 142,
+  "error": null,
+  "secs": 0.6
+ },
+ "CROSS/USDT:USDT": {
+  "ok": true,
+  "rows": 2957,
+  "error": null,
+  "secs": 2.0
+ },
+ "CRV/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.7
+ },
+ "CRWD/USDT:USDT": {
+  "ok": true,
+  "rows": 480,
+  "error": null,
+  "secs": 0.8
+ },
+ "CRWV/USDT:USDT": {
+  "ok": true,
+  "rows": 544,
+  "error": null,
+  "secs": 0.8
+ },
+ "CSCO/USDT:USDT": {
+  "ok": true,
+  "rows": 566,
+  "error": null,
+  "secs": 0.7
+ },
+ "CSOPSAMSUNG2L/USDT:USDT": {
+  "ok": true,
+  "rows": 507,
+  "error": null,
+  "secs": 0.7
+ },
+ "CSOPSKHYNIX2L/USDT:USDT": {
+  "ok": true,
+  "rows": 507,
+  "error": null,
+  "secs": 0.9
+ },
+ "CT/USDT:USDT": {
+  "ok": true,
+  "rows": 271,
+  "error": null,
+  "secs": 1.1
+ },
+ "CTK/USDT:USDT": {
+  "ok": true,
+  "rows": 5935,
+  "error": null,
+  "secs": 2.7
+ },
+ "CTR/USDT:USDT": {
+  "ok": true,
+  "rows": 1025,
+  "error": null,
+  "secs": 1.2
+ },
+ "CTSI/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.8
+ },
+ "CVC/USDT:USDT": {
+  "ok": true,
+  "rows": 6429,
+  "error": null,
+  "secs": 3.6
+ },
+ "CVNA/USDT:USDT": {
+  "ok": true,
+  "rows": 145,
+  "error": null,
+  "secs": 0.7
+ },
+ "CVX/USDT:USDT": {
+  "ok": true,
+  "rows": 5582,
+  "error": null,
+  "secs": 3.9
+ },
+ "CXMT/USDT:USDT": {
+  "ok": true,
+  "rows": 487,
+  "error": null,
+  "secs": 0.7
+ },
+ "CYBER/USDT:USDT": {
+  "ok": true,
+  "rows": 6974,
+  "error": null,
+  "secs": 3.9
+ },
+ "CYPH/USDT:USDT": {
+  "ok": true,
+  "rows": 175,
+  "error": null,
+  "secs": 0.6
+ },
+ "CYS/USDT:USDT": {
+  "ok": true,
+  "rows": 2027,
+  "error": null,
+  "secs": 2.4
+ },
+ "DASH/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.4
+ },
+ "DATAIP/USDT:USDT": {
+  "ok": true,
+  "rows": 811,
+  "error": null,
+  "secs": 0.7
+ },
+ "DDOG/USDT:USDT": {
+  "ok": true,
+  "rows": 222,
+  "error": null,
+  "secs": 0.6
+ },
+ "DEEP/USDT:USDT": {
+  "ok": true,
+  "rows": 3431,
+  "error": null,
+  "secs": 1.9
+ },
+ "DELL/USDT:USDT": {
+  "ok": true,
+  "rows": 506,
+  "error": null,
+  "secs": 0.6
+ },
+ "DEXE/USDT:USDT": {
+  "ok": true,
+  "rows": 4450,
+  "error": null,
+  "secs": 3.2
+ },
+ "DIA/USDT:USDT": {
+  "ok": true,
+  "rows": 4642,
+  "error": null,
+  "secs": 2.9
+ },
+ "DIS/USDT:USDT": {
+  "ok": true,
+  "rows": 561,
+  "error": null,
+  "secs": 0.9
+ },
+ "DJT/USDT:USDT": {
+  "ok": true,
+  "rows": 247,
+  "error": null,
+  "secs": 0.6
+ },
+ "DKNG/USDT:USDT": {
+  "ok": true,
+  "rows": 475,
+  "error": null,
+  "secs": 1.2
+ },
+ "DODOX/USDT:USDT": {
+  "ok": true,
+  "rows": 6977,
+  "error": null,
+  "secs": 4.4
+ },
+ "DOGE/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "DOGS/USDT:USDT": {
+  "ok": true,
+  "rows": 4864,
+  "error": null,
+  "secs": 2.8
+ },
+ "DOLO/USDT:USDT": {
+  "ok": true,
+  "rows": 3381,
+  "error": null,
+  "secs": 2.7
+ },
+ "DOOD/USDT:USDT": {
+  "ok": true,
+  "rows": 4544,
+  "error": null,
+  "secs": 5.1
+ },
+ "DOS/USDT:USDT": {
+  "ok": true,
+  "rows": 575,
+  "error": null,
+  "secs": 1.2
+ },
+ "DOT/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "DRAM/USDT:USDT": {
+  "ok": true,
+  "rows": 544,
+  "error": null,
+  "secs": 0.8
+ },
+ "DRIFT/USDT:USDT": {
+  "ok": true,
+  "rows": 4570,
+  "error": null,
+  "secs": 4.3
+ },
+ "DUSK/USDT:USDT": {
+  "ok": true,
+  "rows": 5227,
+  "error": null,
+  "secs": 5.0
+ },
+ "DYDX/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.8
+ },
+ "DYM/USDT:USDT": {
+  "ok": true,
+  "rows": 6072,
+  "error": null,
+  "secs": 4.3
+ },
+ "EBAY/USDT:USDT": {
+  "ok": true,
+  "rows": 483,
+  "error": null,
+  "secs": 0.7
+ },
+ "EDEN/USDT:USDT": {
+  "ok": true,
+  "rows": 2466,
+  "error": null,
+  "secs": 2.5
+ },
+ "EDGE/USDT:USDT": {
+  "ok": true,
+  "rows": 1444,
+  "error": null,
+  "secs": 1.7
+ },
+ "EDU/USDT:USDT": {
+  "ok": true,
+  "rows": 3891,
+  "error": null,
+  "secs": 3.7
+ },
+ "EGLD/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.2
+ },
+ "EIDO/USDT:USDT": {
+  "ok": true,
+  "rows": 61,
+  "error": null,
+  "secs": 0.6
+ },
+ "EIGEN/USDT:USDT": {
+  "ok": true,
+  "rows": 4650,
+  "error": null,
+  "secs": 3.6
+ },
+ "ELSA/USDT:USDT": {
+  "ok": true,
+  "rows": 1844,
+  "error": null,
+  "secs": 1.3
+ },
+ "ENA/USDT:USDT": {
+  "ok": true,
+  "rows": 5740,
+  "error": null,
+  "secs": 3.7
+ },
+ "ENJ/USDT:USDT": {
+  "ok": true,
+  "rows": 5239,
+  "error": null,
+  "secs": 4.8
+ },
+ "ENS/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.2
+ },
+ "ENSO/USDT:USDT": {
+  "ok": true,
+  "rows": 2523,
+  "error": null,
+  "secs": 2.2
+ },
+ "EQT/USDT:USDT": {
+  "ok": true,
+  "rows": 66,
+  "error": null,
+  "secs": 0.6
+ },
+ "ERA/USDT:USDT": {
+  "ok": true,
+  "rows": 3514,
+  "error": null,
+  "secs": 3.1
+ },
+ "ESP/USDT:USDT": {
+  "ok": true,
+  "rows": 1839,
+  "error": null,
+  "secs": 2.4
+ },
+ "ESPORTS/USDT:USDT": {
+  "ok": true,
+  "rows": 3224,
+  "error": null,
+  "secs": 2.8
+ },
+ "ETC/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "ETH/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "ETHFI/USDT:USDT": {
+  "ok": true,
+  "rows": 5830,
+  "error": null,
+  "secs": 3.8
+ },
+ "ETHW/USDT:USDT": {
+  "ok": true,
+  "rows": 6496,
+  "error": null,
+  "secs": 4.5
+ },
+ "EUL/USDT:USDT": {
+  "ok": true,
+  "rows": 2387,
+  "error": null,
+  "secs": 2.2
+ },
+ "EVAA/USDT:USDT": {
+  "ok": true,
+  "rows": 2447,
+  "error": null,
+  "secs": 2.0
+ },
+ "EWJ/USDT:USDT": {
+  "ok": true,
+  "rows": 730,
+  "error": null,
+  "secs": 1.0
+ },
+ "EWT/USDT:USDT": {
+  "ok": true,
+  "rows": 502,
+  "error": null,
+  "secs": 0.7
+ },
+ "EWY/USDT:USDT": {
+  "ok": true,
+  "rows": 742,
+  "error": null,
+  "secs": 1.1
+ },
+ "EWZ/USDT:USDT": {
+  "ok": true,
+  "rows": 475,
+  "error": null,
+  "secs": 0.9
+ },
+ "EWZS/USDT:USDT": {
+  "ok": true,
+  "rows": 51,
+  "error": null,
+  "secs": 0.6
+ },
+ "F/USDT:USDT": {
+  "ok": true,
+  "rows": 3374,
+  "error": null,
+  "secs": 2.3
+ },
+ "FARTCOIN/USDT:USDT": {
+  "ok": true,
+  "rows": 4167,
+  "error": null,
+  "secs": 3.3
+ },
+ "FET/USDT:USDT": {
+  "ok": true,
+  "rows": 4198,
+  "error": null,
+  "secs": 4.4
+ },
+ "FF/USDT:USDT": {
+  "ok": true,
+  "rows": 2471,
+  "error": null,
+  "secs": 1.9
+ },
+ "FHE/USDT:USDT": {
+  "ok": true,
+  "rows": 3490,
+  "error": null,
+  "secs": 3.5
+ },
+ "FIDA/USDT:USDT": {
+  "ok": true,
+  "rows": 4761,
+  "error": null,
+  "secs": 3.2
+ },
+ "FIGHT/USDT:USDT": {
+  "ok": true,
+  "rows": 1775,
+  "error": null,
+  "secs": 1.4
+ },
+ "FIL/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "FLEX/USDT:USDT": {
+  "ok": true,
+  "rows": 408,
+  "error": null,
+  "secs": 0.7
+ },
+ "FLNC/USDT:USDT": {
+  "ok": true,
+  "rows": 544,
+  "error": null,
+  "secs": 0.7
+ },
+ "FLOCK/USDT:USDT": {
+  "ok": true,
+  "rows": 2592,
+  "error": null,
+  "secs": 2.4
+ },
+ "FLOW/USDT:USDT": {
+  "ok": true,
+  "rows": 5582,
+  "error": null,
+  "secs": 4.7
+ },
+ "FLUID/USDT:USDT": {
+  "ok": true,
+  "rows": 2502,
+  "error": null,
+  "secs": 2.5
+ },
+ "FLUX/USDT:USDT": {
+  "ok": true,
+  "rows": 4818,
+  "error": null,
+  "secs": 3.2
+ },
+ "FOGO/USDT:USDT": {
+  "ok": true,
+  "rows": 1852,
+  "error": null,
+  "secs": 2.9
+ },
+ "FOLKS/USDT:USDT": {
+  "ok": true,
+  "rows": 2601,
+  "error": null,
+  "secs": 1.8
+ },
+ "FORM/USDT:USDT": {
+  "ok": true,
+  "rows": 3636,
+  "error": null,
+  "secs": 2.2
+ },
+ "FRAX/USDT:USDT": {
+  "ok": true,
+  "rows": 1824,
+  "error": null,
+  "secs": 2.1
+ },
+ "FRHC/USDT:USDT": {
+  "ok": true,
+  "rows": 12,
+  "error": null,
+  "secs": 0.6
+ },
+ "FWDI/USDT:USDT": {
+  "ok": true,
+  "rows": 387,
+  "error": null,
+  "secs": 1.0
+ },
+ "G/USDT:USDT": {
+  "ok": true,
+  "rows": 5056,
+  "error": null,
+  "secs": 4.6
+ },
+ "GALA/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.8
+ },
+ "GAS/USDT:USDT": {
+  "ok": true,
+  "rows": 6742,
+  "error": null,
+  "secs": 4.9
+ },
+ "GDX/USDT:USDT": {
+  "ok": true,
+  "rows": 271,
+  "error": null,
+  "secs": 0.8
+ },
+ "GENIUS/USDT:USDT": {
+  "ok": true,
+  "rows": 1279,
+  "error": null,
+  "secs": 1.4
+ },
+ "GEV/USDT:USDT": {
+  "ok": true,
+  "rows": 390,
+  "error": null,
+  "secs": 0.8
+ },
+ "GIGADEV/USDT:USDT": {
+  "ok": true,
+  "rows": 511,
+  "error": null,
+  "secs": 0.8
+ },
+ "GIGGLE/USDT:USDT": {
+  "ok": true,
+  "rows": 2412,
+  "error": null,
+  "secs": 2.2
+ },
+ "GLM/USDT:USDT": {
+  "ok": true,
+  "rows": 5982,
+  "error": null,
+  "secs": 5.3
+ },
+ "GLW/USDT:USDT": {
+  "ok": true,
+  "rows": 491,
+  "error": null,
+  "secs": 0.8
+ },
+ "GME/USDT:USDT": {
+  "ok": true,
+  "rows": 475,
+  "error": null,
+  "secs": 0.8
+ },
+ "GMT/USDT:USDT": {
+  "ok": true,
+  "rows": 5262,
+  "error": null,
+  "secs": 4.7
+ },
+ "GMX/USDT:USDT": {
+  "ok": true,
+  "rows": 4102,
+  "error": null,
+  "secs": 4.2
+ },
+ "GOAT/USDT:USDT": {
+  "ok": true,
+  "rows": 4510,
+  "error": null,
+  "secs": 4.9
+ },
+ "GOOGL/USDT:USDT": {
+  "ok": true,
+  "rows": 719,
+  "error": null,
+  "secs": 0.9
+ },
+ "GPRO/USDT:USDT": {
+  "ok": true,
+  "rows": 219,
+  "error": null,
+  "secs": 0.7
+ },
+ "GPS/USDT:USDT": {
+  "ok": true,
+  "rows": 4316,
+  "error": null,
+  "secs": 2.8
+ },
+ "GRAM/USDT:USDT": {
+  "ok": true,
+  "rows": 817,
+  "error": null,
+  "secs": 0.8
+ },
+ "GRASS/USDT:USDT": {
+  "ok": true,
+  "rows": 4420,
+  "error": null,
+  "secs": 3.8
+ },
+ "GRIFFAIN/USDT:USDT": {
+  "ok": true,
+  "rows": 4090,
+  "error": null,
+  "secs": 3.6
+ },
+ "GRT/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.7
+ },
+ "GRVT/USDT:USDT": {
+  "ok": true,
+  "rows": 642,
+  "error": null,
+  "secs": 0.9
+ },
+ "GS/USDT:USDT": {
+  "ok": true,
+  "rows": 333,
+  "error": null,
+  "secs": 0.9
+ },
+ "GTC/USDT:USDT": {
+  "ok": true,
+  "rows": 4372,
+  "error": null,
+  "secs": 3.6
+ },
+ "GTLB/USDT:USDT": {
+  "ok": true,
+  "rows": 222,
+  "error": null,
+  "secs": 0.7
+ },
+ "GUA/USDT:USDT": {
+  "ok": true,
+  "rows": 2073,
+  "error": null,
+  "secs": 2.1
+ },
+ "GUN/USDT:USDT": {
+  "ok": true,
+  "rows": 3562,
+  "error": null,
+  "secs": 3.4
+ },
+ "GWEI/USDT:USDT": {
+  "ok": true,
+  "rows": 2061,
+  "error": null,
+  "secs": 2.2
+ },
+ "H/USDT:USDT": {
+  "ok": true,
+  "rows": 3463,
+  "error": null,
+  "secs": 3.3
+ },
+ "HAEDAL/USDT:USDT": {
+  "ok": true,
+  "rows": 3381,
+  "error": null,
+  "secs": 3.0
+ },
+ "HANA/USDT:USDT": {
+  "ok": true,
+  "rows": 3971,
+  "error": null,
+  "secs": 3.8
+ },
+ "HANMI/USDT:USDT": {
+  "ok": true,
+  "rows": 499,
+  "error": null,
+  "secs": 0.9
+ },
+ "HBAR/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.8
+ },
+ "HD/USDT:USDT": {
+  "ok": true,
+  "rows": 569,
+  "error": null,
+  "secs": 0.8
+ },
+ "HEI/USDT:USDT": {
+  "ok": true,
+  "rows": 3853,
+  "error": null,
+  "secs": 3.8
+ },
+ "HEMI/USDT:USDT": {
+  "ok": true,
+  "rows": 2661,
+  "error": null,
+  "secs": 2.4
+ },
+ "HIMS/USDT:USDT": {
+  "ok": true,
+  "rows": 478,
+  "error": null,
+  "secs": 0.8
+ },
+ "HIVE/USDT:USDT": {
+  "ok": true,
+  "rows": 4234,
+  "error": null,
+  "secs": 3.9
+ },
+ "HK0625/USDT:USDT": {
+  "ok": true,
+  "rows": 452,
+  "error": null,
+  "secs": 0.8
+ },
+ "HK0700/USDT:USDT": {
+  "ok": true,
+  "rows": 562,
+  "error": null,
+  "secs": 1.2
+ },
+ "HK0992/USDT:USDT": {
+  "ok": true,
+  "rows": 433,
+  "error": null,
+  "secs": 0.7
+ },
+ "HK1810/USDT:USDT": {
+  "ok": true,
+  "rows": 562,
+  "error": null,
+  "secs": 0.8
+ },
+ "HMSTR/USDT:USDT": {
+  "ok": true,
+  "rows": 4678,
+  "error": null,
+  "secs": 4.2
+ },
+ "HOLO/USDT:USDT": {
+  "ok": true,
+  "rows": 2580,
+  "error": null,
+  "secs": 2.4
+ },
+ "HOME/USDT:USDT": {
+  "ok": true,
+  "rows": 3482,
+  "error": null,
+  "secs": 3.1
+ },
+ "HOOD/USDT:USDT": {
+  "ok": true,
+  "rows": 859,
+  "error": null,
+  "secs": 1.1
+ },
+ "HOT/USDT:USDT": {
+  "ok": true,
+  "rows": 4416,
+  "error": null,
+  "secs": 4.0
+ },
+ "HPE/USDT:USDT": {
+  "ok": true,
+  "rows": 494,
+  "error": null,
+  "secs": 0.9
+ },
+ "HUMA/USDT:USDT": {
+  "ok": true,
+  "rows": 3400,
+  "error": null,
+  "secs": 3.1
+ },
+ "HUT/USDT:USDT": {
+  "ok": true,
+  "rows": 175,
+  "error": null,
+  "secs": 0.8
+ },
+ "HYPE/USDT:USDT": {
+  "ok": true,
+  "rows": 3203,
+  "error": null,
+  "secs": 2.8
+ },
+ "HYPER/USDT:USDT": {
+  "ok": true,
+  "rows": 3580,
+  "error": null,
+  "secs": 3.2
+ },
+ "HYUNDAI/USDT:USDT": {
+  "ok": true,
+  "rows": 875,
+  "error": null,
+  "secs": 1.0
+ },
+ "IBKR/USDT:USDT": {
+  "ok": true,
+  "rows": 76,
+  "error": null,
+  "secs": 0.7
+ },
+ "IBM/USDT:USDT": {
+  "ok": true,
+  "rows": 506,
+  "error": null,
+  "secs": 0.8
+ },
+ "ICNT/USDT:USDT": {
+  "ok": true,
+  "rows": 2999,
+  "error": null,
+  "secs": 3.1
+ },
+ "ICP/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.8
+ },
+ "ID/USDT:USDT": {
+  "ok": true,
+  "rows": 4580,
+  "error": null,
+  "secs": 4.1
+ },
+ "IDOL/USDT:USDT": {
+  "ok": true,
+  "rows": 2993,
+  "error": null,
+  "secs": 2.9
+ },
+ "ILV/USDT:USDT": {
+  "ok": true,
+  "rows": 6604,
+  "error": null,
+  "secs": 5.6
+ },
+ "IMX/USDT:USDT": {
+  "ok": true,
+  "rows": 7633,
+  "error": null,
+  "secs": 6.3
+ },
+ "IN/USDT:USDT": {
+  "ok": true,
+  "rows": 2809,
+  "error": null,
+  "secs": 2.5
+ },
+ "INIT/USDT:USDT": {
+  "ok": true,
+  "rows": 3610,
+  "error": null,
+  "secs": 3.6
+ },
+ "INJ/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "INTC/USDT:USDT": {
+  "ok": true,
+  "rows": 859,
+  "error": null,
+  "secs": 1.0
+ },
+ "INTW/USDT:USDT": {
+  "ok": true,
+  "rows": 387,
+  "error": null,
+  "secs": 1.2
+ },
+ "INX/USDT:USDT": {
+  "ok": true,
+  "rows": 1731,
+  "error": null,
+  "secs": 1.6
+ },
+ "IO/USDT:USDT": {
+  "ok": true,
+  "rows": 5320,
+  "error": null,
+  "secs": 4.7
+ },
+ "IONQ/USDT:USDT": {
+  "ok": true,
+  "rows": 237,
+  "error": null,
+  "secs": 0.7
+ },
+ "IOST/USDT:USDT": {
+  "ok": true,
+  "rows": 4671,
+  "error": null,
+  "secs": 4.2
+ },
+ "IOTA/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.9
+ },
+ "IOTX/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.9
+ },
+ "IREN/USDT:USDT": {
+  "ok": true,
+  "rows": 496,
+  "error": null,
+  "secs": 1.0
+ },
+ "IRYS/USDT:USDT": {
+  "ok": true,
+  "rows": 2288,
+  "error": null,
+  "secs": 2.8
+ },
+ "IWM/USDT:USDT": {
+  "ok": true,
+  "rows": 481,
+  "error": null,
+  "secs": 0.8
+ },
+ "JASMY/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.0
+ },
+ "JCT/USDT:USDT": {
+  "ok": true,
+  "rows": 2221,
+  "error": null,
+  "secs": 2.5
+ },
+ "JELLYJELLY/USDT:USDT": {
+  "ok": true,
+  "rows": 3605,
+  "error": null,
+  "secs": 3.7
+ },
+ "JOE/USDT:USDT": {
+  "ok": true,
+  "rows": 3984,
+  "error": null,
+  "secs": 3.7
+ },
+ "JPM/USDT:USDT": {
+  "ok": true,
+  "rows": 554,
+  "error": null,
+  "secs": 0.9
+ },
+ "JST/USDT:USDT": {
+  "ok": true,
+  "rows": 3395,
+  "error": null,
+  "secs": 3.4
+ },
+ "JTO/USDT:USDT": {
+  "ok": true,
+  "rows": 6437,
+  "error": null,
+  "secs": 5.9
+ },
+ "JUP/USDT:USDT": {
+  "ok": true,
+  "rows": 6109,
+  "error": null,
+  "secs": 5.6
+ },
+ "KAIA/USDT:USDT": {
+  "ok": true,
+  "rows": 4349,
+  "error": null,
+  "secs": 4.0
+ },
+ "KAITO/USDT:USDT": {
+  "ok": true,
+  "rows": 3796,
+  "error": null,
+  "secs": 3.2
+ },
+ "KAS/USDT:USDT": {
+  "ok": true,
+  "rows": 6567,
+  "error": null,
+  "secs": 5.3
+ },
+ "KAT/USDT:USDT": {
+  "ok": true,
+  "rows": 1548,
+  "error": null,
+  "secs": 2.0
+ },
+ "KAVA/USDT:USDT": {
+  "ok": true,
+  "rows": 6102,
+  "error": null,
+  "secs": 5.0
+ },
+ "KERNEL/USDT:USDT": {
+  "ok": true,
+  "rows": 3478,
+  "error": null,
+  "secs": 3.4
+ },
+ "KGEN/USDT:USDT": {
+  "ok": true,
+  "rows": 2423,
+  "error": null,
+  "secs": 2.5
+ },
+ "KITE/USDT:USDT": {
+  "ok": true,
+  "rows": 2291,
+  "error": null,
+  "secs": 2.2
+ },
+ "KLAC/USDT:USDT": {
+  "ok": true,
+  "rows": 443,
+  "error": null,
+  "secs": 0.8
+ },
+ "KMNO/USDT:USDT": {
+  "ok": true,
+  "rows": 4167,
+  "error": null,
+  "secs": 3.7
+ },
+ "KNC/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.7
+ },
+ "KO/USDT:USDT": {
+  "ok": true,
+  "rows": 309,
+  "error": null,
+  "secs": 0.8
+ },
+ "KODEX200/USDT:USDT": {
+  "ok": true,
+  "rows": 503,
+  "error": null,
+  "secs": 0.9
+ },
+ "KOMA/USDT:USDT": {
+  "ok": true,
+  "rows": 4228,
+  "error": null,
+  "secs": 4.3
+ },
+ "KORU/USDT:USDT": {
+  "ok": true,
+  "rows": 437,
+  "error": null,
+  "secs": 0.8
+ },
+ "KSM/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.0
+ },
+ "KSTR/USDT:USDT": {
+  "ok": true,
+  "rows": 408,
+  "error": null,
+  "secs": 0.8
+ },
+ "KUAISHOU/USDT:USDT": {
+  "ok": true,
+  "rows": 490,
+  "error": null,
+  "secs": 0.8
+ },
+ "LA/USDT:USDT": {
+  "ok": true,
+  "rows": 4921,
+  "error": null,
+  "secs": 4.8
+ },
+ "LAB/USDT:USDT": {
+  "ok": true,
+  "rows": 2751,
+  "error": null,
+  "secs": 2.7
+ },
+ "LAYER/USDT:USDT": {
+  "ok": true,
+  "rows": 5967,
+  "error": null,
+  "secs": 5.1
+ },
+ "LDO/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.0
+ },
+ "LGELECTRONICS/USDT:USDT": {
+  "ok": true,
+  "rows": 499,
+  "error": null,
+  "secs": 0.7
+ },
+ "LIGHT/USDT:USDT": {
+  "ok": true,
+  "rows": 2554,
+  "error": null,
+  "secs": 2.3
+ },
+ "LINEA/USDT:USDT": {
+  "ok": true,
+  "rows": 2639,
+  "error": null,
+  "secs": 2.4
+ },
+ "LINK/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "LISTA/USDT:USDT": {
+  "ok": true,
+  "rows": 5266,
+  "error": null,
+  "secs": 3.6
+ },
+ "LIT/USDT:USDT": {
+  "ok": true,
+  "rows": 1959,
+  "error": null,
+  "secs": 3.7
+ },
+ "LITE/USDT:USDT": {
+  "ok": true,
+  "rows": 556,
+  "error": null,
+  "secs": 1.0
+ },
+ "LLY/USDT:USDT": {
+  "ok": true,
+  "rows": 512,
+  "error": null,
+  "secs": 0.9
+ },
+ "LPT/USDT:USDT": {
+  "ok": true,
+  "rows": 8545,
+  "error": null,
+  "secs": 5.4
+ },
+ "LQTY/USDT:USDT": {
+  "ok": true,
+  "rows": 4041,
+  "error": null,
+  "secs": 2.8
+ },
+ "LRCX/USDT:USDT": {
+  "ok": true,
+  "rows": 443,
+  "error": null,
+  "secs": 0.7
+ },
+ "LSK/USDT:USDT": {
+  "ok": true,
+  "rows": 7299,
+  "error": null,
+  "secs": 4.4
+ },
+ "LTC/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "LUMIA/USDT:USDT": {
+  "ok": true,
+  "rows": 4181,
+  "error": null,
+  "secs": 3.4
+ },
+ "LUNA2/USDT:USDT": {
+  "ok": true,
+  "rows": 5826,
+  "error": null,
+  "secs": 4.6
+ },
+ "LYN/USDT:USDT": {
+  "ok": true,
+  "rows": 2929,
+  "error": null,
+  "secs": 2.9
+ },
+ "LYTE/USDT:USDT": {
+  "ok": true,
+  "rows": 271,
+  "error": null,
+  "secs": 0.8
+ },
+ "M/USDT:USDT": {
+  "ok": true,
+  "rows": 3905,
+  "error": null,
+  "secs": 2.8
+ },
+ "MAGIC/USDT:USDT": {
+  "ok": true,
+  "rows": 5893,
+  "error": null,
+  "secs": 5.8
+ },
+ "MAGMA/USDT:USDT": {
+  "ok": true,
+  "rows": 1912,
+  "error": null,
+  "secs": 2.0
+ },
+ "MANA/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.1
+ },
+ "MANTA/USDT:USDT": {
+  "ok": true,
+  "rows": 6190,
+  "error": null,
+  "secs": 5.7
+ },
+ "MANTRA/USDT:USDT": {
+  "ok": true,
+  "rows": 1536,
+  "error": null,
+  "secs": 1.5
+ },
+ "MARA/USDT:USDT": {
+  "ok": true,
+  "rows": 237,
+  "error": null,
+  "secs": 0.7
+ },
+ "MARSCOIN/USDT:USDT": {
+  "ok": true,
+  "rows": 450,
+  "error": null,
+  "secs": 0.9
+ },
+ "MASK/USDT:USDT": {
+  "ok": true,
+  "rows": 6572,
+  "error": null,
+  "secs": 5.4
+ },
+ "MAV/USDT:USDT": {
+  "ok": true,
+  "rows": 3708,
+  "error": null,
+  "secs": 3.5
+ },
+ "MAVIA/USDT:USDT": {
+  "ok": true,
+  "rows": 5987,
+  "error": null,
+  "secs": 4.3
+ },
+ "MCD/USDT:USDT": {
+  "ok": true,
+  "rows": 121,
+  "error": null,
+  "secs": 1.0
+ },
+ "MDB/USDT:USDT": {
+  "ok": true,
+  "rows": 222,
+  "error": null,
+  "secs": 0.8
+ },
+ "MDT/USDT:USDT": {
+  "ok": true,
+  "rows": 76,
+  "error": null,
+  "secs": 0.9
+ },
+ "ME/USDT:USDT": {
+  "ok": true,
+  "rows": 5471,
+  "error": null,
+  "secs": 6.2
+ },
+ "MEGA/USDT:USDT": {
+  "ok": true,
+  "rows": 1733,
+  "error": null,
+  "secs": 1.8
+ },
+ "MEITUAN/USDT:USDT": {
+  "ok": true,
+  "rows": 490,
+  "error": null,
+  "secs": 0.9
+ },
+ "MELANIA/USDT:USDT": {
+  "ok": true,
+  "rows": 3983,
+  "error": null,
+  "secs": 3.7
+ },
+ "MELI/USDT:USDT": {
+  "ok": true,
+  "rows": 51,
+  "error": null,
+  "secs": 0.6
+ },
+ "MEME/USDT:USDT": {
+  "ok": true,
+  "rows": 6646,
+  "error": null,
+  "secs": 6.2
+ },
+ "MERL/USDT:USDT": {
+  "ok": true,
+  "rows": 3511,
+  "error": null,
+  "secs": 3.6
+ },
+ "MET/USDT:USDT": {
+  "ok": true,
+  "rows": 2399,
+  "error": null,
+  "secs": 2.5
+ },
+ "META/USDT:USDT": {
+  "ok": true,
+  "rows": 719,
+  "error": null,
+  "secs": 0.9
+ },
+ "METIS/USDT:USDT": {
+  "ok": true,
+  "rows": 5870,
+  "error": null,
+  "secs": 5.0
+ },
+ "MEW/USDT:USDT": {
+  "ok": true,
+  "rows": 5284,
+  "error": null,
+  "secs": 5.3
+ },
+ "MINA/USDT:USDT": {
+  "ok": true,
+  "rows": 4144,
+  "error": null,
+  "secs": 4.1
+ },
+ "MINIMAX/USDT:USDT": {
+  "ok": true,
+  "rows": 562,
+  "error": null,
+  "secs": 0.9
+ },
+ "MIRA/USDT:USDT": {
+  "ok": true,
+  "rows": 2723,
+  "error": null,
+  "secs": 2.6
+ },
+ "MMT/USDT:USDT": {
+  "ok": true,
+  "rows": 2255,
+  "error": null,
+  "secs": 2.5
+ },
+ "MOCA/USDT:USDT": {
+  "ok": true,
+  "rows": 4193,
+  "error": null,
+  "secs": 4.8
+ },
+ "MON/USDT:USDT": {
+  "ok": true,
+  "rows": 2406,
+  "error": null,
+  "secs": 2.7
+ },
+ "MOODENG/USDT:USDT": {
+  "ok": true,
+  "rows": 4505,
+  "error": null,
+  "secs": 4.9
+ },
+ "MOONSHOT/USDT:USDT": {
+  "ok": true,
+  "rows": 163,
+  "error": null,
+  "secs": 0.6
+ },
+ "MORPHO/USDT:USDT": {
+  "ok": true,
+  "rows": 4306,
+  "error": null,
+  "secs": 4.8
+ },
+ "MOVE/USDT:USDT": {
+  "ok": true,
+  "rows": 4270,
+  "error": null,
+  "secs": 5.1
+ },
+ "MOVR/USDT:USDT": {
+  "ok": true,
+  "rows": 6328,
+  "error": null,
+  "secs": 7.0
+ },
+ "MP/USDT:USDT": {
+  "ok": true,
+  "rows": 142,
+  "error": null,
+  "secs": 0.7
+ },
+ "MRK/USDT:USDT": {
+  "ok": true,
+  "rows": 242,
+  "error": null,
+  "secs": 0.8
+ },
+ "MRNA/USDT:USDT": {
+  "ok": true,
+  "rows": 247,
+  "error": null,
+  "secs": 0.7
+ },
+ "MRVL/USDT:USDT": {
+  "ok": true,
+  "rows": 565,
+  "error": null,
+  "secs": 1.0
+ },
+ "MSFT/USDT:USDT": {
+  "ok": true,
+  "rows": 663,
+  "error": null,
+  "secs": 1.2
+ },
+ "MSTR/USDT:USDT": {
+  "ok": true,
+  "rows": 846,
+  "error": null,
+  "secs": 1.2
+ },
+ "MSTU/USDT:USDT": {
+  "ok": true,
+  "rows": 103,
+  "error": null,
+  "secs": 0.7
+ },
+ "MTL/USDT:USDT": {
+  "ok": true,
+  "rows": 4546,
+  "error": null,
+  "secs": 4.8
+ },
+ "MU/USDT:USDT": {
+  "ok": true,
+  "rows": 677,
+  "error": null,
+  "secs": 1.1
+ },
+ "MUBARAK/USDT:USDT": {
+  "ok": true,
+  "rows": 3646,
+  "error": null,
+  "secs": 3.9
+ },
+ "MUU/USDT:USDT": {
+  "ok": true,
+  "rows": 367,
+  "error": null,
+  "secs": 0.8
+ },
+ "MVLL/USDT:USDT": {
+  "ok": true,
+  "rows": 432,
+  "error": null,
+  "secs": 0.9
+ },
+ "MYX/USDT:USDT": {
+  "ok": true,
+  "rows": 4556,
+  "error": null,
+  "secs": 4.5
+ },
+ "NAORIS/USDT:USDT": {
+  "ok": true,
+  "rows": 2832,
+  "error": null,
+  "secs": 2.7
+ },
+ "NATGAS/USDT:USDT": {
+  "ok": true,
+  "rows": 1374,
+  "error": null,
+  "secs": 1.7
+ },
+ "NAVER/USDT:USDT": {
+  "ok": true,
+  "rows": 499,
+  "error": null,
+  "secs": 0.9
+ },
+ "NBIS/USDT:USDT": {
+  "ok": true,
+  "rows": 519,
+  "error": null,
+  "secs": 0.9
+ },
+ "NEAR/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "NEIRO/USDT:USDT": {
+  "ok": true,
+  "rows": 4739,
+  "error": null,
+  "secs": 4.3
+ },
+ "NEO/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.4
+ },
+ "NET/USDT:USDT": {
+  "ok": true,
+  "rows": 271,
+  "error": null,
+  "secs": 1.2
+ },
+ "NEWT/USDT:USDT": {
+  "ok": true,
+  "rows": 3514,
+  "error": null,
+  "secs": 3.2
+ },
+ "NFLX/USDT:USDT": {
+  "ok": true,
+  "rows": 478,
+  "error": null,
+  "secs": 0.8
+ },
+ "NIGHT/USDT:USDT": {
+  "ok": true,
+  "rows": 2039,
+  "error": null,
+  "secs": 1.8
+ },
+ "NIL/USDT:USDT": {
+  "ok": true,
+  "rows": 3605,
+  "error": null,
+  "secs": 2.5
+ },
+ "NKE/USDT:USDT": {
+  "ok": true,
+  "rows": 142,
+  "error": null,
+  "secs": 1.0
+ },
+ "NMR/USDT:USDT": {
+  "ok": true,
+  "rows": 7143,
+  "error": null,
+  "secs": 5.1
+ },
+ "NOK/USDT:USDT": {
+  "ok": true,
+  "rows": 507,
+  "error": null,
+  "secs": 0.8
+ },
+ "NOM/USDT:USDT": {
+  "ok": true,
+  "rows": 2663,
+  "error": null,
+  "secs": 2.4
+ },
+ "NOT/USDT:USDT": {
+  "ok": true,
+  "rows": 5476,
+  "error": null,
+  "secs": 4.8
+ },
+ "NOW/USDT:USDT": {
+  "ok": true,
+  "rows": 496,
+  "error": null,
+  "secs": 1.1
+ },
+ "NU/USDT:USDT": {
+  "ok": true,
+  "rows": 12,
+  "error": null,
+  "secs": 0.6
+ },
+ "NVDA/USDT:USDT": {
+  "ok": true,
+  "rows": 719,
+  "error": null,
+  "secs": 1.1
+ },
+ "NVDL/USDT:USDT": {
+  "ok": true,
+  "rows": 222,
+  "error": null,
+  "secs": 0.6
+ },
+ "NVO/USDT:USDT": {
+  "ok": true,
+  "rows": 507,
+  "error": null,
+  "secs": 0.8
+ },
+ "NXPC/USDT:USDT": {
+  "ok": true,
+  "rows": 3294,
+  "error": null,
+  "secs": 3.1
+ },
+ "O/USDT:USDT": {
+  "ok": true,
+  "rows": 864,
+  "error": null,
+  "secs": 0.8
+ },
+ "OG/USDT:USDT": {
+  "ok": true,
+  "rows": 3348,
+  "error": null,
+  "secs": 3.4
+ },
+ "OGN/USDT:USDT": {
+  "ok": true,
+  "rows": 5033,
+  "error": null,
+  "secs": 4.5
+ },
+ "OKLO/USDT:USDT": {
+  "ok": true,
+  "rows": 145,
+  "error": null,
+  "secs": 0.7
+ },
+ "ON/USDT:USDT": {
+  "ok": true,
+  "rows": 2329,
+  "error": null,
+  "secs": 2.4
+ },
+ "ONDO/USDT:USDT": {
+  "ok": true,
+  "rows": 6178,
+  "error": null,
+  "secs": 4.3
+ },
+ "ONDS/USDT:USDT": {
+  "ok": true,
+  "rows": 496,
+  "error": null,
+  "secs": 0.8
+ },
+ "ONE/USDT:USDT": {
+  "ok": true,
+  "rows": 4636,
+  "error": null,
+  "secs": 2.8
+ },
+ "ONG/USDT:USDT": {
+  "ok": true,
+  "rows": 6918,
+  "error": null,
+  "secs": 4.4
+ },
+ "ONT/USDT:USDT": {
+  "ok": true,
+  "rows": 5683,
+  "error": null,
+  "secs": 3.8
+ },
+ "OP/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "OPEN/USDT:USDT": {
+  "ok": true,
+  "rows": 2620,
+  "error": null,
+  "secs": 1.8
+ },
+ "OPENAI/USDT:USDT": {
+  "ok": true,
+  "rows": 519,
+  "error": null,
+  "secs": 0.8
+ },
+ "OPG/USDT:USDT": {
+  "ok": true,
+  "rows": 1240,
+  "error": null,
+  "secs": 1.5
+ },
+ "OPN/USDT:USDT": {
+  "ok": true,
+  "rows": 1600,
+  "error": null,
+  "secs": 1.8
+ },
+ "ORCA/USDT:USDT": {
+  "ok": true,
+  "rows": 5270,
+  "error": null,
+  "secs": 5.2
+ },
+ "ORCL/USDT:USDT": {
+  "ok": true,
+  "rows": 566,
+  "error": null,
+  "secs": 0.9
+ },
+ "ORDER/USDT:USDT": {
+  "ok": true,
+  "rows": 2045,
+  "error": null,
+  "secs": 2.1
+ },
+ "ORDI/USDT:USDT": {
+  "ok": true,
+  "rows": 6622,
+  "error": null,
+  "secs": 6.6
+ },
+ "OURA/USDT:USDT": {
+  "ok": true,
+  "rows": 160,
+  "error": null,
+  "secs": 0.6
+ },
+ "OXY/USDT:USDT": {
+  "ok": true,
+  "rows": 51,
+  "error": null,
+  "secs": 0.5
+ },
+ "PANW/USDT:USDT": {
+  "ok": true,
+  "rows": 352,
+  "error": null,
+  "secs": 0.9
+ },
+ "PARTI/USDT:USDT": {
+  "ok": true,
+  "rows": 3620,
+  "error": null,
+  "secs": 3.0
+ },
+ "PATH/USDT:USDT": {
+  "ok": true,
+  "rows": 175,
+  "error": null,
+  "secs": 0.8
+ },
+ "PAXG/USDT:USDT": {
+  "ok": true,
+  "rows": 3588,
+  "error": null,
+  "secs": 2.6
+ },
+ "PAYP/USDT:USDT": {
+  "ok": true,
+  "rows": 712,
+  "error": null,
+  "secs": 0.8
+ },
+ "PDD/USDT:USDT": {
+  "ok": true,
+  "rows": 237,
+  "error": null,
+  "secs": 0.9
+ },
+ "PENDLE/USDT:USDT": {
+  "ok": true,
+  "rows": 3627,
+  "error": null,
+  "secs": 2.5
+ },
+ "PENG/USDT:USDT": {
+  "ok": true,
+  "rows": 352,
+  "error": null,
+  "secs": 0.9
+ },
+ "PENGU/USDT:USDT": {
+  "ok": true,
+  "rows": 4186,
+  "error": null,
+  "secs": 3.1
+ },
+ "PEOPLE/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.1
+ },
+ "PFE/USDT:USDT": {
+  "ok": true,
+  "rows": 56,
+  "error": null,
+  "secs": 0.7
+ },
+ "PHA/USDT:USDT": {
+  "ok": true,
+  "rows": 4109,
+  "error": null,
+  "secs": 2.7
+ },
+ "PHAROS/USDT:USDT": {
+  "ok": true,
+  "rows": 1110,
+  "error": null,
+  "secs": 1.7
+ },
+ "PIEVERSE/USDT:USDT": {
+  "ok": true,
+  "rows": 2195,
+  "error": null,
+  "secs": 1.8
+ },
+ "PIPPIN/USDT:USDT": {
+  "ok": true,
+  "rows": 5296,
+  "error": null,
+  "secs": 3.9
+ },
+ "PIXEL/USDT:USDT": {
+  "ok": true,
+  "rows": 6037,
+  "error": null,
+  "secs": 4.6
+ },
+ "PLAY/USDT:USDT": {
+  "ok": true,
+  "rows": 2857,
+  "error": null,
+  "secs": 2.8
+ },
+ "PLTR/USDT:USDT": {
+  "ok": true,
+  "rows": 846,
+  "error": null,
+  "secs": 0.8
+ },
+ "PLUME/USDT:USDT": {
+  "ok": true,
+  "rows": 4250,
+  "error": null,
+  "secs": 2.9
+ },
+ "PNUT/USDT:USDT": {
+  "ok": true,
+  "rows": 4402,
+  "error": null,
+  "secs": 3.7
+ },
+ "POL/USDT:USDT": {
+  "ok": true,
+  "rows": 4756,
+  "error": null,
+  "secs": 3.4
+ },
+ "POLYX/USDT:USDT": {
+  "ok": true,
+  "rows": 6804,
+  "error": null,
+  "secs": 4.2
+ },
+ "PONS/USDT:USDT": {
+  "ok": true,
+  "rows": 421,
+  "error": null,
+  "secs": 0.7
+ },
+ "POPCAT/USDT:USDT": {
+  "ok": true,
+  "rows": 4888,
+  "error": null,
+  "secs": 3.0
+ },
+ "POPMART/USDT:USDT": {
+  "ok": true,
+  "rows": 544,
+  "error": null,
+  "secs": 0.7
+ },
+ "PORTAL/USDT:USDT": {
+  "ok": true,
+  "rows": 5938,
+  "error": null,
+  "secs": 3.5
+ },
+ "POWER/USDT:USDT": {
+  "ok": true,
+  "rows": 2249,
+  "error": null,
+  "secs": 1.8
+ },
+ "POWR/USDT:USDT": {
+  "ok": true,
+  "rows": 6693,
+  "error": null,
+  "secs": 5.3
+ },
+ "PREDICT/USDT:USDT": {
+  "ok": true,
+  "rows": 127,
+  "error": null,
+  "secs": 0.6
+ },
+ "PRL/USDT:USDT": {
+  "ok": true,
+  "rows": 1402,
+  "error": null,
+  "secs": 1.2
+ },
+ "PROM/USDT:USDT": {
+  "ok": true,
+  "rows": 4071,
+  "error": null,
+  "secs": 4.4
+ },
+ "PROVE/USDT:USDT": {
+  "ok": true,
+  "rows": 2833,
+  "error": null,
+  "secs": 2.6
+ },
+ "PUMP/USDT:USDT": {
+  "ok": true,
+  "rows": 3365,
+  "error": null,
+  "secs": 3.6
+ },
+ "PUNDIX/USDT:USDT": {
+  "ok": true,
+  "rows": 3383,
+  "error": null,
+  "secs": 2.4
+ },
+ "PYPL/USDT:USDT": {
+  "ok": true,
+  "rows": 333,
+  "error": null,
+  "secs": 0.7
+ },
+ "PYTH/USDT:USDT": {
+  "ok": true,
+  "rows": 6532,
+  "error": null,
+  "secs": 4.3
+ },
+ "Q/USDT:USDT": {
+  "ok": true,
+  "rows": 2697,
+  "error": null,
+  "secs": 2.0
+ },
+ "QCOM/USDT:USDT": {
+  "ok": true,
+  "rows": 593,
+  "error": null,
+  "secs": 0.8
+ },
+ "QNT/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.8
+ },
+ "QNTX/USDT:USDT": {
+  "ok": true,
+  "rows": 510,
+  "error": null,
+  "secs": 1.0
+ },
+ "QQQ/USDT:USDT": {
+  "ok": true,
+  "rows": 692,
+  "error": null,
+  "secs": 0.8
+ },
+ "QTUM/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.1
+ },
+ "RAM/USDT:USDT": {
+  "ok": true,
+  "rows": 247,
+  "error": null,
+  "secs": 0.7
+ },
+ "RARE/USDT:USDT": {
+  "ok": true,
+  "rows": 4930,
+  "error": null,
+  "secs": 3.7
+ },
+ "RAVE/USDT:USDT": {
+  "ok": true,
+  "rows": 2224,
+  "error": null,
+  "secs": 1.8
+ },
+ "RAYSOL/USDT:USDT": {
+  "ok": true,
+  "rows": 4224,
+  "error": null,
+  "secs": 4.1
+ },
+ "RDDT/USDT:USDT": {
+  "ok": true,
+  "rows": 304,
+  "error": null,
+  "secs": 0.8
+ },
+ "RDW/USDT:USDT": {
+  "ok": true,
+  "rows": 103,
+  "error": null,
+  "secs": 0.8
+ },
+ "RE/USDT:USDT": {
+  "ok": true,
+  "rows": 898,
+  "error": null,
+  "secs": 1.1
+ },
+ "RECALL/USDT:USDT": {
+  "ok": true,
+  "rows": 2376,
+  "error": null,
+  "secs": 1.9
+ },
+ "RED/USDT:USDT": {
+  "ok": true,
+  "rows": 4111,
+  "error": null,
+  "secs": 3.3
+ },
+ "RENDER/USDT:USDT": {
+  "ok": true,
+  "rows": 5051,
+  "error": null,
+  "secs": 3.9
+ },
+ "RESOLV/USDT:USDT": {
+  "ok": true,
+  "rows": 3914,
+  "error": null,
+  "secs": 3.5
+ },
+ "REZ/USDT:USDT": {
+  "ok": true,
+  "rows": 5572,
+  "error": null,
+  "secs": 4.4
+ },
+ "RIF/USDT:USDT": {
+  "ok": true,
+  "rows": 6800,
+  "error": null,
+  "secs": 6.1
+ },
+ "RIVER/USDT:USDT": {
+  "ok": true,
+  "rows": 3395,
+  "error": null,
+  "secs": 3.0
+ },
+ "RIVN/USDT:USDT": {
+  "ok": true,
+  "rows": 475,
+  "error": null,
+  "secs": 0.9
+ },
+ "RKLB/USDT:USDT": {
+  "ok": true,
+  "rows": 544,
+  "error": null,
+  "secs": 1.2
+ },
+ "RLC/USDT:USDT": {
+  "ok": true,
+  "rows": 4426,
+  "error": null,
+  "secs": 3.1
+ },
+ "ROBO/USDT:USDT": {
+  "ok": true,
+  "rows": 1565,
+  "error": null,
+  "secs": 1.7
+ },
+ "RONIN/USDT:USDT": {
+  "ok": true,
+  "rows": 6080,
+  "error": null,
+  "secs": 6.1
+ },
+ "ROSE/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.4
+ },
+ "RPL/USDT:USDT": {
+  "ok": true,
+  "rows": 4883,
+  "error": null,
+  "secs": 4.4
+ },
+ "RSR/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.2
+ },
+ "RUM/USDT:USDT": {
+  "ok": true,
+  "rows": 145,
+  "error": null,
+  "secs": 0.8
+ },
+ "RUNE/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.0
+ },
+ "RVN/USDT:USDT": {
+  "ok": true,
+  "rows": 6600,
+  "error": null,
+  "secs": 4.9
+ },
+ "S/USDT:USDT": {
+  "ok": true,
+  "rows": 4007,
+  "error": null,
+  "secs": 4.9
+ },
+ "SAFE/USDT:USDT": {
+  "ok": true,
+  "rows": 4504,
+  "error": null,
+  "secs": 3.6
+ },
+ "SAGA/USDT:USDT": {
+  "ok": true,
+  "rows": 5701,
+  "error": null,
+  "secs": 4.4
+ },
+ "SAHARA/USDT:USDT": {
+  "ok": true,
+  "rows": 3876,
+  "error": null,
+  "secs": 2.6
+ },
+ "SAMSUNG/USDT:USDT": {
+  "ok": true,
+  "rows": 880,
+  "error": null,
+  "secs": 0.9
+ },
+ "SAMSUNGEM/USDT:USDT": {
+  "ok": true,
+  "rows": 499,
+  "error": null,
+  "secs": 0.9
+ },
+ "SAND/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.1
+ },
+ "SANTOS/USDT:USDT": {
+  "ok": true,
+  "rows": 4486,
+  "error": null,
+  "secs": 4.0
+ },
+ "SAPIEN/USDT:USDT": {
+  "ok": true,
+  "rows": 2709,
+  "error": null,
+  "secs": 2.6
+ },
+ "SCR/USDT:USDT": {
+  "ok": true,
+  "rows": 4523,
+  "error": null,
+  "secs": 3.1
+ },
+ "SECZ/USDT:USDT": {
+  "ok": true,
+  "rows": 142,
+  "error": null,
+  "secs": 0.6
+ },
+ "SEI/USDT:USDT": {
+  "ok": true,
+  "rows": 3561,
+  "error": null,
+  "secs": 2.8
+ },
+ "SENT/USDT:USDT": {
+  "ok": true,
+  "rows": 2673,
+  "error": null,
+  "secs": 1.9
+ },
+ "SFP/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.1
+ },
+ "SHAZ/USDT:USDT": {
+  "ok": true,
+  "rows": 352,
+  "error": null,
+  "secs": 0.7
+ },
+ "SHELL/USDT:USDT": {
+  "ok": true,
+  "rows": 3813,
+  "error": null,
+  "secs": 2.4
+ },
+ "SHOP/USDT:USDT": {
+  "ok": true,
+  "rows": 271,
+  "error": null,
+  "secs": 0.7
+ },
+ "SIGN/USDT:USDT": {
+  "ok": true,
+  "rows": 4981,
+  "error": null,
+  "secs": 4.0
+ },
+ "SIREN/USDT:USDT": {
+  "ok": true,
+  "rows": 4092,
+  "error": null,
+  "secs": 3.3
+ },
+ "SKDD/USDT:USDT": {
+  "ok": true,
+  "rows": 247,
+  "error": null,
+  "secs": 1.1
+ },
+ "SKHY/USDT:USDT": {
+  "ok": true,
+  "rows": 384,
+  "error": null,
+  "secs": 0.8
+ },
+ "SKHYNIX/USDT:USDT": {
+  "ok": true,
+  "rows": 875,
+  "error": null,
+  "secs": 0.8
+ },
+ "SKL/USDT:USDT": {
+  "ok": true,
+  "rows": 5496,
+  "error": null,
+  "secs": 3.6
+ },
+ "SKR/USDT:USDT": {
+  "ok": true,
+  "rows": 2025,
+  "error": null,
+  "secs": 2.3
+ },
+ "SKUU/USDT:USDT": {
+  "ok": true,
+  "rows": 247,
+  "error": null,
+  "secs": 0.7
+ },
+ "SKY/USDT:USDT": {
+  "ok": true,
+  "rows": 2592,
+  "error": null,
+  "secs": 2.6
+ },
+ "SKYAI/USDT:USDT": {
+  "ok": true,
+  "rows": 3305,
+  "error": null,
+  "secs": 2.5
+ },
+ "SLP/USDT:USDT": {
+  "ok": true,
+  "rows": 6462,
+  "error": null,
+  "secs": 4.2
+ },
+ "SLX/USDT:USDT": {
+  "ok": true,
+  "rows": 1193,
+  "error": null,
+  "secs": 1.7
+ },
+ "SMCI/USDT:USDT": {
+  "ok": true,
+  "rows": 438,
+  "error": null,
+  "secs": 0.9
+ },
+ "SMH/USDT:USDT": {
+  "ok": true,
+  "rows": 328,
+  "error": null,
+  "secs": 0.7
+ },
+ "SMR/USDT:USDT": {
+  "ok": true,
+  "rows": 51,
+  "error": null,
+  "secs": 0.6
+ },
+ "SNDK/USDT:USDT": {
+  "ok": true,
+  "rows": 667,
+  "error": null,
+  "secs": 0.9
+ },
+ "SNOW/USDT:USDT": {
+  "ok": true,
+  "rows": 385,
+  "error": null,
+  "secs": 1.2
+ },
+ "SNPS/USDT:USDT": {
+  "ok": true,
+  "rows": 103,
+  "error": null,
+  "secs": 0.6
+ },
+ "SNX/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.4
+ },
+ "SNXX/USDT:USDT": {
+  "ok": true,
+  "rows": 387,
+  "error": null,
+  "secs": 0.7
+ },
+ "SOFI/USDT:USDT": {
+  "ok": true,
+  "rows": 352,
+  "error": null,
+  "secs": 0.8
+ },
+ "SOL/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "SOLV/USDT:USDT": {
+  "ok": true,
+  "rows": 4000,
+  "error": null,
+  "secs": 3.0
+ },
+ "SOMI/USDT:USDT": {
+  "ok": true,
+  "rows": 2681,
+  "error": null,
+  "secs": 2.8
+ },
+ "SONIC/USDT:USDT": {
+  "ok": true,
+  "rows": 4056,
+  "error": null,
+  "secs": 4.5
+ },
+ "SONY/USDT:USDT": {
+  "ok": true,
+  "rows": 438,
+  "error": null,
+  "secs": 0.9
+ },
+ "SOON/USDT:USDT": {
+  "ok": true,
+  "rows": 4334,
+  "error": null,
+  "secs": 3.4
+ },
+ "SOPH/USDT:USDT": {
+  "ok": true,
+  "rows": 4430,
+  "error": null,
+  "secs": 4.4
+ },
+ "SOXL/USDT:USDT": {
+  "ok": true,
+  "rows": 555,
+  "error": null,
+  "secs": 0.9
+ },
+ "SOXS/USDT:USDT": {
+  "ok": true,
+  "rows": 367,
+  "error": null,
+  "secs": 0.9
+ },
+ "SPACE/USDT:USDT": {
+  "ok": true,
+  "rows": 1775,
+  "error": null,
+  "secs": 1.6
+ },
+ "SPCX/USDT:USDT": {
+  "ok": true,
+  "rows": 534,
+  "error": null,
+  "secs": 0.9
+ },
+ "SPELL/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.2
+ },
+ "SPK/USDT:USDT": {
+  "ok": true,
+  "rows": 3095,
+  "error": null,
+  "secs": 2.5
+ },
+ "SPORTFUN/USDT:USDT": {
+  "ok": true,
+  "rows": 1816,
+  "error": null,
+  "secs": 2.0
+ },
+ "SPX/USDT:USDT": {
+  "ok": true,
+  "rows": 4228,
+  "error": null,
+  "secs": 2.9
+ },
+ "SPY/USDT:USDT": {
+  "ok": true,
+  "rows": 692,
+  "error": null,
+  "secs": 0.9
+ },
+ "SQD/USDT:USDT": {
+  "ok": true,
+  "rows": 3541,
+  "error": null,
+  "secs": 3.8
+ },
+ "SQQQ/USDT:USDT": {
+  "ok": true,
+  "rows": 432,
+  "error": null,
+  "secs": 0.8
+ },
+ "SSV/USDT:USDT": {
+  "ok": true,
+  "rows": 4084,
+  "error": null,
+  "secs": 3.7
+ },
+ "STABLE/USDT:USDT": {
+  "ok": true,
+  "rows": 2259,
+  "error": null,
+  "secs": 1.9
+ },
+ "STAR/USDT:USDT": {
+  "ok": true,
+  "rows": 1110,
+  "error": null,
+  "secs": 1.3
+ },
+ "STBL/USDT:USDT": {
+  "ok": true,
+  "rows": 2545,
+  "error": null,
+  "secs": 1.9
+ },
+ "STEEM/USDT:USDT": {
+  "ok": true,
+  "rows": 6782,
+  "error": null,
+  "secs": 4.2
+ },
+ "STM/USDT:USDT": {
+  "ok": true,
+  "rows": 61,
+  "error": null,
+  "secs": 0.6
+ },
+ "STO/USDT:USDT": {
+  "ok": true,
+  "rows": 3612,
+  "error": null,
+  "secs": 3.1
+ },
+ "STRC/USDT:USDT": {
+  "ok": true,
+  "rows": 507,
+  "error": null,
+  "secs": 0.9
+ },
+ "STRK/USDT:USDT": {
+  "ok": true,
+  "rows": 5992,
+  "error": null,
+  "secs": 4.0
+ },
+ "STX/USDT:USDT": {
+  "ok": true,
+  "rows": 4090,
+  "error": null,
+  "secs": 2.8
+ },
+ "STXX/USDT:USDT": {
+  "ok": true,
+  "rows": 481,
+  "error": null,
+  "secs": 0.7
+ },
+ "SUI/USDT:USDT": {
+  "ok": true,
+  "rows": 3876,
+  "error": null,
+  "secs": 3.3
+ },
+ "SUN/USDT:USDT": {
+  "ok": true,
+  "rows": 4888,
+  "error": null,
+  "secs": 4.6
+ },
+ "SUPER/USDT:USDT": {
+  "ok": true,
+  "rows": 7834,
+  "error": null,
+  "secs": 6.2
+ },
+ "SUSHI/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.7
+ },
+ "SWARMS/USDT:USDT": {
+  "ok": true,
+  "rows": 4060,
+  "error": null,
+  "secs": 4.1
+ },
+ "SXT/USDT:USDT": {
+  "ok": true,
+  "rows": 3372,
+  "error": null,
+  "secs": 2.3
+ },
+ "SYN/USDT:USDT": {
+  "ok": true,
+  "rows": 4924,
+  "error": null,
+  "secs": 3.1
+ },
+ "SYRUP/USDT:USDT": {
+  "ok": true,
+  "rows": 3344,
+  "error": null,
+  "secs": 3.6
+ },
+ "T/USDT:USDT": {
+  "ok": true,
+  "rows": 6478,
+  "error": null,
+  "secs": 5.6
+ },
+ "TA/USDT:USDT": {
+  "ok": true,
+  "rows": 2892,
+  "error": null,
+  "secs": 2.6
+ },
+ "TAC/USDT:USDT": {
+  "ok": true,
+  "rows": 2927,
+  "error": null,
+  "secs": 3.0
+ },
+ "TAG/USDT:USDT": {
+  "ok": true,
+  "rows": 2867,
+  "error": null,
+  "secs": 2.7
+ },
+ "TAIKO/USDT:USDT": {
+  "ok": true,
+  "rows": 3196,
+  "error": null,
+  "secs": 4.4
+ },
+ "TAKE/USDT:USDT": {
+  "ok": true,
+  "rows": 2627,
+  "error": null,
+  "secs": 2.8
+ },
+ "TAO/USDT:USDT": {
+  "ok": true,
+  "rows": 5686,
+  "error": null,
+  "secs": 5.9
+ },
+ "TBT/USDT:USDT": {
+  "ok": true,
+  "rows": 333,
+  "error": null,
+  "secs": 0.8
+ },
+ "TEAM/USDT:USDT": {
+  "ok": true,
+  "rows": 222,
+  "error": null,
+  "secs": 0.7
+ },
+ "TEM/USDT:USDT": {
+  "ok": true,
+  "rows": 237,
+  "error": null,
+  "secs": 0.8
+ },
+ "TENCENT/USDT:USDT": {
+  "ok": true,
+  "rows": 562,
+  "error": null,
+  "secs": 0.9
+ },
+ "TER/USDT:USDT": {
+  "ok": true,
+  "rows": 413,
+  "error": null,
+  "secs": 1.2
+ },
+ "THE/USDT:USDT": {
+  "ok": true,
+  "rows": 4306,
+  "error": null,
+  "secs": 3.7
+ },
+ "THETA/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.6
+ },
+ "TIA/USDT:USDT": {
+  "ok": true,
+  "rows": 6663,
+  "error": null,
+  "secs": 4.9
+ },
+ "TLM/USDT:USDT": {
+  "ok": true,
+  "rows": 5039,
+  "error": null,
+  "secs": 3.3
+ },
+ "TMF/USDT:USDT": {
+  "ok": true,
+  "rows": 333,
+  "error": null,
+  "secs": 0.6
+ },
+ "TNSR/USDT:USDT": {
+  "ok": true,
+  "rows": 6492,
+  "error": null,
+  "secs": 4.1
+ },
+ "TOSHI/USDT:USDT": {
+  "ok": true,
+  "rows": 2544,
+  "error": null,
+  "secs": 2.2
+ },
+ "TOWNS/USDT:USDT": {
+  "ok": true,
+  "rows": 2800,
+  "error": null,
+  "secs": 2.1
+ },
+ "TQQQ/USDT:USDT": {
+  "ok": true,
+  "rows": 432,
+  "error": null,
+  "secs": 0.7
+ },
+ "TRADOOR/USDT:USDT": {
+  "ok": true,
+  "rows": 2531,
+  "error": null,
+  "secs": 1.9
+ },
+ "TRB/USDT:USDT": {
+  "ok": true,
+  "rows": 7633,
+  "error": null,
+  "secs": 4.6
+ },
+ "TREE/USDT:USDT": {
+  "ok": true,
+  "rows": 2902,
+  "error": null,
+  "secs": 2.1
+ },
+ "TRIA/USDT:USDT": {
+  "ok": true,
+  "rows": 1691,
+  "error": null,
+  "secs": 1.2
+ },
+ "TRUMP/USDT:USDT": {
+  "ok": true,
+  "rows": 3994,
+  "error": null,
+  "secs": 2.8
+ },
+ "TRUST/USDT:USDT": {
+  "ok": true,
+  "rows": 2794,
+  "error": null,
+  "secs": 1.7
+ },
+ "TRUTH/USDT:USDT": {
+  "ok": true,
+  "rows": 2460,
+  "error": null,
+  "secs": 1.8
+ },
+ "TRX/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "TSLA/USDT:USDT": {
+  "ok": true,
+  "rows": 885,
+  "error": null,
+  "secs": 0.8
+ },
+ "TSLL/USDT:USDT": {
+  "ok": true,
+  "rows": 222,
+  "error": null,
+  "secs": 0.6
+ },
+ "TSM/USDT:USDT": {
+  "ok": true,
+  "rows": 692,
+  "error": null,
+  "secs": 0.7
+ },
+ "TST/USDT:USDT": {
+  "ok": true,
+  "rows": 3862,
+  "error": null,
+  "secs": 2.2
+ },
+ "TTWO/USDT:USDT": {
+  "ok": true,
+  "rows": 408,
+  "error": null,
+  "secs": 0.9
+ },
+ "TURBO/USDT:USDT": {
+  "ok": true,
+  "rows": 5392,
+  "error": null,
+  "secs": 3.6
+ },
+ "TURTLE/USDT:USDT": {
+  "ok": true,
+  "rows": 2373,
+  "error": null,
+  "secs": 1.6
+ },
+ "TUT/USDT:USDT": {
+  "ok": true,
+  "rows": 3629,
+  "error": null,
+  "secs": 2.5
+ },
+ "TWST/USDT:USDT": {
+  "ok": true,
+  "rows": 145,
+  "error": null,
+  "secs": 0.7
+ },
+ "TWT/USDT:USDT": {
+  "ok": true,
+  "rows": 6647,
+  "error": null,
+  "secs": 4.1
+ },
+ "TXN/USDT:USDT": {
+  "ok": true,
+  "rows": 418,
+  "error": null,
+  "secs": 0.7
+ },
+ "TZA/USDT:USDT": {
+  "ok": true,
+  "rows": 367,
+  "error": null,
+  "secs": 0.7
+ },
+ "UAI/USDT:USDT": {
+  "ok": true,
+  "rows": 2598,
+  "error": null,
+  "secs": 1.9
+ },
+ "UB/USDT:USDT": {
+  "ok": true,
+  "rows": 2573,
+  "error": null,
+  "secs": 1.7
+ },
+ "UBER/USDT:USDT": {
+  "ok": true,
+  "rows": 556,
+  "error": null,
+  "secs": 0.7
+ },
+ "UMA/USDT:USDT": {
+  "ok": true,
+  "rows": 6949,
+  "error": null,
+  "secs": 4.2
+ },
+ "UNH/USDT:USDT": {
+  "ok": true,
+  "rows": 142,
+  "error": null,
+  "secs": 0.7
+ },
+ "UNI/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.6
+ },
+ "UNITREE/USDT:USDT": {
+  "ok": true,
+  "rows": 529,
+  "error": null,
+  "secs": 0.8
+ },
+ "URNM/USDT:USDT": {
+  "ok": true,
+  "rows": 478,
+  "error": null,
+  "secs": 0.8
+ },
+ "US/USDT:USDT": {
+  "ok": true,
+  "rows": 2027,
+  "error": null,
+  "secs": 1.8
+ },
+ "USAR/USDT:USDT": {
+  "ok": true,
+  "rows": 580,
+  "error": null,
+  "secs": 0.7
+ },
+ "USDBRL/USDT:USDT": {
+  "ok": true,
+  "rows": 174,
+  "error": null,
+  "secs": 0.6
+ },
+ "USDC/USDT:USDT": {
+  "ok": true,
+  "rows": 4031,
+  "error": null,
+  "secs": 3.2
+ },
+ "USDEX/USDT:USDT": {
+  "ok": true,
+  "rows": 121,
+  "error": null,
+  "secs": 0.6
+ },
+ "USELESS/USDT:USDT": {
+  "ok": true,
+  "rows": 2741,
+  "error": null,
+  "secs": 1.8
+ },
+ "USTC/USDT:USDT": {
+  "ok": true,
+  "rows": 6503,
+  "error": null,
+  "secs": 4.0
+ },
+ "USUAL/USDT:USDT": {
+  "ok": true,
+  "rows": 4180,
+  "error": null,
+  "secs": 2.9
+ },
+ "UVXY/USDT:USDT": {
+  "ok": true,
+  "rows": 472,
+  "error": null,
+  "secs": 0.7
+ },
+ "V/USDT:USDT": {
+  "ok": true,
+  "rows": 554,
+  "error": null,
+  "secs": 0.8
+ },
+ "VANA/USDT:USDT": {
+  "ok": true,
+  "rows": 4192,
+  "error": null,
+  "secs": 3.2
+ },
+ "VELVET/USDT:USDT": {
+  "ok": true,
+  "rows": 2927,
+  "error": null,
+  "secs": 2.9
+ },
+ "VET/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.2
+ },
+ "VIRTUAL/USDT:USDT": {
+  "ok": true,
+  "rows": 4228,
+  "error": null,
+  "secs": 3.1
+ },
+ "VKTX/USDT:USDT": {
+  "ok": true,
+  "rows": 121,
+  "error": null,
+  "secs": 0.7
+ },
+ "VRT/USDT:USDT": {
+  "ok": true,
+  "rows": 390,
+  "error": null,
+  "secs": 0.8
+ },
+ "VST/USDT:USDT": {
+  "ok": true,
+  "rows": 276,
+  "error": null,
+  "secs": 0.8
+ },
+ "VTHO/USDT:USDT": {
+  "ok": true,
+  "rows": 3971,
+  "error": null,
+  "secs": 2.8
+ },
+ "VVV/USDT:USDT": {
+  "ok": true,
+  "rows": 3930,
+  "error": null,
+  "secs": 2.7
+ },
+ "W/USDT:USDT": {
+  "ok": true,
+  "rows": 5734,
+  "error": null,
+  "secs": 3.5
+ },
+ "WAL/USDT:USDT": {
+  "ok": true,
+  "rows": 3586,
+  "error": null,
+  "secs": 2.7
+ },
+ "WAXP/USDT:USDT": {
+  "ok": true,
+  "rows": 6785,
+  "error": null,
+  "secs": 5.2
+ },
+ "WCT/USDT:USDT": {
+  "ok": true,
+  "rows": 4340,
+  "error": null,
+  "secs": 3.0
+ },
+ "WDC/USDT:USDT": {
+  "ok": true,
+  "rows": 532,
+  "error": null,
+  "secs": 0.8
+ },
+ "WEN/USDT:USDT": {
+  "ok": true,
+  "rows": 392,
+  "error": null,
+  "secs": 0.6
+ },
+ "WET/USDT:USDT": {
+  "ok": true,
+  "rows": 2364,
+  "error": null,
+  "secs": 1.7
+ },
+ "WIF/USDT:USDT": {
+  "ok": true,
+  "rows": 6190,
+  "error": null,
+  "secs": 4.2
+ },
+ "WLD/USDT:USDT": {
+  "ok": true,
+  "rows": 3630,
+  "error": null,
+  "secs": 3.0
+ },
+ "WLFI/USDT:USDT": {
+  "ok": true,
+  "rows": 2693,
+  "error": null,
+  "secs": 1.9
+ },
+ "WMT/USDT:USDT": {
+  "ok": true,
+  "rows": 549,
+  "error": null,
+  "secs": 0.8
+ },
+ "WOO/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.9
+ },
+ "XAG/USDT:USDT": {
+  "ok": true,
+  "rows": 1872,
+  "error": null,
+  "secs": 1.9
+ },
+ "XAI/USDT:USDT": {
+  "ok": true,
+  "rows": 6244,
+  "error": null,
+  "secs": 4.1
+ },
+ "XAN/USDT:USDT": {
+  "ok": true,
+  "rows": 2472,
+  "error": null,
+  "secs": 1.8
+ },
+ "XAU/USDT:USDT": {
+  "ok": true,
+  "rows": 2034,
+  "error": null,
+  "secs": 1.7
+ },
+ "XAUT/USDT:USDT": {
+  "ok": true,
+  "rows": 1402,
+  "error": null,
+  "secs": 1.3
+ },
+ "XBI/USDT:USDT": {
+  "ok": true,
+  "rows": 392,
+  "error": null,
+  "secs": 0.7
+ },
+ "XLE/USDT:USDT": {
+  "ok": true,
+  "rows": 488,
+  "error": null,
+  "secs": 0.7
+ },
+ "XLM/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.9
+ },
+ "XMR/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 4.0
+ },
+ "XNY/USDT:USDT": {
+  "ok": true,
+  "rows": 2753,
+  "error": null,
+  "secs": 1.9
+ },
+ "XOM/USDT:USDT": {
+  "ok": true,
+  "rows": 145,
+  "error": null,
+  "secs": 0.6
+ },
+ "XPD/USDT:USDT": {
+  "ok": true,
+  "rows": 1733,
+  "error": null,
+  "secs": 1.3
+ },
+ "XPIN/USDT:USDT": {
+  "ok": true,
+  "rows": 2574,
+  "error": null,
+  "secs": 1.8
+ },
+ "XPL/USDT:USDT": {
+  "ok": true,
+  "rows": 2699,
+  "error": null,
+  "secs": 2.0
+ },
+ "XPT/USDT:USDT": {
+  "ok": true,
+  "rows": 1733,
+  "error": null,
+  "secs": 1.4
+ },
+ "XRP/USDT:USDT": {
+  "ok": true,
+  "rows": null,
+  "error": null,
+  "secs": 0.0,
+  "skipped": true
+ },
+ "XTZ/USDT:USDT": {
+  "ok": true,
+  "rows": 5731,
+  "error": null,
+  "secs": 3.5
+ },
+ "XVG/USDT:USDT": {
+  "ok": true,
+  "rows": 3704,
+  "error": null,
+  "secs": 2.6
+ },
+ "XVS/USDT:USDT": {
+  "ok": true,
+  "rows": 3940,
+  "error": null,
+  "secs": 2.5
+ },
+ "YB/USDT:USDT": {
+  "ok": true,
+  "rows": 2404,
+  "error": null,
+  "secs": 1.9
+ },
+ "YFI/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.7
+ },
+ "YGG/USDT:USDT": {
+  "ok": true,
+  "rows": 6995,
+  "error": null,
+  "secs": 3.8
+ },
+ "ZAMA/USDT:USDT": {
+  "ok": true,
+  "rows": 1859,
+  "error": null,
+  "secs": 1.3
+ },
+ "ZBT/USDT:USDT": {
+  "ok": true,
+  "rows": 2747,
+  "error": null,
+  "secs": 1.9
+ },
+ "ZCSH/USDT:USDT": {
+  "ok": true,
+  "rows": 103,
+  "error": null,
+  "secs": 0.6
+ },
+ "ZEC/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 3.7
+ },
+ "ZEN/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.6
+ },
+ "ZEREBRO/USDT:USDT": {
+  "ok": true,
+  "rows": 4090,
+  "error": null,
+  "secs": 2.5
+ },
+ "ZEST/USDT:USDT": {
+  "ok": true,
+  "rows": 982,
+  "error": null,
+  "secs": 0.8
+ },
+ "ZETA/USDT:USDT": {
+  "ok": true,
+  "rows": 6102,
+  "error": null,
+  "secs": 3.9
+ },
+ "ZHIPU/USDT:USDT": {
+  "ok": true,
+  "rows": 562,
+  "error": null,
+  "secs": 0.7
+ },
+ "ZHONGJI/USDT:USDT": {
+  "ok": true,
+  "rows": 499,
+  "error": null,
+  "secs": 0.7
+ },
+ "ZIL/USDT:USDT": {
+  "ok": true,
+  "rows": 5268,
+  "error": null,
+  "secs": 3.2
+ },
+ "ZK/USDT:USDT": {
+  "ok": true,
+  "rows": 5330,
+  "error": null,
+  "secs": 3.3
+ },
+ "ZKC/USDT:USDT": {
+  "ok": true,
+  "rows": 2614,
+  "error": null,
+  "secs": 1.9
+ },
+ "ZKP/USDT:USDT": {
+  "ok": true,
+  "rows": 2355,
+  "error": null,
+  "secs": 2.1
+ },
+ "ZM/USDT:USDT": {
+  "ok": true,
+  "rows": 475,
+  "error": null,
+  "secs": 0.7
+ },
+ "ZORA/USDT:USDT": {
+  "ok": true,
+  "rows": 2867,
+  "error": null,
+  "secs": 2.0
+ },
+ "ZRO/USDT:USDT": {
+  "ok": true,
+  "rows": 5266,
+  "error": null,
+  "secs": 3.3
+ },
+ "ZRX/USDT:USDT": {
+  "ok": true,
+  "rows": 5335,
+  "error": null,
+  "secs": 3.8
+ },
+ "ZS/USDT:USDT": {
+  "ok": true,
+  "rows": 222,
+  "error": null,
+  "secs": 1.0
+ },
+ "哈基米/USDT:USDT": {
+  "ok": true,
+  "rows": 421,
+  "error": null,
+  "secs": 0.7
+ },
+ "币安人生/USDT:USDT": {
+  "ok": true,
+  "rows": 2345,
+  "error": null,
+  "secs": 1.7
+ },
+ "我踏马来了/USDT:USDT": {
+  "ok": true,
+  "rows": 1820,
+  "error": null,
+  "secs": 1.4
+ },
+ "牛来/USDT:USDT": {
+  "ok": true,
+  "rows": 462,
+  "error": null,
+  "secs": 0.8
+ },
+ "龙虾/USDT:USDT": {
+  "ok": true,
+  "rows": 1493,
+  "error": null,
+  "secs": 1.3
+ }
+}

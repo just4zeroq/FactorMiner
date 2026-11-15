@@ -23,6 +23,7 @@ import json
 import logging
 import os
 import shutil
+import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -42,6 +43,17 @@ STAGES = (
     "backtested",
     "completed",
 )
+
+
+def _write_metric(run_path: Path, record: Dict[str, Any]) -> None:
+    """Append one structured metric line to ``<run>/metrics.jsonl`` (O1)."""
+    try:
+        path = run_path / "metrics.jsonl"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, default=str, ensure_ascii=False) + "\n")
+    except OSError as exc:  # pragma: no cover - observability is best effort
+        logger.debug("metrics.jsonl append skipped: %s", exc)
 
 
 def _windows(config: Dict[str, Any]) -> Dict[str, Optional[str]]:
@@ -84,6 +96,14 @@ def _stage_mining(work: Dict[str, Any], client, log: Callable[[str], None]):
         "factor_ids": factor_ids,
         "verdicts": verdicts,
         "n_promoted": sum(1 for v in verdicts if v["status"] == "INSPECTED"),
+        "funnel": dict(getattr(director, "funnel", {}) or {}),
+        "stopped_early": getattr(getattr(director, "miner", None), "stop_reason", None),
+        "cache": dict(
+            director.evaluator.cache.summary()
+            if getattr(director, "evaluator", None) is not None
+            and hasattr(director.evaluator, "cache")
+            else {}
+        ),
         "val_read_count": int(getattr(director, "val_read_count", 0)),
         "hypothesis_budget": dict(getattr(director, "hypothesis_budget", {}) or {}),
         "budget_snapshot": dict(getattr(director, "budget_snapshot", {}) or {}),
@@ -398,6 +418,12 @@ def run_experiment(
     work["experiment"]["resume_verified"] = bool(resume_verification)
     db_root = str(path / "factor_db")
     work["storage"]["db_root"] = db_root
+    # E1: every evaluated candidate is appended to a per-run journal, so a run
+    # that dies mid-generation can be diagnosed (and its cache re-used) without
+    # replaying the whole search. The path is per-run and therefore never enters
+    # the config hash.
+    eval_cfg = work.setdefault("evaluation", {})
+    eval_cfg["journal_path"] = str(path / "evaluations.jsonl")
     completed = set(status.get("completed_stages", []))
     state: Dict[str, Any] = {}
     state_file = path / "state.json"
@@ -415,14 +441,32 @@ def run_experiment(
             log(f"[skip] {name} (already completed)")
             return state[name]
         log(f"[stage] {name}")
+        started = time.monotonic()
         try:
             result = fn()
         except Exception as exc:
+            _write_metric(path, {
+                "run_id": rid, "stage": name, "status": "failed",
+                "seconds": round(time.monotonic() - started, 3),
+                "error": str(exc)[:500],
+            })
             registry.update_status(rid, name, status="failed", error=str(exc), root=root)
             raise
         state[name] = result
         registry.update_status(rid, name, root=root)
         registry.write_artifact(rid, "state.json", _jsonable(state), root=root)
+        # O1: one structured line per stage so an external collector does not
+        # have to parse a 100 KB state.json to chart stage durations.
+        _write_metric(path, {
+            "run_id": rid,
+            "stage": name,
+            "status": "ok",
+            "seconds": round(time.monotonic() - started, 3),
+            "n_candidates": (result or {}).get("n_candidates")
+            if isinstance(result, dict) else None,
+            "n_promoted": (result or {}).get("n_promoted")
+            if isinstance(result, dict) else None,
+        })
         return result
 
     # ---- holdout discipline ------------------------------------------------
@@ -552,9 +596,41 @@ def run_experiment(
 
     def do_wf():
         from core.experiment.walk_forward import run_walk_forward
+
+        # E3: walk-forward used to validate EVERY stored candidate (61–71 per
+        # run, 5 folds each = ~300 fits) even though none had passed the gates.
+        # Validating the promoted set is the informative version; ``--wf-scope
+        # all`` keeps the old research behaviour. When the gate promoted nothing
+        # the stage is *skipped with a reason* rather than failed — "no factor
+        # survived the gates" is a result, not a broken pipeline.
+        wf_cfg = ((work.get("experiment") or {}).get("walk_forward") or {})
+        scope = str(wf_cfg.get("scope") or "promoted").lower()
+        all_ids = list(mining.get("factor_ids", []))
+        if scope == "all":
+            ids = all_ids
+        else:
+            ids = [
+                v["factor_id"]
+                for v in mining.get("verdicts", [])
+                if str(v.get("status") or "").upper() == "INSPECTED"
+            ]
+        if not ids:
+            return {
+                "n_folds": 0,
+                "n_factors": 0,
+                "scope": scope,
+                "skipped": True,
+                "reason": (
+                    "no factor passed the promotion gates"
+                    if scope == "promoted"
+                    else "no factor was stored"
+                ),
+            }
         # X-07: ``n_folds=0`` is not a validation. Fail the stage loudly
         # instead of writing a green ``validated`` record into state.json.
-        outcome = run_walk_forward(db_root, mining.get("factor_ids", []), work)
+        outcome = run_walk_forward(db_root, ids, work)
+        outcome["scope"] = scope
+        outcome["n_factors"] = len(ids)
         if int(outcome.get("n_folds", 0) or 0) <= 0:
             raise RuntimeError(
                 "Walk-forward produced 0 folds (not enough bars for the "

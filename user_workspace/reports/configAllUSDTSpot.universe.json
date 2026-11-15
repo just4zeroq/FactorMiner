@@ -1,0 +1,724 @@
+{
+  "generated_at": "2026-11-15T22:01:44",
+  "universe": "user_workspace/universes/binance_spot_usdt_1d.json",
+  "config": "user_workspace\\configs\\configAllUSDTSpot.json",
+  "rule": {
+    "min_bars_in_mine_window": 250,
+    "needs_bar_in_test": true
+  },
+  "listed": 505,
+  "usable": 363,
+  "dropped": 142,
+  "dropped_detail": [
+    {
+      "symbol": "AAOIB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 61
+    },
+    {
+      "symbol": "AAPLB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "ADBEB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "AERO/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 59
+    },
+    {
+      "symbol": "AGPUB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "AIGENSYN/USDT",
+      "reason": "mine_bars=48",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ALABB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 40
+    },
+    {
+      "symbol": "ALLO/USDT",
+      "reason": "mine_bars=232",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AMATB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "AMCB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "AMDB/USDT",
+      "reason": "mine_bars=8",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AMZNB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "APPB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "ARMB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 61
+    },
+    {
+      "symbol": "ASMLB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 40
+    },
+    {
+      "symbol": "ASTSB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 40
+    },
+    {
+      "symbol": "AT/USDT",
+      "reason": "mine_bars=216",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AVGOB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 61
+    },
+    {
+      "symbol": "AXTIB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "BABAB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 61
+    },
+    {
+      "symbol": "BANK/USDT",
+      "reason": "mine_bars=230",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BBB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "BEB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "BMNRB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 40
+    },
+    {
+      "symbol": "BNCB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "BOTB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "BREV/USDT",
+      "reason": "mine_bars=176",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BRKBB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "BSPB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "CBRSB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 69
+    },
+    {
+      "symbol": "CFG/USDT",
+      "reason": "mine_bars=107",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CHIP/USDT",
+      "reason": "mine_bars=71",
+      "test_bars": 75
+    },
+    {
+      "symbol": "COHRB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 40
+    },
+    {
+      "symbol": "COINB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 69
+    },
+    {
+      "symbol": "CRCLB/USDT",
+      "reason": "mine_bars=20",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CRDOB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 40
+    },
+    {
+      "symbol": "CRMB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 5
+    },
+    {
+      "symbol": "CRWDB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 12
+    },
+    {
+      "symbol": "CRWVB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "CYPHB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "DELLB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "DJTB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 19
+    },
+    {
+      "symbol": "DRAMB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 69
+    },
+    {
+      "symbol": "ESP/USDT",
+      "reason": "mine_bars=139",
+      "test_bars": 75
+    },
+    {
+      "symbol": "EWYB/USDT",
+      "reason": "mine_bars=8",
+      "test_bars": 75
+    },
+    {
+      "symbol": "F/USDT",
+      "reason": "mine_bars=249",
+      "test_bars": 75
+    },
+    {
+      "symbol": "FLNCB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "FOGO/USDT",
+      "reason": "mine_bars=167",
+      "test_bars": 75
+    },
+    {
+      "symbol": "FWDIB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "GENIUS/USDT",
+      "reason": "mine_bars=40",
+      "test_bars": 75
+    },
+    {
+      "symbol": "GEVB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "GIGGLE/USDT",
+      "reason": "mine_bars=249",
+      "test_bars": 75
+    },
+    {
+      "symbol": "GLWB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 69
+    },
+    {
+      "symbol": "GMEB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 33
+    },
+    {
+      "symbol": "GOOGLB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 69
+    },
+    {
+      "symbol": "GPROB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "GRAM/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 74
+    },
+    {
+      "symbol": "GSB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "HIMSB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 5
+    },
+    {
+      "symbol": "HOODB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 61
+    },
+    {
+      "symbol": "HPEB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "HYPE/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "IBMB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 61
+    },
+    {
+      "symbol": "INTCB/USDT",
+      "reason": "mine_bars=8",
+      "test_bars": 75
+    },
+    {
+      "symbol": "INTWB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "IRENB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 40
+    },
+    {
+      "symbol": "JPMB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "KAT/USDT",
+      "reason": "mine_bars=105",
+      "test_bars": 75
+    },
+    {
+      "symbol": "KGST/USDT",
+      "reason": "mine_bars=189",
+      "test_bars": 75
+    },
+    {
+      "symbol": "KITE/USDT",
+      "reason": "mine_bars=240",
+      "test_bars": 75
+    },
+    {
+      "symbol": "KORUB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "KSTRB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "LITEB/USDT",
+      "reason": "mine_bars=1",
+      "test_bars": 75
+    },
+    {
+      "symbol": "LLYB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "MANTRA/USDT",
+      "reason": "mine_bars=119",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MARSCOIN/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 10
+    },
+    {
+      "symbol": "MDBB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "MEGA/USDT",
+      "reason": "mine_bars=62",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MET/USDT",
+      "reason": "mine_bars=230",
+      "test_bars": 75
+    },
+    {
+      "symbol": "METAB/USDT",
+      "reason": "mine_bars=1",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MMT/USDT",
+      "reason": "mine_bars=239",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MRNAB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 12
+    },
+    {
+      "symbol": "MRVLB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 61
+    },
+    {
+      "symbol": "MSFTB/USDT",
+      "reason": "mine_bars=1",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MSTRB/USDT",
+      "reason": "mine_bars=8",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MUB/USDT",
+      "reason": "mine_bars=20",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MUUB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "MVLLB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "NBISB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 69
+    },
+    {
+      "symbol": "NFLXB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 40
+    },
+    {
+      "symbol": "NIGHT/USDT",
+      "reason": "mine_bars=112",
+      "test_bars": 75
+    },
+    {
+      "symbol": "NOKB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 61
+    },
+    {
+      "symbol": "NVDAB/USDT",
+      "reason": "mine_bars=20",
+      "test_bars": 75
+    },
+    {
+      "symbol": "OPG/USDT",
+      "reason": "mine_bars=40",
+      "test_bars": 75
+    },
+    {
+      "symbol": "OPN/USDT",
+      "reason": "mine_bars=118",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ORCLB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "PDDB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "PENGB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "PLTRB/USDT",
+      "reason": "mine_bars=1",
+      "test_bars": 75
+    },
+    {
+      "symbol": "PYPLB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "QCOMB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 69
+    },
+    {
+      "symbol": "QNTB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "QQQB/USDT",
+      "reason": "mine_bars=1",
+      "test_bars": 75
+    },
+    {
+      "symbol": "RDDTB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "RE/USDT",
+      "reason": "mine_bars=13",
+      "test_bars": 75
+    },
+    {
+      "symbol": "RKLBB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 61
+    },
+    {
+      "symbol": "ROBO/USDT",
+      "reason": "mine_bars=119",
+      "test_bars": 75
+    },
+    {
+      "symbol": "RWUSD/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "SAPIEN/USDT",
+      "reason": "mine_bars=237",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SECZB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "SENT/USDT",
+      "reason": "mine_bars=160",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SHAZB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "SKDDB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "SKHYB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 63
+    },
+    {
+      "symbol": "SKUUB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "SMCIB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 40
+    },
+    {
+      "symbol": "SMHB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "SNDKB/USDT",
+      "reason": "mine_bars=20",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SNXXB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "SOXLB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 69
+    },
+    {
+      "symbol": "SOXSB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "SPCXB/USDT",
+      "reason": "mine_bars=19",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SPYB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 69
+    },
+    {
+      "symbol": "SQQQB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 12
+    },
+    {
+      "symbol": "STXB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 12
+    },
+    {
+      "symbol": "TMFB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "TQQQB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "TSLAB/USDT",
+      "reason": "mine_bars=20",
+      "test_bars": 75
+    },
+    {
+      "symbol": "TSMB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 61
+    },
+    {
+      "symbol": "U/USDT",
+      "reason": "mine_bars=169",
+      "test_bars": 75
+    },
+    {
+      "symbol": "USARB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 40
+    },
+    {
+      "symbol": "USDEB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "UVXYB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "VSTB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "WDCB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 69
+    },
+    {
+      "symbol": "WENB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "XAUT/USDT",
+      "reason": "mine_bars=97",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ZAMA/USDT",
+      "reason": "mine_bars=149",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ZKP/USDT",
+      "reason": "mine_bars=175",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ZMB/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "币安人生/USDT",
+      "reason": "mine_bars=175",
+      "test_bars": 75
+    },
+    {
+      "symbol": "牛来/USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 5
+    }
+  ]
+}

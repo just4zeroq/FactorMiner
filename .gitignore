@@ -124,6 +124,13 @@ user_workspace/reports/backtest_runs/
 # (.holdout_ledger.json / .hypothesis_budget.json / .universe_ledger.json) are
 # deliberately NOT ignored — they must be committed (see system_code_review.md T2).
 user_workspace/runs/
+# Cross-run evaluation cache (metric memo keyed on expression + panel + economics).
+# Regenerable and machine-specific; never commit a stale verdict.
+user_workspace/.eval_cache/
+# Per-exchange universe download journals (one jsonl per asset per attempt, with a
+# fresh timestamp every run). The *resolved* universe lives in user_workspace/universes/;
+# these logs are scratch diagnostics.
+user_workspace/reports/universe_downloads/
 user_workspace/reports/**/spec.yaml
 user_workspace/reports/**/config.yaml
 web/node_modules/

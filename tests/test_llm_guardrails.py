@@ -157,7 +157,13 @@ class LLMGuardrailTests(unittest.TestCase):
         self.assertFalse(result.succeeded)
         self.assertEqual(result.error_type, "FactorOutputError")
 
-    def test_evaluator_respects_configured_worker_limit(self):
+    def test_evaluator_serialises_instead_of_threading(self):
+        """P0-3: a thread pool was a *negative* optimisation (0.58x measured).
+
+        ``max_workers`` is therefore honoured as 1 and the workload runs
+        serially. The probe asserts the new contract: never more than one
+        candidate in flight, and every candidate still evaluated.
+        """
         returns = pd.Series([0.01, 0.02, 0.03], index=self.frame.index)
         tracker = {
             "lock": threading.Lock(),
@@ -169,8 +175,9 @@ class LLMGuardrailTests(unittest.TestCase):
             StaticDataClient(self.frame, returns),
             {"evaluation": {"max_workers": 2}},
         )
+        self.assertEqual(evaluator.max_workers, 1, "thread pool must be coerced to serial")
         feedback = evaluator.evaluate(candidates)
-        self.assertEqual(tracker["peak"], 2)
+        self.assertEqual(tracker["peak"], 1)
         self.assertTrue(all(result.succeeded for result in feedback.results))
 
     def test_evaluator_rejects_invalid_worker_limit(self):

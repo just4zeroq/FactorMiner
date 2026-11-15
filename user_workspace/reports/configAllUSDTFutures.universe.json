@@ -1,0 +1,1594 @@
+{
+  "generated_at": "2026-11-15T22:01:40",
+  "universe": "user_workspace/universes/binance_futures_usdt_1d.json",
+  "config": "user_workspace\\configs\\configAllUSDTFutures.json",
+  "rule": {
+    "min_bars_in_mine_window": 250,
+    "needs_bar_in_test": true
+  },
+  "listed": 755,
+  "usable": 439,
+  "dropped": 316,
+  "dropped_detail": [
+    {
+      "symbol": "AAOI/USDT:USDT",
+      "reason": "mine_bars=23",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AAPL/USDT:USDT",
+      "reason": "mine_bars=86",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ABBV/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "ACN/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "ACU/USDT:USDT",
+      "reason": "mine_bars=161",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ADBE/USDT:USDT",
+      "reason": "mine_bars=20",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AGPU/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "AIA/USDT:USDT",
+      "reason": "mine_bars=162",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AIGENSYN/USDT:USDT",
+      "reason": "mine_bars=63",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AKAM/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "ALAB/USDT:USDT",
+      "reason": "mine_bars=9",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ALLO/USDT:USDT",
+      "reason": "mine_bars=232",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AMAT/USDT:USDT",
+      "reason": "mine_bars=23",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AMC/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "AMD/USDT:USDT",
+      "reason": "mine_bars=56",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AMGN/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "AMZN/USDT:USDT",
+      "reason": "mine_bars=142",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ANET/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "ANTHROPIC/USDT:USDT",
+      "reason": "mine_bars=29",
+      "test_bars": 75
+    },
+    {
+      "symbol": "APLD/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "APP/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 66
+    },
+    {
+      "symbol": "ARM/USDT:USDT",
+      "reason": "mine_bars=36",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ARX/USDT:USDT",
+      "reason": "mine_bars=8",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ASML/USDT:USDT",
+      "reason": "mine_bars=20",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ASTS/USDT:USDT",
+      "reason": "mine_bars=30",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AT/USDT:USDT",
+      "reason": "mine_bars=245",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AVGO/USDT:USDT",
+      "reason": "mine_bars=72",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AXTI/USDT:USDT",
+      "reason": "mine_bars=23",
+      "test_bars": 75
+    },
+    {
+      "symbol": "AZTEC/USDT:USDT",
+      "reason": "mine_bars=140",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BABA/USDT:USDT",
+      "reason": "mine_bars=72",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BAC/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "BASED/USDT:USDT",
+      "reason": "mine_bars=93",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BBX/USDT:USDT",
+      "reason": "mine_bars=30",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BE/USDT:USDT",
+      "reason": "mine_bars=36",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BEAT/USDT:USDT",
+      "reason": "mine_bars=231",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BILL/USDT:USDT",
+      "reason": "mine_bars=55",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BIRB/USDT:USDT",
+      "reason": "mine_bars=153",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BITO/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 49
+    },
+    {
+      "symbol": "BMNR/USDT:USDT",
+      "reason": "mine_bars=20",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BNC/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 67
+    },
+    {
+      "symbol": "BOT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 67
+    },
+    {
+      "symbol": "BREV/USDT:USDT",
+      "reason": "mine_bars=183",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BRKB/USDT:USDT",
+      "reason": "mine_bars=44",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BSB/USDT:USDT",
+      "reason": "mine_bars=98",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BSP/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 74
+    },
+    {
+      "symbol": "BTW/USDT:USDT",
+      "reason": "mine_bars=27",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BWET/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "BX/USDT:USDT",
+      "reason": "mine_bars=23",
+      "test_bars": 75
+    },
+    {
+      "symbol": "BYD/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 7
+    },
+    {
+      "symbol": "BZ/USDT:USDT",
+      "reason": "mine_bars=91",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CAP/USDT:USDT",
+      "reason": "mine_bars=4",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CAT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 74
+    },
+    {
+      "symbol": "CBRS/USDT:USDT",
+      "reason": "mine_bars=43",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CC/USDT:USDT",
+      "reason": "mine_bars=243",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CEG/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "CFG/USDT:USDT",
+      "reason": "mine_bars=107",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CHIP/USDT:USDT",
+      "reason": "mine_bars=76",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CIEN/USDT:USDT",
+      "reason": "mine_bars=9",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CL/USDT:USDT",
+      "reason": "mine_bars=91",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CLANKER/USDT:USDT",
+      "reason": "mine_bars=231",
+      "test_bars": 75
+    },
+    {
+      "symbol": "COHR/USDT:USDT",
+      "reason": "mine_bars=36",
+      "test_bars": 75
+    },
+    {
+      "symbol": "COIN/USDT:USDT",
+      "reason": "mine_bars=142",
+      "test_bars": 75
+    },
+    {
+      "symbol": "COLLECT/USDT:USDT",
+      "reason": "mine_bars=182",
+      "test_bars": 75
+    },
+    {
+      "symbol": "COPPER/USDT:USDT",
+      "reason": "mine_bars=117",
+      "test_bars": 75
+    },
+    {
+      "symbol": "COST/USDT:USDT",
+      "reason": "mine_bars=22",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CRCL/USDT:USDT",
+      "reason": "mine_bars=142",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CRDO/USDT:USDT",
+      "reason": "mine_bars=23",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CRM/USDT:USDT",
+      "reason": "mine_bars=28",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CRML/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "CRWD/USDT:USDT",
+      "reason": "mine_bars=23",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CRWV/USDT:USDT",
+      "reason": "mine_bars=44",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CSCO/USDT:USDT",
+      "reason": "mine_bars=47",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CSOPSAMSUNG2L/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 34
+    },
+    {
+      "symbol": "CSOPSKHYNIX2L/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 34
+    },
+    {
+      "symbol": "CT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "CTR/USDT:USDT",
+      "reason": "mine_bars=34",
+      "test_bars": 75
+    },
+    {
+      "symbol": "CVNA/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "CXMT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 27
+    },
+    {
+      "symbol": "CYPH/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "CYS/USDT:USDT",
+      "reason": "mine_bars=201",
+      "test_bars": 75
+    },
+    {
+      "symbol": "DATAIP/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 73
+    },
+    {
+      "symbol": "DDOG/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 12
+    },
+    {
+      "symbol": "DELL/USDT:USDT",
+      "reason": "mine_bars=28",
+      "test_bars": 75
+    },
+    {
+      "symbol": "DIS/USDT:USDT",
+      "reason": "mine_bars=47",
+      "test_bars": 75
+    },
+    {
+      "symbol": "DJT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 20
+    },
+    {
+      "symbol": "DKNG/USDT:USDT",
+      "reason": "mine_bars=21",
+      "test_bars": 75
+    },
+    {
+      "symbol": "DOS/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 34
+    },
+    {
+      "symbol": "DRAM/USDT:USDT",
+      "reason": "mine_bars=44",
+      "test_bars": 75
+    },
+    {
+      "symbol": "EBAY/USDT:USDT",
+      "reason": "mine_bars=22",
+      "test_bars": 75
+    },
+    {
+      "symbol": "EDGE/USDT:USDT",
+      "reason": "mine_bars=104",
+      "test_bars": 75
+    },
+    {
+      "symbol": "EIDO/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "ELSA/USDT:USDT",
+      "reason": "mine_bars=160",
+      "test_bars": 75
+    },
+    {
+      "symbol": "EQT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "ESP/USDT:USDT",
+      "reason": "mine_bars=141",
+      "test_bars": 75
+    },
+    {
+      "symbol": "EWJ/USDT:USDT",
+      "reason": "mine_bars=104",
+      "test_bars": 75
+    },
+    {
+      "symbol": "EWT/USDT:USDT",
+      "reason": "mine_bars=30",
+      "test_bars": 75
+    },
+    {
+      "symbol": "EWY/USDT:USDT",
+      "reason": "mine_bars=107",
+      "test_bars": 75
+    },
+    {
+      "symbol": "EWZ/USDT:USDT",
+      "reason": "mine_bars=21",
+      "test_bars": 75
+    },
+    {
+      "symbol": "EWZS/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "FIGHT/USDT:USDT",
+      "reason": "mine_bars=159",
+      "test_bars": 75
+    },
+    {
+      "symbol": "FLEX/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 74
+    },
+    {
+      "symbol": "FLNC/USDT:USDT",
+      "reason": "mine_bars=44",
+      "test_bars": 75
+    },
+    {
+      "symbol": "FOGO/USDT:USDT",
+      "reason": "mine_bars=172",
+      "test_bars": 75
+    },
+    {
+      "symbol": "FOLKS/USDT:USDT",
+      "reason": "mine_bars=237",
+      "test_bars": 75
+    },
+    {
+      "symbol": "FRHC/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "FWDI/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 67
+    },
+    {
+      "symbol": "GDX/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 28
+    },
+    {
+      "symbol": "GENIUS/USDT:USDT",
+      "reason": "mine_bars=76",
+      "test_bars": 75
+    },
+    {
+      "symbol": "GEV/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 66
+    },
+    {
+      "symbol": "GIGADEV/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 42
+    },
+    {
+      "symbol": "GLW/USDT:USDT",
+      "reason": "mine_bars=20",
+      "test_bars": 75
+    },
+    {
+      "symbol": "GME/USDT:USDT",
+      "reason": "mine_bars=21",
+      "test_bars": 75
+    },
+    {
+      "symbol": "GOOGL/USDT:USDT",
+      "reason": "mine_bars=97",
+      "test_bars": 75
+    },
+    {
+      "symbol": "GPRO/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 11
+    },
+    {
+      "symbol": "GRAM/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 74
+    },
+    {
+      "symbol": "GRVT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 45
+    },
+    {
+      "symbol": "GS/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "GTLB/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 12
+    },
+    {
+      "symbol": "GUA/USDT:USDT",
+      "reason": "mine_bars=192",
+      "test_bars": 75
+    },
+    {
+      "symbol": "GWEI/USDT:USDT",
+      "reason": "mine_bars=153",
+      "test_bars": 75
+    },
+    {
+      "symbol": "HANMI/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 31
+    },
+    {
+      "symbol": "HD/USDT:USDT",
+      "reason": "mine_bars=47",
+      "test_bars": 75
+    },
+    {
+      "symbol": "HIMS/USDT:USDT",
+      "reason": "mine_bars=22",
+      "test_bars": 75
+    },
+    {
+      "symbol": "HK0625/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 13
+    },
+    {
+      "symbol": "HK0700/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "HK0992/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 7
+    },
+    {
+      "symbol": "HK1810/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "HOOD/USDT:USDT",
+      "reason": "mine_bars=149",
+      "test_bars": 75
+    },
+    {
+      "symbol": "HPE/USDT:USDT",
+      "reason": "mine_bars=23",
+      "test_bars": 75
+    },
+    {
+      "symbol": "HUT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "HYUNDAI/USDT:USDT",
+      "reason": "mine_bars=29",
+      "test_bars": 75
+    },
+    {
+      "symbol": "IBKR/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "IBM/USDT:USDT",
+      "reason": "mine_bars=28",
+      "test_bars": 75
+    },
+    {
+      "symbol": "INTC/USDT:USDT",
+      "reason": "mine_bars=149",
+      "test_bars": 75
+    },
+    {
+      "symbol": "INTW/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 67
+    },
+    {
+      "symbol": "INX/USDT:USDT",
+      "reason": "mine_bars=152",
+      "test_bars": 75
+    },
+    {
+      "symbol": "IONQ/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 17
+    },
+    {
+      "symbol": "IREN/USDT:USDT",
+      "reason": "mine_bars=28",
+      "test_bars": 75
+    },
+    {
+      "symbol": "IRYS/USDT:USDT",
+      "reason": "mine_bars=217",
+      "test_bars": 75
+    },
+    {
+      "symbol": "IWM/USDT:USDT",
+      "reason": "mine_bars=23",
+      "test_bars": 75
+    },
+    {
+      "symbol": "JCT/USDT:USDT",
+      "reason": "mine_bars=233",
+      "test_bars": 75
+    },
+    {
+      "symbol": "JPM/USDT:USDT",
+      "reason": "mine_bars=44",
+      "test_bars": 75
+    },
+    {
+      "symbol": "KAT/USDT:USDT",
+      "reason": "mine_bars=121",
+      "test_bars": 75
+    },
+    {
+      "symbol": "KITE/USDT:USDT",
+      "reason": "mine_bars=245",
+      "test_bars": 75
+    },
+    {
+      "symbol": "KLAC/USDT:USDT",
+      "reason": "mine_bars=9",
+      "test_bars": 75
+    },
+    {
+      "symbol": "KO/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 39
+    },
+    {
+      "symbol": "KODEX200/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 31
+    },
+    {
+      "symbol": "KORU/USDT:USDT",
+      "reason": "mine_bars=9",
+      "test_bars": 75
+    },
+    {
+      "symbol": "KSTR/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 74
+    },
+    {
+      "symbol": "KUAISHOU/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 34
+    },
+    {
+      "symbol": "LGELECTRONICS/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 31
+    },
+    {
+      "symbol": "LIT/USDT:USDT",
+      "reason": "mine_bars=190",
+      "test_bars": 75
+    },
+    {
+      "symbol": "LITE/USDT:USDT",
+      "reason": "mine_bars=47",
+      "test_bars": 75
+    },
+    {
+      "symbol": "LLY/USDT:USDT",
+      "reason": "mine_bars=30",
+      "test_bars": 75
+    },
+    {
+      "symbol": "LRCX/USDT:USDT",
+      "reason": "mine_bars=9",
+      "test_bars": 75
+    },
+    {
+      "symbol": "LYTE/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 28
+    },
+    {
+      "symbol": "MAGMA/USDT:USDT",
+      "reason": "mine_bars=182",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MANTRA/USDT:USDT",
+      "reason": "mine_bars=119",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MARA/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 17
+    },
+    {
+      "symbol": "MARSCOIN/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 13
+    },
+    {
+      "symbol": "MCD/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "MDB/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 12
+    },
+    {
+      "symbol": "MDT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "MEGA/USDT:USDT",
+      "reason": "mine_bars=152",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MEITUAN/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 34
+    },
+    {
+      "symbol": "MELI/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "META/USDT:USDT",
+      "reason": "mine_bars=97",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MINIMAX/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 59
+    },
+    {
+      "symbol": "MMT/USDT:USDT",
+      "reason": "mine_bars=239",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MOONSHOT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "MP/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "MRK/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 17
+    },
+    {
+      "symbol": "MRNA/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 20
+    },
+    {
+      "symbol": "MRVL/USDT:USDT",
+      "reason": "mine_bars=47",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MSFT/USDT:USDT",
+      "reason": "mine_bars=72",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MSTR/USDT:USDT",
+      "reason": "mine_bars=142",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MSTU/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "MU/USDT:USDT",
+      "reason": "mine_bars=85",
+      "test_bars": 75
+    },
+    {
+      "symbol": "MUU/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 60
+    },
+    {
+      "symbol": "MVLL/USDT:USDT",
+      "reason": "mine_bars=2",
+      "test_bars": 75
+    },
+    {
+      "symbol": "NATGAS/USDT:USDT",
+      "reason": "mine_bars=91",
+      "test_bars": 75
+    },
+    {
+      "symbol": "NAVER/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 31
+    },
+    {
+      "symbol": "NBIS/USDT:USDT",
+      "reason": "mine_bars=36",
+      "test_bars": 75
+    },
+    {
+      "symbol": "NET/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 28
+    },
+    {
+      "symbol": "NFLX/USDT:USDT",
+      "reason": "mine_bars=22",
+      "test_bars": 75
+    },
+    {
+      "symbol": "NIGHT/USDT:USDT",
+      "reason": "mine_bars=203",
+      "test_bars": 75
+    },
+    {
+      "symbol": "NKE/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "NOK/USDT:USDT",
+      "reason": "mine_bars=30",
+      "test_bars": 75
+    },
+    {
+      "symbol": "NOW/USDT:USDT",
+      "reason": "mine_bars=28",
+      "test_bars": 75
+    },
+    {
+      "symbol": "NU/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "NVDA/USDT:USDT",
+      "reason": "mine_bars=97",
+      "test_bars": 75
+    },
+    {
+      "symbol": "NVDL/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 12
+    },
+    {
+      "symbol": "NVO/USDT:USDT",
+      "reason": "mine_bars=30",
+      "test_bars": 75
+    },
+    {
+      "symbol": "O/USDT:USDT",
+      "reason": "mine_bars=7",
+      "test_bars": 75
+    },
+    {
+      "symbol": "OKLO/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "ONDS/USDT:USDT",
+      "reason": "mine_bars=28",
+      "test_bars": 75
+    },
+    {
+      "symbol": "OPENAI/USDT:USDT",
+      "reason": "mine_bars=36",
+      "test_bars": 75
+    },
+    {
+      "symbol": "OPG/USDT:USDT",
+      "reason": "mine_bars=70",
+      "test_bars": 75
+    },
+    {
+      "symbol": "OPN/USDT:USDT",
+      "reason": "mine_bars=130",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ORCL/USDT:USDT",
+      "reason": "mine_bars=47",
+      "test_bars": 75
+    },
+    {
+      "symbol": "OURA/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "OXY/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "PANW/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 55
+    },
+    {
+      "symbol": "PATH/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "PAYP/USDT:USDT",
+      "reason": "mine_bars=100",
+      "test_bars": 75
+    },
+    {
+      "symbol": "PDD/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 17
+    },
+    {
+      "symbol": "PENG/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 55
+    },
+    {
+      "symbol": "PFE/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "PHAROS/USDT:USDT",
+      "reason": "mine_bars=48",
+      "test_bars": 75
+    },
+    {
+      "symbol": "PIEVERSE/USDT:USDT",
+      "reason": "mine_bars=229",
+      "test_bars": 75
+    },
+    {
+      "symbol": "PLTR/USDT:USDT",
+      "reason": "mine_bars=142",
+      "test_bars": 75
+    },
+    {
+      "symbol": "PONS/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 8
+    },
+    {
+      "symbol": "POPMART/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 53
+    },
+    {
+      "symbol": "POWER/USDT:USDT",
+      "reason": "mine_bars=207",
+      "test_bars": 75
+    },
+    {
+      "symbol": "PREDICT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "PRL/USDT:USDT",
+      "reason": "mine_bars=91",
+      "test_bars": 75
+    },
+    {
+      "symbol": "PYPL/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "QCOM/USDT:USDT",
+      "reason": "mine_bars=56",
+      "test_bars": 75
+    },
+    {
+      "symbol": "QNTX/USDT:USDT",
+      "reason": "mine_bars=33",
+      "test_bars": 75
+    },
+    {
+      "symbol": "QQQ/USDT:USDT",
+      "reason": "mine_bars=86",
+      "test_bars": 75
+    },
+    {
+      "symbol": "RAM/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 20
+    },
+    {
+      "symbol": "RAVE/USDT:USDT",
+      "reason": "mine_bars=199",
+      "test_bars": 75
+    },
+    {
+      "symbol": "RDDT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 39
+    },
+    {
+      "symbol": "RDW/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "RE/USDT:USDT",
+      "reason": "mine_bars=13",
+      "test_bars": 75
+    },
+    {
+      "symbol": "RIVN/USDT:USDT",
+      "reason": "mine_bars=21",
+      "test_bars": 75
+    },
+    {
+      "symbol": "RKLB/USDT:USDT",
+      "reason": "mine_bars=44",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ROBO/USDT:USDT",
+      "reason": "mine_bars=124",
+      "test_bars": 75
+    },
+    {
+      "symbol": "RUM/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "SAMSUNG/USDT:USDT",
+      "reason": "mine_bars=29",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SAMSUNGEM/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 31
+    },
+    {
+      "symbol": "SECZ/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "SENT/USDT:USDT",
+      "reason": "mine_bars=229",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SHAZ/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 55
+    },
+    {
+      "symbol": "SHOP/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 28
+    },
+    {
+      "symbol": "SKDD/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 20
+    },
+    {
+      "symbol": "SKHY/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 66
+    },
+    {
+      "symbol": "SKHYNIX/USDT:USDT",
+      "reason": "mine_bars=29",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SKR/USDT:USDT",
+      "reason": "mine_bars=160",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SKUU/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 20
+    },
+    {
+      "symbol": "SLX/USDT:USDT",
+      "reason": "mine_bars=30",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SMCI/USDT:USDT",
+      "reason": "mine_bars=9",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SMH/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 47
+    },
+    {
+      "symbol": "SMR/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "SNDK/USDT:USDT",
+      "reason": "mine_bars=85",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SNOW/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 66
+    },
+    {
+      "symbol": "SNPS/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "SNXX/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 67
+    },
+    {
+      "symbol": "SOFI/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 55
+    },
+    {
+      "symbol": "SONY/USDT:USDT",
+      "reason": "mine_bars=9",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SOXL/USDT:USDT",
+      "reason": "mine_bars=47",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SOXS/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 60
+    },
+    {
+      "symbol": "SPACE/USDT:USDT",
+      "reason": "mine_bars=159",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SPCX/USDT:USDT",
+      "reason": "mine_bars=41",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SPORTFUN/USDT:USDT",
+      "reason": "mine_bars=166",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SPY/USDT:USDT",
+      "reason": "mine_bars=86",
+      "test_bars": 75
+    },
+    {
+      "symbol": "SQQQ/USDT:USDT",
+      "reason": "mine_bars=2",
+      "test_bars": 75
+    },
+    {
+      "symbol": "STABLE/USDT:USDT",
+      "reason": "mine_bars=237",
+      "test_bars": 75
+    },
+    {
+      "symbol": "STAR/USDT:USDT",
+      "reason": "mine_bars=48",
+      "test_bars": 75
+    },
+    {
+      "symbol": "STM/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "STRC/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 74
+    },
+    {
+      "symbol": "STXX/USDT:USDT",
+      "reason": "mine_bars=20",
+      "test_bars": 75
+    },
+    {
+      "symbol": "TBT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 49
+    },
+    {
+      "symbol": "TEAM/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 12
+    },
+    {
+      "symbol": "TEM/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 17
+    },
+    {
+      "symbol": "TENCENT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 54
+    },
+    {
+      "symbol": "TER/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 74
+    },
+    {
+      "symbol": "TMF/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 49
+    },
+    {
+      "symbol": "TQQQ/USDT:USDT",
+      "reason": "mine_bars=2",
+      "test_bars": 75
+    },
+    {
+      "symbol": "TRIA/USDT:USDT",
+      "reason": "mine_bars=145",
+      "test_bars": 75
+    },
+    {
+      "symbol": "TRUST/USDT:USDT",
+      "reason": "mine_bars=238",
+      "test_bars": 75
+    },
+    {
+      "symbol": "TSLA/USDT:USDT",
+      "reason": "mine_bars=154",
+      "test_bars": 75
+    },
+    {
+      "symbol": "TSLL/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 12
+    },
+    {
+      "symbol": "TSM/USDT:USDT",
+      "reason": "mine_bars=86",
+      "test_bars": 75
+    },
+    {
+      "symbol": "TTWO/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 74
+    },
+    {
+      "symbol": "TWST/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "TXN/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 74
+    },
+    {
+      "symbol": "TZA/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 60
+    },
+    {
+      "symbol": "UAI/USDT:USDT",
+      "reason": "mine_bars=237",
+      "test_bars": 75
+    },
+    {
+      "symbol": "UBER/USDT:USDT",
+      "reason": "mine_bars=47",
+      "test_bars": 75
+    },
+    {
+      "symbol": "UNH/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "UNITREE/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 26
+    },
+    {
+      "symbol": "URNM/USDT:USDT",
+      "reason": "mine_bars=22",
+      "test_bars": 75
+    },
+    {
+      "symbol": "US/USDT:USDT",
+      "reason": "mine_bars=201",
+      "test_bars": 75
+    },
+    {
+      "symbol": "USAR/USDT:USDT",
+      "reason": "mine_bars=56",
+      "test_bars": 75
+    },
+    {
+      "symbol": "USDBRL/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "USDEX/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "UVXY/USDT:USDT",
+      "reason": "mine_bars=20",
+      "test_bars": 75
+    },
+    {
+      "symbol": "V/USDT:USDT",
+      "reason": "mine_bars=44",
+      "test_bars": 75
+    },
+    {
+      "symbol": "VKTX/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "VRT/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 66
+    },
+    {
+      "symbol": "VST/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 28
+    },
+    {
+      "symbol": "WDC/USDT:USDT",
+      "reason": "mine_bars=36",
+      "test_bars": 75
+    },
+    {
+      "symbol": "WEN/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 67
+    },
+    {
+      "symbol": "WET/USDT:USDT",
+      "reason": "mine_bars=203",
+      "test_bars": 75
+    },
+    {
+      "symbol": "WMT/USDT:USDT",
+      "reason": "mine_bars=44",
+      "test_bars": 75
+    },
+    {
+      "symbol": "XAG/USDT:USDT",
+      "reason": "mine_bars=175",
+      "test_bars": 75
+    },
+    {
+      "symbol": "XAU/USDT:USDT",
+      "reason": "mine_bars=202",
+      "test_bars": 75
+    },
+    {
+      "symbol": "XAUT/USDT:USDT",
+      "reason": "mine_bars=97",
+      "test_bars": 75
+    },
+    {
+      "symbol": "XBI/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 67
+    },
+    {
+      "symbol": "XLE/USDT:USDT",
+      "reason": "mine_bars=21",
+      "test_bars": 75
+    },
+    {
+      "symbol": "XOM/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "XPD/USDT:USDT",
+      "reason": "mine_bars=152",
+      "test_bars": 75
+    },
+    {
+      "symbol": "XPT/USDT:USDT",
+      "reason": "mine_bars=152",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ZAMA/USDT:USDT",
+      "reason": "mine_bars=173",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ZCSH/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 0
+    },
+    {
+      "symbol": "ZEST/USDT:USDT",
+      "reason": "mine_bars=27",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ZHIPU/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 59
+    },
+    {
+      "symbol": "ZHONGJI/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 31
+    },
+    {
+      "symbol": "ZKP/USDT:USDT",
+      "reason": "mine_bars=192",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ZM/USDT:USDT",
+      "reason": "mine_bars=21",
+      "test_bars": 75
+    },
+    {
+      "symbol": "ZS/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 12
+    },
+    {
+      "symbol": "哈基米/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 8
+    },
+    {
+      "symbol": "我踏马来了/USDT:USDT",
+      "reason": "mine_bars=161",
+      "test_bars": 75
+    },
+    {
+      "symbol": "牛来/USDT:USDT",
+      "reason": "mine_bars=0",
+      "test_bars": 15
+    },
+    {
+      "symbol": "龙虾/USDT:USDT",
+      "reason": "mine_bars=112",
+      "test_bars": 75
+    }
+  ]
+}

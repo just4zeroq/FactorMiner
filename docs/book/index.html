@@ -128,7 +128,7 @@ mark{background:var(--mark);padding:0 2px;border-radius:2px}
 <a class="nav-item" href="#chapter-3">第 3 章 评价体系：从 IC 到 fitness</a>
 </div>
 <div class="nav-group"><div class="nav-group-title">第二篇 · 算法与范式：候选从哪里来</div>
-<a class="nav-item" href="#chapter-4">第 4 章 因子挖掘算法谱系总览：六种范式与选型</a>
+<a class="nav-item" href="#chapter-4">第 4 章 因子挖掘算法谱系总览：范式小结卡与选型</a>
 <a class="nav-item" href="#chapter-5">第 5 章 表达式语言：算子、终端与计算图</a>
 <a class="nav-item" href="#chapter-6">第 6 章 手工公式库与确定性枚举：从 Alpha101 到 Alpha360</a>
 <a class="nav-item" href="#chapter-7">第 7 章 遗传规划：把公式当作可演化的语法树</a>
@@ -161,7 +161,7 @@ mark{background:var(--mark);padding:0 2px;border-radius:2px}
 <hr>
 <h2 id="内容提要">内容提要</h2>
 <p>这是一本关于<strong>自动化因子挖掘</strong>的技术书。它不只讲「因子是什么」，而是把一条完整的研究链路拆开：</p>
-<ol><li><strong>概念层</strong>：因子、Alpha、风险暴露、截面打分、前瞻收益、研究结论的等级；</li><li><strong>表示层</strong>：算子、终端、AST / RPN / 源码 / 张量四种表达式形态，以及它们各自的搜索与执行代价；</li><li><strong>算法层</strong>：先给出六种常见范式（手工规则、遗传规划、深度网络、强化学习、大语言模型、稀疏统计）的谱系与选型，再依次展开表达式语言、公式库与四种自动范式，六种产生候选的方式；</li><li><strong>评价层</strong>：IC / RankIC / ICIR / 分位收益 / 换手 / 覆盖率的精确口径，以及 fitness 如何把多个指标压成一个可优化标量；</li><li><strong>证伪层</strong>：多重检验、Newey–West HAC、BH-FDR / Holm、随机零分布、Deflated Sharpe Ratio、晋升闸门、purge / embargo、逐折重拟合的 walk-forward、一次性留出账本、阳性对照与统计功效；</li><li><strong>组合与执行层</strong>：去重、mutual-IC 因子池、权重拟合、事件驱动回测、成本恒等式与真实资金费；</li><li><strong>工程层</strong>：统一中间体抽象、Director 调度、异构存储、沙盒、实验 manifest、八阶段流水线、可复现性验证；</li><li><strong>行业层</strong>：20+ 个开源框架的源码级横向矩阵、成熟度 × 加密货币适配度象限、十八条反面模式。</li></ol>
+<ol><li><strong>概念层</strong>：因子、Alpha、风险暴露、截面打分、前瞻收益、研究结论的等级；</li><li><strong>表示层</strong>：算子、终端、AST / RPN / 源码 / 张量四种表达式形态，以及它们各自的搜索与执行代价；</li><li><strong>算法层</strong>：先用十一种范式的"小结卡"系统讲清每种的<strong>原理</strong>与<strong>工作方式</strong>——四种主力自动范式（遗传规划、强化学习、大语言模型、神经网络）加七种补充范式（手工规则、确定性枚举、稀疏统计、对抗生成、蒙特卡洛树搜索、聚类集成、贝叶斯优化）——再依次展开表达式语言、公式库与四种自动范式的深读；</li><li><strong>评价层</strong>：IC / RankIC / ICIR / 分位收益 / 换手 / 覆盖率的精确口径，以及 fitness 如何把多个指标压成一个可优化标量；</li><li><strong>证伪层</strong>：多重检验、Newey–West HAC、BH-FDR / Holm、随机零分布、Deflated Sharpe Ratio、晋升闸门、purge / embargo、逐折重拟合的 walk-forward、一次性留出账本、阳性对照与统计功效；</li><li><strong>组合与执行层</strong>：去重、mutual-IC 因子池、权重拟合、事件驱动回测、成本恒等式与真实资金费；</li><li><strong>工程层</strong>：统一中间体抽象、Director 调度、异构存储、沙盒、实验 manifest、八阶段流水线、可复现性验证；</li><li><strong>行业层</strong>：20+ 个开源框架的源码级横向矩阵、成熟度 × 加密货币适配度象限、十八条反面模式。</li></ol>
 <p>全书所有实现细节都对应到 <code>FactorMiner</code> 仓库中的真实文件与行号；所有竞品结论都来自项目内已有的源码实读报告，而不是 README 宣称。书中大量引用<strong>失败的实验结果</strong>——严格样本外含成本 −6.40%、验证段 −4.43%、84 个存量因子全库重审 0 通过——因为一个能诚实证伪自己的系统，比多 20 个算子更有教学价值。</p>
 <h2 id="本书的三个特点">本书的三个特点</h2>
 <p><strong>第一，把「打分」和「证伪」分开讲。</strong> 多数资料把 IC 当作终点。本书用整整一篇说明：IC 是相关性的描述，不是显著性的判定，更不是可交易性的证明。搜索得越猛，越需要多重检验折减；<code>num_trials</code> 这个分母，就是结论的一部分。</p>
@@ -176,7 +176,7 @@ mark{background:var(--mark);padding:0 2px;border-radius:2px}
 <h3 id="第一篇-基础-因子到底在预测什么">第一篇 基础：因子到底在预测什么</h3>
 <div class="table-wrap"><table><thead><tr><th>章</th><th>标题</th><th>核心问题</th></tr></thead><tbody><tr><td>1</td><td>因子、Alpha 与预测问题</td><td>什么才算「发现了一个因子」</td></tr><tr><td>2</td><td>数据、面板与时间语义</td><td>四个时点如何决定有没有前视</td></tr><tr><td>3</td><td>评价体系：从 IC 到 fitness</td><td>一个标量怎么承载全部研究偏好</td></tr></tbody></table></div>
 <h3 id="第二篇-算法与范式-候选从哪里来">第二篇 算法与范式：候选从哪里来</h3>
-<div class="table-wrap"><table><thead><tr><th>章</th><th>标题</th><th>核心问题</th></tr></thead><tbody><tr><td>4</td><td>因子挖掘算法谱系总览：六种范式与选型</td><td>常见打法有哪些、各自数学本质与怎么选</td></tr><tr><td>5</td><td>表达式语言：算子、终端与计算图</td><td>公式如何变成可执行、可变异的对象</td></tr><tr><td>6</td><td>手工公式库与确定性枚举：从 Alpha101 到 Alpha360</td><td>Alpha101 / Alpha158 / Alpha360 的真正用途</td></tr><tr><td>7</td><td>遗传规划：把公式当作可演化的语法树</td><td>语法树上的达尔文式搜索与膨胀控制</td></tr><tr><td>8</td><td>强化学习：把因子构造建模为序列决策</td><td>序列决策、策略梯度与动作掩码</td></tr><tr><td>9</td><td>大语言模型：从假设到代码与反思闭环</td><td>假设→代码→反思闭环与沙盒边界</td></tr><tr><td>10</td><td>神经网络：端到端表征与通道因子</td><td>端到端表征、IC Loss 与通道物化</td></tr></tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>章</th><th>标题</th><th>核心问题</th></tr></thead><tbody><tr><td>4</td><td>因子挖掘算法谱系总览：范式小结卡与选型</td><td>十一种范式各怎么工作、原理是什么、怎么选</td></tr><tr><td>5</td><td>表达式语言：算子、终端与计算图</td><td>公式如何变成可执行、可变异的对象</td></tr><tr><td>6</td><td>手工公式库与确定性枚举：从 Alpha101 到 Alpha360</td><td>Alpha101 / Alpha158 / Alpha360 的真正用途</td></tr><tr><td>7</td><td>遗传规划：把公式当作可演化的语法树</td><td>语法树上的达尔文式搜索与膨胀控制</td></tr><tr><td>8</td><td>强化学习：把因子构造建模为序列决策</td><td>序列决策、策略梯度与动作掩码</td></tr><tr><td>9</td><td>大语言模型：从假设到代码与反思闭环</td><td>假设→代码→反思闭环与沙盒边界</td></tr><tr><td>10</td><td>神经网络：端到端表征与通道因子</td><td>端到端表征、IC Loss 与通道物化</td></tr></tbody></table></div>
 <h3 id="第三篇-因子挖掘全流程-从假设到可交易组合">第三篇 因子挖掘全流程：从假设到可交易组合</h3>
 <div class="table-wrap"><table><thead><tr><th>章</th><th>标题</th><th>核心问题</th></tr></thead><tbody><tr><td>11</td><td>去重、多样性与因子池：从一堆公式到一个组合</td><td>怎么把候选收成可交易组合</td></tr><tr><td>12</td><td>过拟合的数学：max of noise 与选择偏差</td><td>max of noise 与选择偏差如何制造"显著"</td></tr><tr><td>13</td><td>统计闸门：从「打分」到「判定」</td><td>HAC、FDR、零分布、DSR 与晋升判定</td></tr><tr><td>14</td><td>留出纪律：让「验证」成为可消耗、可审计的预算</td><td>purge / embargo、账本、滚动预注册与功效</td></tr><tr><td>15</td><td>从 IC 到 PnL：成本、组合与三次诚实的失败</td><td>成本、换手、组合回测与三次诚实的失败</td></tr><tr><td>16</td><td>可复现性与端到端实验流水线</td><td>让结论换台机器仍成立、全流程可审计</td></tr></tbody></table></div>
 <h3 id="第四篇-工程实践与行业参照-把研究变成可复现系统">第四篇 工程实践与行业参照：把研究变成可复现系统</h3>
@@ -464,63 +464,176 @@ def turnover_aware(factor_values, returns, base_metrics: dict) -&gt; dict:
 <h3 id="本章小结-3">本章小结</h3>
 <ol><li>IC 的正确次序是「逐期截面算相关 → 对时间序列取均值」；把 <code>T×N</code> 展平算一次相关会把市场共同冲击误当作预测力。</li><li>RankIC 对异常值稳健、对单调变换不变，是主口径；但它对尾部不敏感，必须配分位多空收益一起看。</li><li>Turnover 有原始因子变化、归一化变化、组合权重换手三种语义，只有第三种能乘成本率。<code>ICIR × √A</code> 必须写明 <code>A</code> 的取值。</li><li>fitness 用<strong>几何混合</strong>（而非算术加权）让任一侧塌陷即归零，并叠加覆盖惩罚、符号一致性惩罚、小样本收缩与可选换手惩罚；成本留给闸门而非 fitness。</li><li><code>oos_exponent=0.5</code> 意味着验证段被反复读取，因此 <code>val_read_count</code> 是必需的研究元数据；正式 run 记录为 87。</li><li>竞品里最危险的目标是「直接优化回测年化收益」（AlphaMaster），最省力的功效提升是「在昂贵计算前用廉价 gate 拒掉 90% 候选」（LLM-Framework）。</li><li>指标可以写 0，不可以编。「宁可零分，不要模拟图表」贯穿 FactorMiner 的评估、快照与 Inspector 三层。</li></ol>
 <hr></section>
-<section class="chapter" id="chapter-4" data-title="ch04"><h2 id="第-4-章-因子挖掘算法谱系总览-六种范式与选型">第 4 章 因子挖掘算法谱系总览：六种范式与选型</h2>
-<blockquote><p>本章回答：在动手写任何一行挖掘代码之前，因子挖掘领域到底有哪些"常见打法"，它们各自的数学本质、代表工作和致命弱点是什么，以及面对一个新问题该先看哪一类文献。我们把后面六章要深挖的遗传规划、强化学习、大语言模型、神经网络与手工公式，连同稀疏回归、表征学习等"教材里常提但本书不单列"的方法，统一放进一张谱系图里，并给出一组可操作的选型判断。读完本章，你应当能在看到一个新框架时，先把它归到某一类范式，再预判它会在哪里翻车。</p></blockquote>
+<section class="chapter" id="chapter-4" data-title="ch04"><h2 id="第-4-章-因子挖掘算法谱系总览-范式小结卡与选型">第 4 章 因子挖掘算法谱系总览：范式小结卡与选型</h2>
+<blockquote><p>本章回答：因子挖掘领域到底有哪几种"找公式"的打法，每一种的<strong>原理</strong>是什么、具体<strong>怎么工作</strong>、产物长什么样、适合什么场景、又会在哪里翻车。我们把十一种范式逐一做成"范式小结卡"，其中遗传规划（GP）、强化学习（RL）、神经网络（NN）、大语言模型（LLM）四种是主流自动挖掘范式，后面有专章深读；其余七种——手工规则、确定性枚举、稀疏统计、对抗生成、蒙特卡洛树搜索、聚类集成、贝叶斯优化——在此一并讲清。读完本章，你应当能对一个新框架先归类、再预判它的优缺点。</p></blockquote>
 <h3 id="4-1-范式与框架-先分清两层">4.1 范式与框架：先分清两层</h3>
 <p>讨论"算法"之前，必须分开两个常被混用的词。</p>
-<p><strong>框架（framework）</strong> 是一份具体的工程实现：它有自己的算子清单、数据接口、默认参数和打包方式。qlib、RD-Agent、gplearn、AlphaGen、AlphaMaster、AlphaForge、FactorMiner 都是框架。同一个框架里往往塞进了不止一种范式——例如 qlib 既是算子与数据的"事实上标准"，又把自动挖掘外包给 RD-Agent；FactorMiner 一个包里就同时装着遗传规划、强化学习、大语言模型与神经网络四条生成路径。</p>
-<p><strong>范式（paradigm）</strong> 是对"因子从哪里来"这一根本问题的回答方式，与具体代码无关。它决定了：候选以什么数学对象表示（一棵树？一个网络权重？一段代码？）、靠什么信号引导搜索（适应度排序？梯度？奖励？）、以及最怕哪一种失败（膨胀？奖励作弊？泄漏？）。范式是稳定的，框架是流水的；一个范式可以被十几个框架各自实现，而一个框架的兴衰不改范式本身的功过。</p>
-<p>本书把因子挖掘的算法收敛到<strong>六个常见范式</strong>。前五个在后续章节逐一深读，第六个（经典统计与稀疏方法）虽然本书不单列章节，却是几乎所有实证资产定价研究的基座，必须在此讲清其位置：</p>
-<ol><li>手工规则与公式库（假设驱动 / 符号）</li><li>遗传规划与符号回归（数据驱动 / 符号 / 无梯度）</li><li>表征学习与深度网络（数据驱动 / 亚符号 / 梯度）</li><li>强化学习（数据驱动 / 序列决策 / 策略梯度）</li><li>大语言模型生成（数据驱动 / 神经-符号混合）</li><li>经典统计与稀疏方法（数据驱动 / 线性 / 梯度或闭式）</li></ol>
-<p>理解这六者的关键，是抓住两条主轴。第一条是<strong>驱动方式</strong>：因子到底来自研究者的经济直觉（假设驱动），还是来自对数据的某种自动扫描（数据驱动）。第二条是<strong>表示形式</strong>：因子是一个人能读的公式（符号），还是一个只有前向传播能算的黑盒（亚符号）。这两条轴几乎预言了每种范式 80% 的优缺点。</p>
-<h3 id="4-2-六个常见范式逐一速写">4.2 六个常见范式逐一速写</h3>
-<h4 id="4-2-1-手工规则与公式库">4.2.1 手工规则与公式库</h4>
-<p>这是最古老、也最不可替代的范式。研究者基于经济学逻辑（动量、反转、流动性、估值偏离）手写一个打分函数，例如 WorldQuant 公开的一百零一个公式化 Alpha（Kakushadze, 2016），它们由 <code>rank</code>、<code>ts_argmax</code>、<code>signed_power</code>、<code>decay_linear</code>、三元条件 <code>? :</code>、<code>adv{d}</code> 等约二十四类算子拼成。qlib 的 Alpha158 / Alpha360 则是"声明式模板"：把若干字段按时间位移铺开，自动生成数百个候选特征，本质仍是人工设计的特征工程。</p>
-<p>它的核心优势是<strong>可解释、可预注册、过拟合风险天然最低</strong>——因为公式在见数据之前就写好了，选择偏差被先验假设吸收。致命弱点是<strong>覆盖率受人类想象力上限约束</strong>，且当市场结构切换时，人工规则的更新速度远慢于自动搜索。本书第 6 章专门讲它"不是挖掘结果，而是基线与消融材料"的定位。</p>
-<h4 id="4-2-2-遗传规划与符号回归">4.2.2 遗传规划与符号回归</h4>
-<p>遗传规划（Genetic Programming, GP）把"找因子"改写成在表达式树空间上的随机搜索：一棵由算子与行情字段组成的抽象语法树（AST）就是一个候选，适应度（通常是截面 RankIC 或其组合）引导选择、交叉、变异，种群逐代演化（Koza, 1992 奠基）。gplearn 是这一范式最普及的开源实现（默认种群 1000、迭代 20 代、锦标赛规模 20、初始深度 2–6）；gpquant 把它推向量化，用约 60 个算子、把 fitness 直接定为回测 Sharpe。</p>
-<p>GP 的独特价值是<strong>能发现人类没写过的非线性组合，且产物仍是可读公式</strong>。但它有三道坎：表达式膨胀（bloat）、每一次评估都是一次独立假设检验（放大多重检验分母）、以及需要强闸门防止"公式越长越像过拟合"。本书第 7 章从树表示、闭包性质、锦标赛选择的概率推导一直讲到膨胀控制与真实陷阱。</p>
-<h4 id="4-2-3-表征学习与深度网络">4.2.3 表征学习与深度网络</h4>
-<p>这条路线放弃"可读公式"，转而把因子定义为某个可微网络的一个输出通道：输入是标准化后的行情面板，网络在训练目标（MSE、或直接与标签相关系数最大化的 IC Loss）指引下用反向传播学出一组权重，再把某个隐藏通道冻结成一个因子（"通道物化"）。AlphaForge（AAAI'25）用 DCGAN 式生成器生产因子、用卷积预测器打分；qlib 的模型层（LSTM、Transformer、图网络）也属于这一类，只是它把"自动挖掘器"留给了外部。</p>
-<p>优势是<strong>能捕捉高维非线性与跨标的复杂模式，且天然端到端</strong>。代价是黑盒不可解释、对样本量与非平稳极其敏感、训练产物与"可直接评分的因子"之间存在一道必须讲清的边界（权重本身不是因子，物化出的通道才是）。本书第 10 章展开。</p>
-<h4 id="4-2-4-强化学习">4.2.4 强化学习</h4>
-<p>强化学习（RL）把"构造一条公式"建模成马尔可夫决策过程：状态是已生成的表达式前缀（或 RPN 栈），动作是从词表里选一个算子 / 终端 / 窗口 / 停止符，奖励是整条轨迹终止时的一次性因子评价。与 GP 的本质区别在于：GP 是<strong>无模型演化</strong>，直接在个体上做选择；RL 是<strong>可学习的生成分布</strong>，把"什么样的结构值得生成"压缩进参数 θ，用策略梯度整体平移采样分布。AlphaGen 用 MaskablePPO + LSTM/Transformer 生成公式并即时喂入 AlphaPool；AlphaMaster 用 REINFORCE + 循环 Transformer + 定长 token 序列，配 Top-60 精英堆与 island 策略。</p>
-<p>RL 能天然做<strong>组合感知搜索</strong>（奖励可定义为"加入因子池后的组合增益"），但极度依赖两件事：把非法动作挡在外的<strong>动作掩码</strong>，以及 reward 口径的设计——直接优化回测收益几乎必然 reward hacking。本书第 8 章讲透"RL 挖因子的关键不是 PPO，是 masking"。</p>
-<h4 id="4-2-5-大语言模型生成">4.2.5 大语言模型生成</h4>
-<p>大语言模型（LLM）把因子构造变成"假设→代码→执行→反思"的闭环：模型基于可用字段与少量成功/失败示例，写出一段计算因子的 Python 代码，沙盒执行后算指标，再把结果回灌提示词作为下一轮反思。RD-Agent 把这一过程拆成"假设生成→规格→代码"两段式，并配 CoSTEER 单轮最多十次自纠错；LLM-Alpha-Mining-Framework 在代码触碰数据前用文本闸门拒掉约九成候选，并用 18 个生态位（MAP-Elites）做多样性管理。</p>
-<p>它的卖点是<strong>能借用模型训练语料里的金融常识，把"研究者的直觉"自动化</strong>，并能自然产出可读代码。最危险的不是"模型会不会写因子"，而是<strong>训练数据覆盖回测年份造成的隐性泄漏</strong>、幻觉代码，以及"反思记忆把验证集指标回灌提示词"这类温和但致命的违规。本书第 9 章细讲沙盒边界与统计闸门。</p>
-<h4 id="4-2-6-经典统计与稀疏方法">4.2.6 经典统计与稀疏方法</h4>
-<p>这一支不属于"自动挖掘新因子"的热门叙事，却是整个领域的计量基座，必须在此点名。它把因子视作对收益的横截面回归项：用 Lasso / SCAD / 弹性网在成百上千个候选特征上做<strong>稀疏线性回归</strong>，靠惩罚项而非搜索来挑出少数几个有解释力的因子；用 PCA / ICA 从大量异象中提取<strong>共同因子</strong>；用 Granger 因果、贝叶斯层次模型做因果与不确定性推断。Fama–MacBeth 两阶段回归、因子动物园（factor zoo）的稀疏化，都归在此类。</p>
-<p>它的优点是<strong>方差低、结论稳健、对多重检验友好（惩罚即正则）</strong>，缺点是表达力受限于线性与预设特征池，难以捕捉 GP/NN 能找到的复杂非线性。在本书中，它主要作为"基线对照"与"组合层降维（岭回归权重）"出现，不单列章节，但读者应清楚它始终在场。</p>
-<h3 id="4-3-一张总表-六种范式并排看">4.3 一张总表：六种范式并排看</h3>
-<div class="table-wrap"><table><thead><tr><th>范式</th><th>代表工作</th><th>核心机制</th><th>因子表示</th><th>优化方式</th><th>主要风险</th><th>深读</th></tr></thead><tbody><tr><td>手工规则 / 公式库</td><td>WorldQuant Alpha、qlib Alpha158/360</td><td>人工写公式，预注册后验证</td><td>符号（AST）</td><td>无（人定）</td><td>覆盖率受想象力约束</td><td>第 6 章</td></tr><tr><td>遗传规划 / 符号回归</td><td>gplearn、gpquant、AlphaGen(GP 基线)</td><td>种群演化表达式树</td><td>符号（AST）</td><td>无梯度、选择压力</td><td>膨胀、多重检验放大</td><td>第 7 章</td></tr><tr><td>表征学习 / 深度网络</td><td>AlphaForge、qlib 模型层</td><td>反向传播学出隐藏通道</td><td>亚符号（张量）</td><td>梯度（IC Loss / MSE）</td><td>黑盒、非平稳、可复现难</td><td>第 10 章</td></tr><tr><td>强化学习</td><td>AlphaGen、AlphaMaster</td><td>序列决策 + 策略梯度</td><td>符号（AST）</td><td>策略梯度（REINFORCE/PPO）</td><td>奖励作弊、不稳定、掩码缺失</td><td>第 8 章</td></tr><tr><td>大语言模型</td><td>RD-Agent、LLM-Alpha-Mining</td><td>假设→代码→反思闭环</td><td>神经-符号（代码）</td><td>无梯度、上下文更新</td><td>数据泄漏、幻觉、非确定</td><td>第 9 章</td></tr><tr><td>经典统计 / 稀疏</td><td>Lasso/SCAD、PCA/ICA、Fama–MacBeth</td><td>回归惩罚 / 矩阵分解</td><td>线性系数</td><td>梯度或闭式</td><td>表达力受限、依赖特征池</td><td>（基线对照）</td></tr></tbody></table></div>
-<h3 id="4-4-用四个维度给范式分类">4.4 用四个维度给范式分类</h3>
-<p>把表 4.3 转成可推理的坐标，更有用的是下面四个二分维度。每个范式都能在四维空间里定位，定位本身就能预判它的失败模式。</p>
+<p><strong>框架（framework）</strong> 是一份具体的工程实现：它有自己的算子清单、数据接口、默认参数和打包方式。qlib、RD-Agent、gplearn、AlphaGen、AlphaMaster、AlphaForge、FactorMiner 都是框架。同一个框架里往往塞进了不止一种范式——例如 AlphaForge 用 GAN 做主力生成器，同时把 gplearn、MaskablePPO 当作对照 baseline；FactorMiner 一个包里就同时装着 GP、RL、LLM、NN 四条生成路径。</p>
+<p><strong>范式（paradigm）</strong> 是对"因子从哪里来"这一根本问题的回答方式，与具体代码无关。它决定三件事：候选以什么数学对象表示（一棵树？一段代码？一组权重？）、靠什么信号更新（适应度排序？策略梯度？反向传播？还是上下文反思？）、以及最怕哪种失败（膨胀？奖励作弊？数据泄漏？）。范式是稳定的，框架是流水的；一个范式可被十几个框架各自实现，框架兴衰不改范式本身的功过。</p>
+<p>本章把算法收敛到<strong>十一种范式</strong>。它们在本书中的地位并不相同，先给一张地图：</p>
+<div class="table-wrap"><table><thead><tr><th>层级</th><th>范式</th><th>本书位置</th></tr></thead><tbody><tr><td>主力自动范式（专章深读）</td><td>遗传规划 GP、强化学习 RL、大语言模型 LLM、神经网络 NN</td><td>第 7–10 章</td></tr><tr><td>基础与对照范式（讲清定位）</td><td>手工规则与公式库、经典统计与稀疏方法</td><td>第 6 章 / 基线对照</td></tr><tr><td>补充范式（本章讲清）</td><td>确定性枚举、对抗生成 GAN、蒙特卡洛树搜索、聚类与集成选择、贝叶斯优化</td><td>本章 4.3</td></tr></tbody></table></div>
+<p><strong>证据层级的诚实声明</strong>：下面每张小结卡里，凡标 <code>【源码实证】</code> 的框架细节都来自项目内 <code>docs/research/</code> 的源码实读报告；凡标 <code>【学界常见】</code> 的，是该领域通用方法，但在本次调研的 20+ 框架中<strong>未作为主力范式出现</strong>，故只讲原理与工作方式，不虚构某框架的具体实现。这个区分贯穿全书。</p>
+<p>理解这些范式的关键，是抓住两条主轴。第一条是<strong>驱动方式</strong>：因子来自研究者的经济直觉（假设驱动），还是来自对数据的自动扫描（数据驱动）。第二条是<strong>表示形式</strong>：因子是一个人能读的公式（符号），还是只有前向传播能算的黑盒（亚符号）。这两条轴几乎预言了每种范式 80% 的优缺点。</p>
+<h3 id="4-2-四大主力自动范式-逐张小结卡">4.2 四大主力自动范式：逐张小结卡</h3>
+<p>这一节是全书四种主力挖掘范式的"浓缩卡片"。每张卡按同一模板组织：<strong>定位 → 原理 → 工作方式 → 产物与信号 → 代表框架 → 优势与陷阱 → 一句话小结</strong>。想要公式推导与源码细节的读者，按卡末指引读第 7–10 章。</p>
+<h4 id="4-2-1-遗传规划-gp-把公式当作个体来演化">4.2.1 遗传规划（GP）：把公式当作个体来演化</h4>
+<p><strong>定位</strong>。把"找因子"改写为在表达式树空间上的随机搜索：一棵由算子与行情字段组成的抽象语法树（AST）就是一个候选，适应度引导选择、交叉、变异，种群逐代演化。</p>
+<p><strong>原理</strong>。设算子集 F（每个带元数 arity 1 或 2）、终端集 T（行情字段与临时常数），一棵合法树递归定义为：叶子取自 T，内部节点取自 F 且子节点数等于 arity，根的输出即因子面值。搜索空间由 Catalan 数量级给出，深度 d=4 时已远超可枚举范围，所以 GP 只能是"带选择压力的随机游走"：</p>
+<pre><code>f       = Eval(tree, X)                    # tree: AST，X: 行情面板
+RankIC  = (1/T) · Σ_t spearman(f_t, r_{t+1})
+fitness = Φ(RankIC, RankIC_oos, coverage, turnover, …)
+adjusted = fitness / (1 + parsimony · depth)   # 简约压力，FactorMiner parsimony=0.05</code></pre>
+<p>GP 只用 Φ 的<strong>序关系</strong>（谁更大），不要求可导——这是它能处理离散、变长公式的根本原因。锦标赛选择的概率有闭式解：按 fitness 降序排名为 i 的个体，在规模 k 的锦标赛中胜出概率为 <code>[C(N−i+1,k) − C(N−i,k)] / C(N,k)</code>，直接给出"小种群必须配小 k"的调参依据。</p>
+<p><strong>工作方式</strong>（一次 GP 挖掘的完整循环）：</p>
+<ol><li><strong>初始化</strong>：用 grow / full / half-and-half 生成 N 棵合法树，深度限制 2–6；临时常数由 uniform(−2,2) 之类分布抽取。</li><li><strong>评价</strong>：对每棵树算 AST 得到因子面值 f，再算 RankIC、覆盖率、换手、成本净收益，合成 fitness。</li><li><strong>选择</strong>：做 N 次锦标赛，每次随机抽 k 个个体，取其中 fitness 最高者获得繁殖资格。</li><li><strong>繁殖</strong>：按概率执行子树交叉、点变异、子树变异、hoist 变异（缩短树高以控制膨胀）、复制。</li><li><strong>精英保留</strong>：把最优若干棵原样带入下一代——不写回种群就会"任务成功但零产物"。</li><li><strong>去重与记账</strong>：源码 MD5 硬去重 + 面值相关性软去重；每评估一个候选，<code>num_trials += 1</code>。</li><li><strong>终止</strong>：达到代数上限或 fitness 停滞，输出 <code>state.population</code> 中的优秀个体。</li></ol>
+<p><strong>产物与信号</strong>：可读的 AST 公式；优化信号是离散适应度的序关系（无梯度）。</p>
+<p><strong>代表框架</strong> <code>【源码实证】</code>：gplearn（默认种群 1000 / 20 代 / 锦标赛 20 / 初始深度 2–6，17 内置 + 5 保护算子，<code>parsimony_coefficient=&#x27;auto&#x27;</code>）；gpquant（约 60 算子，fitness 直接用回测 Sharpe，固定 <code>[:400]/[400:800]</code> 单次切分）；AlphaGen 的 GP baseline；FactorMiner GP（种群 20 / 最大深度 4 / 锦标赛 k=3 / 交叉 0.8 / 变异 0.3 / 精英 2，<code>crypto_seed_ratio=0.3</code>）。</p>
+<p><strong>优势与陷阱</strong>：产物可读、无需梯度、对算子集友好；但必然面对表达式膨胀、每次评估都是一次独立假设检验（放大多重检验分母）、以及常数/全零因子在相关性下产生虚高的坑。</p>
+<blockquote><p><strong>一句话小结</strong>：GP 是"在公式语法树上的达尔文式搜索"——用锦标赛和变异代替梯度，代价是膨胀与试验次数爆炸。深读第 7 章。</p></blockquote>
+<h4 id="4-2-2-强化学习-rl-把因子构造建模为序列决策">4.2.2 强化学习（RL）：把因子构造建模为序列决策</h4>
+<p><strong>定位</strong>。把"写一条公式"建模成马尔可夫决策过程（MDP）：状态是已生成的表达式前缀（RPN 栈），动作是选一个算子 / 终端 / 窗口 / 停止符，奖励是整条轨迹终止时的一次性因子评价。</p>
+<p><strong>原理</strong>。目标与策略梯度是整套方法的地基：</p>
+<pre><code>J(θ)  = E_{τ~π_θ}[ R(τ) ]                         # 期望回报
+∇J(θ) = E_τ[ R(τ) · Σ_t ∇log π_θ(a_t|s_t) ]       # log-derivative trick
+∇J(θ) = E_τ[ Σ_t ∇log π_θ(a_t|s_t) · (R − b) ]    # 加 baseline b，只减方差不改期望
+J&#x27;(θ) = J(θ) + β·H(π_θ),  H = −Σ_a π log π        # 熵正则防坍缩</code></pre>
+<p>与 GP 的本质差别：GP 是<strong>无模型演化</strong>，直接在个体上选择，没有跨代参数记忆；RL 是<strong>可学习的生成分布</strong>，把"什么结构值得生成"压缩进参数 θ，用梯度整体平移采样分布。采用 softmax 参数化时，两个闭式梯度反复出现：<code>∇_z log π(a|s) = e_a − p</code>（one-hot 减概率向量）、<code>∂H/∂z_a ∝ −p_a(log p_a + 1)</code>。</p>
+<p><strong>工作方式</strong>（一次 RL 训练 + 采样循环）：</p>
+<ol><li><strong>定义 MDP</strong>：状态 = 当前栈/前缀；动作 = 词表中的 token；转移由栈的弹压规则确定（确定性）；终止时折叠成 AST。</li><li><strong>动作掩码</strong>：把违反栈深约束（<code>delta = 1 − arity</code>）、剩余步数无法归约到 1 的非法位 logits 置为 <code>−1e8/−1e9</code>，使采样天然合法。</li><li><strong>采样轨迹</strong>：按 <code>π_θ</code> 逐 token 采样 L 步，得到公式 τ，执行后得奖励 R(τ)。</li><li><strong>计算优势</strong>：<code>advantages = reward − mean(rewards)</code>（batch baseline），降低梯度方差。</li><li><strong>策略更新</strong>：REINFORCE 用 <code>grad_log p = one_hot − p</code> 累加 <code>advantage · grad_log p</code>，再加熵梯度，logits clip 到 ±20 防溢出。</li><li><strong>出样</strong>：轨迹是训练产物；把每条轨迹折叠成的 AST 表达式连同指标写入 <code>state.population</code>，才是研究产物。</li></ol>
+<p><strong>产物与信号</strong>：采样分布参数 θ（训练产物）+ 一批带指标的 AST 表达式（研究产物）；优化信号是奖励的似然比梯度。</p>
+<p><strong>代表框架</strong> <code>【源码实证】</code>：AlphaGen（MaskablePPO + LSTM/Transformer 策略网络，reward 是加入 AlphaPool 后的组合增量 <code>new_obj</code>，<code>loss = wᵀMw − 2wᵀc + 1 + α‖w‖₁</code>，α=5e-3，mutual IC&gt;0.99 拒收）；AlphaMaster（REINFORCE + LoopedTransformer + 8 token 定长序列 + Top-60 精英堆 + island）；FactorMiner RL（纯 NumPy 概率字典，无 PyTorch 依赖，traj_len 4 / lr 0.05 / entropy_coef 0.01 / batch 10，<code>get_source()</code> 返回 AST 而非动作序列）。</p>
+<p><strong>优势与陷阱</strong>：能学出"生成分布"、天然可做组合感知搜索；但成败系于两件事——<strong>动作掩码</strong>（没有它则大量非法候选浪费试验预算）与 <strong>reward 口径</strong>（直接优化回测收益几乎必然 reward hacking）。此外训练产物与可评分因子是两类东西，策略权重不等于因子。</p>
+<blockquote><p><strong>一句话小结</strong>：RL 是"学着写公式的生成分布"——关键从来不是 PPO 还是 REINFORCE，而是动作掩码与诚实的 reward。深读第 8 章。</p></blockquote>
+<h4 id="4-2-3-神经网络-nn-端到端表征与通道因子">4.2.3 神经网络（NN）：端到端表征与通道因子</h4>
+<p><strong>定位</strong>。放弃"可读公式"，把因子定义为某个可微网络的一个输出通道：输入标准化行情面板，网络在训练目标指引下用反向传播学出权重，再把某个隐藏通道冻结成独立因子（"通道物化"）。</p>
+<p><strong>原理</strong>。训练目标是 MSE 与 Pearson IC Loss 的联合：</p>
+<pre><code>L = (1 − α)·MSE(pred, y) + α·(1 − corr(pred, y))    # FactorMiner 教学模板 α 默认 0.7
+channels   = tanh(X @ W1 + b1)                       # 隐藏通道
+prediction = channels @ W2 + b2
+gram  = W1ᵀW1;  off_diag = gram − diag(diag(gram))    # 通道去相关惩罚
+dW1  += diversity · 4 · (W1 · off_diag)</code></pre>
+<p>为什么要直接优化 IC？因为 MSE 关心数值拟合，而交易只关心<strong>秩序</strong>（谁涨得多）；IC Loss 把优化目标对齐到截面秩相关。通道去相关惩罚则迫使不同隐藏通道学到互补信号，而不是挤在同一个方向上。</p>
+<p><strong>工作方式</strong>（一次 NN 因子挖掘）：</p>
+<ol><li><strong>构造张量</strong>：把面板转成 <code>样本 × 特征</code> 的过去式特征矩阵（只能用当前及更早的数据），标签是前瞻收益。</li><li><strong>标准化</strong>：在<strong>训练段</strong> fit scaler（mean/std），再应用到验证/测试段——全样本 fit 会泄漏。</li><li><strong>前向与损失</strong>：算 channels 和 prediction，联合 MSE + IC Loss + L2 + Gram 去相关。</li><li><strong>反向传播</strong>：梯度裁剪（clip 5.0），早停（patience 20），逐轮在样本外算 RankIC。</li><li><strong>通道物化</strong>：选出样本外表现最好的隐藏通道 <code>channel_idx</code>，冻结其权重，导出 <code>.npz</code> 工件，产出一个独立因子 <code>FactorExpressionTensor(model_version_id, channel_idx)</code>。</li><li><strong>入池与跨轮保留</strong>：按样本外 fitness 排名取 Top-K，跨轮保留全程最优，写入 <code>state.population</code>。</li></ol>
+<p><strong>产物与信号</strong>：可序列化的模型工件 + 物化后的通道因子；优化信号是损失的梯度。</p>
+<p><strong>代表框架</strong> <code>【源码实证】</code>：AlphaForge（AAAI'25，GAN 生成器 + Conv Predictor + 可微掩码，predictor 用 <code>weighted_mse_loss</code> 减少真实 evaluate 次数，入池阈值 <code>ic&amp;gt;0.03 &amp;amp; icir&amp;gt;0.1</code>）；qlib 模型层（LSTM/Transformer/图网络，但无挖掘器）；FactorMiner NN（纯 NumPy MLP，He 初始化，MODEL_FORMAT <code>numpy_mlp_factor_v1</code>；真正 Miner 在 <code>user_workspace/custom_miners/my_custom_nn.py</code>，hidden_dim 8 / lr 0.01 / epochs 50 / diversity 1e-3 / top_k_factors 5）。</p>
+<p><strong>优势与陷阱</strong>：表达力最强、天然端到端；但黑盒不可解释、对样本量与非平稳极敏感，且必须守住硬边界——<strong>网络权重不是因子，物化出的通道才是</strong>；训练张量也不能直接当可保存因子。</p>
+<blockquote><p><strong>一句话小结</strong>：NN 是"用梯度学出一个黑盒表征、再冻结某个通道当因子"——最强也最难证伪，边界在通道物化。深读第 10 章。</p></blockquote>
+<h4 id="4-2-4-大语言模型-llm-假设-代码-反思闭环">4.2.4 大语言模型（LLM）：假设→代码→反思闭环</h4>
+<p><strong>定位</strong>。把因子构造变成"假设生成 → 写代码 → 沙盒执行 → 看指标 → 反思 → 下一轮"的闭环，用自然语言的常识与推理能力替代手工设计。</p>
+<p><strong>原理</strong>。LLM 范式没有参数更新——<strong>更新的是上下文，不是权重</strong>。它把历史成功/失败经验、可用字段语义、评价指标组装进提示词，让模型产出代码；沙盒执行后把结果再写回提示词，形成 few-shot 反馈：</p>
+<pre><code>prompt_t = system(字段语义) + few-shot(成功池 top-5, 失败池 top-5) + reflection(上轮失败原因)
+code_t   = LLM(prompt_t) 经代码块抽取
+factor_t = Sandbox.run(code_t)        # AST 白名单 + 资源限制
+V_t      = evaluate(factor_t)         # IC / RankIC / 成本净收益
+archive  ← (code_t, V_t);  prompt_{t+1} = prompt_t + reflection(V_t)</code></pre>
+<p><strong>工作方式</strong>（一次 LLM 挖掘循环）：</p>
+<ol><li><strong>初始化</strong>：注入可用字段清单与语义（FactorMiner 还注入 <code>CRYPTO_STREAM_SPECS.rationale</code>），限制 <code>latest_visible_year</code> 防模型"背诵"回测年份。</li><li><strong>生成</strong>：模型产出 Python 因子代码；用 <code>prompt_hash = sha256(prompt)</code> 记录来源，抽取围栏代码块（fenced code block），附 provenance（generator/model/prompt_sha256/iteration）。</li><li><strong>校验与执行</strong>：AST 白名单检查（禁 <code>_</code> 前缀、禁私有赋值、常数 ≤1e6、幂次 ≤6），必须在 multiprocessing spawn 子进程 + 墙钟超时内把结果赋给 <code>factor</code>；再校验索引对齐。</li><li><strong>评价与反思</strong>：算指标，成功/失败 reflection 各留 100 条，取最近 5+5 组装下一轮 few-shot。</li><li><strong>出样</strong>：<code>state.population = successful</code> 集合；正式档案只持久化 Prompt 的 SHA-256，完整提示词存于旁路 recorder。</li></ol>
+<p><strong>产物与信号</strong>：一段可读的因子代码 + provenance；优化信号是自然语言反思与 few-shot 上下文更新（无梯度）。</p>
+<p><strong>代表框架</strong> <code>【源码实证】</code>：RD-Agent（微软，假设→规格→代码两段式 JSON，CoSTEER 单轮最多 10 次自纠错，SOTA 库 0.99 相关去重）；LLM-Alpha-Mining-Framework（文本 gate 在碰 DataFrame 前拒掉约 90%，anti-paraphrase 六层去重，18-niche MAP-Elites = horizon 3 × data family 3 × turnover 2）；CosmosAlpha（MCTS/UCT + Graph Flow + Pareto）；FactorMiner LLM（顺序 / cross_asset 双模式，batch_size 5，<code>RestrictedSandbox</code>）。</p>
+<p><strong>优势与陷阱</strong>：能把研究者直觉自动化、产物天然是可读代码；但最危险的不是"模型会不会写因子"，而是<strong>训练数据覆盖回测年份的隐性泄漏</strong>、幻觉代码、以及反思记忆把验证集指标回灌提示词。同 prompt 重复采样还会快速烧光 <code>num_trials</code>。外部 API 非确定，需旁路 recorder 做确定性回放。</p>
+<blockquote><p><strong>一句话小结</strong>：LLM 是"用反思记忆驱动代码生成的搜索"——更新的是上下文而非权重，成败在沙盒边界与防泄漏。深读第 9 章。</p></blockquote>
+<h3 id="4-3-其他七种范式-逐张小结卡">4.3 其他七种范式：逐张小结卡</h3>
+<p>这七种范式要么是所有研究的基线（手工、稀疏统计），要么在调研框架里以"主方法"或"组合层"身份真实存在（枚举、GAN、MCTS、聚类集成），要么是该领域常见但本次调研未作为主力范式出现的通用方法（贝叶斯优化）。每种同样给小结卡。</p>
+<h4 id="4-3-1-手工规则与公式库">4.3.1 手工规则与公式库</h4>
+<p><strong>定位</strong>。研究者基于经济逻辑（动量、反转、流动性、估值偏离）手写一个打分函数，在见数据之前就定好。</p>
+<p><strong>原理</strong>。把经济假设直接翻译成一个确定性函数 <code>f(X) → 截面打分</code>，候选不由搜索产生，而由人脑假设驱动，因此选择偏差被先验假设吸收，不进入 <code>num_trials</code> 分母（前提是<strong>真的</strong>没反复试）。</p>
+<p><strong>工作方式</strong>：① 从经济逻辑提出假设；② 选字段与算子写成公式；③ 在样本外一次性验证；④ 若不成立，修订假设并<strong>记入试验日志</strong>；⑤ 与自动范式的结果做消融对照。</p>
+<p><strong>产物与信号</strong>：可读公式；无自动更新信号（人来更新）。</p>
+<p><strong>代表框架</strong> <code>【源码实证】</code>：WorldQuant 101 Formulaic Alphas（Kakushadze 2016，约 24 类算子拼成，含 <code>rank</code>、<code>ts_argmax</code>、<code>signed_power</code>、<code>decay_linear</code>、三元条件 <code>? :</code>、<code>adv{d}</code>）；qlib Alpha158 / Alpha360（声明式模板，Alpha360 = 6 字段 × 60 位移，Alpha158 = kbar + price + rolling 组 × 5 窗口）。</p>
+<p><strong>优势与陷阱</strong>：可解释、可预注册、过拟合风险天然最低；但覆盖率受人类想象力约束，市场结构切换时更新慢。它是<strong>基线与消融材料，不是挖掘结果</strong>。</p>
+<blockquote><p><strong>一句话小结</strong>：手工规则是"假设先行、验证在后"的范式——最诚实，但最慢；它是标尺，不是产量。深读第 6 章。</p></blockquote>
+<h4 id="4-3-2-确定性枚举与模板组合">4.3.2 确定性枚举与模板组合</h4>
+<p><strong>定位</strong>。不搜索"公式结构"，而是把一组固定模板的参数（窗口、字段、组合方式）按网格展开，穷举出成百上千个候选。</p>
+<p><strong>原理</strong>。设模板集合 P、参数网格 G，候选集 = <code>{p(g) | p ∈ P, g ∈ G}</code>，规模是网格的笛卡尔积。它不做学习，靠<strong>覆盖</strong>换取发现：只要真实信号落在模板族里，枚举就不会漏。</p>
+<p><strong>工作方式</strong>：① 定义模板族（如 <code>ts_rank(field, window)</code>）；② 展开窗口 <code>(6,12,24,48)</code> 与字段集；③ 对每个候选算 IC/RankIC；④ 组合层做两两组合；⑤ 用 Spearman 相关去重（如阈值 0.75）；⑥ 上多重检验闸门。</p>
+<p><strong>产物与信号</strong>：一批参数化的固定公式；无学习信号，只有筛选。</p>
+<p><strong>代表框架</strong> <code>【源码实证】</code>：crypto-factor-lab（21-op DSL 的 AST 枚举 + 受约束 LLM 提议）；alpha-factor-mining-crypto（13 核心 + 40 多窗口 + 40 组合，去冗余 Spearman <code>corr_threshold=0.75</code>，<code>score = 0.7·|spread_ir| + 0.3·|ic_ir|</code>）。</p>
+<p><strong>优势与陷阱</strong>：实现简单、可复现、覆盖确定；但参数网格的组合爆炸<strong>等于隐式多重检验</strong>——枚举一万个候选却按一次检验报告，是最常见的统计谎言来源。</p>
+<blockquote><p><strong>一句话小结</strong>：枚举是"用覆盖换发现"的蛮力法——便宜可靠，但必须把候选总数老老实实记进 <code>num_trials</code>。</p></blockquote>
+<h4 id="4-3-3-经典统计与稀疏方法">4.3.3 经典统计与稀疏方法</h4>
+<p><strong>定位</strong>。把因子视作对收益的横截面回归项，用惩罚与矩阵分解从大堆特征里挑出少数稳健因子。</p>
+<p><strong>原理</strong>。稀疏回归在 OLS 上加 L1/SCAD 惩罚，把不重要的系数压到零：</p>
+<pre><code>β̂ = argmin_β [ (1/2)‖y − Xβ‖² + λ·Ω(β) ]    # Ω = |β|₁ (Lasso) 或 SCAD</code></pre>
+<p>惩罚项同时是正则与"选择器"，因此天然对多重检验友好；PCA/ICA 则从异象矩阵里提取共同因子作为降维表示。</p>
+<p><strong>工作方式</strong>：① 收集大特征池（因子动物园）；② 标准化后做 LassoCV / RidgeCV / 弹性网；③ 保留非零系数特征；④ 用 Fama–MacBeth 两阶段估计风险溢价与 t 值；⑤ 用 Newey–West 修正序列相关。</p>
+<p><strong>产物与信号</strong>：稀疏线性组合的系数；优化信号是带惩罚的损失梯度或闭式解。</p>
+<p><strong>代表框架</strong> <code>【源码实证】</code>：<code>alpha-factor-mining-crypto</code> 的 <code>regularized_optimize</code>（LassoCV/RidgeCV）与 <code>cluster_select</code>（层次聚类）；AlphaForge-Crypto 的 ICWeighted / Ridge / OptimalShrinkage(Ledoit-Wolf) 组合；FactorMiner 的岭回归组合（<code>λ=1.0</code>，<code>min_obs=60</code>，异常退化等权）。</p>
+<p><strong>优势与陷阱</strong>：方差低、结论稳健、最易通过统计审查；但表达力受限于线性与预设特征池，难以捕捉 GP/NN 能找到的非线性。</p>
+<blockquote><p><strong>一句话小结</strong>：稀疏统计是"用惩罚代替搜索"的稳健派——不惊艳，却最难被证伪推翻，是所有自动范式的计量基座。</p></blockquote>
+<h4 id="4-3-4-对抗生成-gan">4.3.4 对抗生成（GAN）</h4>
+<p><strong>定位</strong>。用一个生成器网络直接产出因子表达式的 token 序列，用一个判别/预测网络给候选打分，两者对抗训练。</p>
+<p><strong>原理</strong>。生成器 <code>G(z)</code> 把随机噪声 <code>z∈ℝ¹⁰⁰</code> 映射成表达式 logits，经可微掩码与 Gumbel-Softmax 采样成合法公式；预测器 <code>P</code> 用真实评价分数作标签学习"给公式打分"，从而<strong>减少对昂贵的真实 evaluate 的调用次数</strong>。生成器损失把"让预测器给高分"与多样性正则绑在一起：</p>
+<pre><code>loss_G = −mean(pred) + loss_simi + loss_potential    # 后者惩罚与已生成样本/隐空间过相似</code></pre>
+<p><strong>工作方式</strong>：① 生成器输出 <code>(batch, 20, SIZE_ACTION)</code> logits；② 无参数掩码器把非法动作置 <code>−1e8</code>；③ <code>Gumbel-Softmax(hard=True)</code> 采样使离散采样可微；④ 预测器用 <code>weighted_mse_loss</code>（近期样本权重 2）+ 早停学习打分；⑤ 生成器按 −mean(pred) + 相似度惩罚更新；⑥ 把入池阈值达标的公式存入 zoo。</p>
+<p><strong>产物与信号</strong>：一批 token 序列公式；优化信号是预测器的可微代理分数（代理真实评价）。</p>
+<p><strong>代表框架</strong> <code>【源码实证】</code>：AlphaForge（AAAI'25 的<strong>主方法</strong>，DCGAN 生成器 + Conv Predictor，23 启用算子 / 窗口 <code>[1,5,10,20,30,40,50]</code>，<code>zoo_size=100</code>，入池阈值 <code>ic&amp;gt;0.03 &amp;amp; icir&amp;gt;0.1</code>，NaN&gt;0.8 / 唯一值&lt;0.01 / 与 zoo 相关过高置 0）。</p>
+<p><strong>优势与陷阱</strong>：生成器能学到复杂分布、代理预测器大幅降低 evaluate 成本；但引入 GAN 训练不稳定性，且预测器是"对真实指标的近似"——代理被优化过头就会与真实目标脱节。调研确认它<strong>没有</strong> FDR / Holm / purge 校正，防过拟合靠多段切分 + 早停 + 相关过滤。</p>
+<blockquote><p><strong>一句话小结</strong>：GAN 是"用可微代理模型给公式打分、反过来训练生成器"——快，但要警惕代理与真实评价的漂移。</p></blockquote>
+<h4 id="4-3-5-蒙特卡洛树搜索-mcts">4.3.5 蒙特卡洛树搜索（MCTS）</h4>
+<p><strong>定位</strong>。把表达式构造当作树搜索问题，用 UCT（Upper Confidence bound applied to Trees）在"探索新结构"与"利用已知好结构"之间平衡。</p>
+<p><strong>原理</strong>。每个节点是一个部分表达式，选择阶段用 UCT 值挑子节点：</p>
+<pre><code>UCT = mean_reward + c · sqrt( ln(N_parent) / N_child )    # c 控制探索强度</code></pre>
+<p>叶节点展开后做随机模拟（rollout）得到奖励，再沿路径反向传播更新访问数与奖励均值。与 GP 的"无记忆演化"不同，MCTS 显式维护一棵带统计量的搜索树。</p>
+<p><strong>工作方式</strong>：① 从根节点（空表达式）开始；② 按 UCT 选子节点直到叶；③ 展开叶节点的一个合法动作；④ rollout 出完整公式并评价；⑤ 反向传播奖励与访问数；⑥ 重复若干轮后取奖励最高的完整路径。</p>
+<p><strong>产物与信号</strong>：搜索树上的高分公式路径；优化信号是 rollout 奖励的反向传播。</p>
+<p><strong>代表框架</strong> <code>【源码实证】</code>：CosmosAlpha（MCTS/UCT + Graph Flow 效用传播 + 三维 Pareto 选择 <code>(|ric|, −std, top20)</code> + 类型化 DSL + LightGBM，<code>【学界常见】</code> 的 UCT 公式即其选择核心）。</p>
+<p><strong>优势与陷阱</strong>：能有系统地探索结构化空间、天然支持多目标 Pareto；但每次 rollout 都要评价公式，成本高， CosmosAlpha 同样<strong>无独立 holdout / 无多重检验</strong>，四个挖因子配置在同一窗口内评估选择扩散。</p>
+<blockquote><p><strong>一句话小结</strong>：MCTS 是"带记忆与探索/利用权衡的公式树搜索"——比 GP 更系统，但同样躲不过"搜索次数即检验次数"。</p></blockquote>
+<h4 id="4-3-6-聚类与集成选择">4.3.6 聚类与集成选择</h4>
+<p><strong>定位</strong>。不在"生成新公式"上下功夫，而在"已有因子池里挑谁、怎么加权"——把选择本身当作可优化的问题。</p>
+<p><strong>原理</strong>。用相关性/层次聚类把高度相似的因子分组，每组选代表，降低冗余；再用贪心前向或集成回归决定权重：</p>
+<pre><code>greedy_forward: 按 |IC_IR| 排序加入，要求 max_corr ≤ 0.7, min_ic_ir ≥ 0.3
+combiner:       EqualWeight / ICWeighted / Ridge / LightGBM / OptimalShrinkage</code></pre>
+<p><strong>工作方式</strong>：① 计算因子间相关矩阵；② 层次聚类分组，组内按 IC_IR 选代表；③ 贪心前向加入不超相关阈值的因子；④ 用验证窗口拟合组合权重；⑤ 逐期（如 <code>shift=21</code>）用历史窗口重估权重。</p>
+<p><strong>产物与信号</strong>：一个因子子集 + 权重向量；优化信号是 IC_IR 或组合目标。</p>
+<p><strong>代表框架</strong> <code>【源码实证】</code>：<code>alpha-factor-mining-crypto</code> 的 <code>cluster_select</code> + <code>greedy_forward(max_corr=0.7, min_ic_ir=0.3, max_factors=15)</code>；AlphaForge-Crypto 的 5 种 combiner；AlphaForge 的逐日 <code>torch.linalg.lstsq</code> 动态组合（<code>shift=21</code>，只用历史窗口，明确的防前视设计）。</p>
+<p><strong>优势与陷阱</strong>：能显著改善组合层面的稳健性、降低因子冗余；但它<strong>放大而非减少</strong>上游搜索的选择偏差——网格扫描 <code>max_corr × min_ic_ir</code> 产出 12 组候选却未做多重检验校正，就是现成的反面例子。</p>
+<blockquote><p><strong>一句话小结</strong>：聚类集成是"把选择当优化"的组合范式——能把一堆公式收成一个组合，但绝不替你背统计责任。深读第 11 章。</p></blockquote>
+<h4 id="4-3-7-贝叶斯优化-超参-结构寻优">4.3.7 贝叶斯优化（超参/结构寻优）</h4>
+<p><strong>定位</strong>。用贝叶斯推断指导"下一步该试哪个配置"，目标是用尽量少的评价次数找到最优超参或结构参数。 <code>【学界常见：本次调研的 20+ 框架未以其为挖掘主范式，此处讲通用原理】</code></p>
+<p><strong>原理</strong>。维护一个代理模型（常用高斯过程）拟合"配置 → 目标值"的未知函数，并用采集函数决定下一个试验点：</p>
+<pre><code>EI(x) = E[ max(0, f(x) − f_best) ]      # Expected Improvement：期望改进
+x_next = argmax_x EI(x)                  # 在&quot;高均值&quot;与&quot;高不确定&quot;之间平衡</code></pre>
+<p>高斯过程给出每个点的均值与方差，EI 自然实现探索/利用权衡；每观察一个新点，后验更新，再选下一点。</p>
+<p><strong>工作方式</strong>：① 定义搜索空间（窗口、深度、阈值、算子概率等）；② 随机采样若干初始点并评价；③ 用观测数据拟合高斯过程后验；④ 最大化 EI 选下一个配置；⑤ 评价并更新后验；⑥ 达预算后取最优配置。</p>
+<p><strong>产物与信号</strong>：一组最优超参/结构配置；优化信号是采集函数（基于代理模型的不确定性估计）。</p>
+<p><strong>代表框架</strong> <code>【学界常见】</code>：自动化机器学习（AutoML / HPO）领域的通用工具（如 Gaussian-process-based BO、TPE、SMAC）；在因子挖掘中，它更多作为<strong>其他范式的内层加速器</strong>——给 GP/NN 找更好的超参，而不是直接产出表达式。本次调研的框架中未见以其为生成主力的实例，故不列源码引用。</p>
+<p><strong>优势与陷阱</strong>：样本效率高于网格/随机搜索，适合"评价很贵"的场景；但代理模型本身有建模误差，且<strong>每试一个配置仍是一次假设检验</strong>——把 BO 用在回测目标上，若不记 <code>num_trials</code>，同样是过拟合温床。</p>
+<blockquote><p><strong>一句话小结</strong>：贝叶斯优化是"用代理模型聪明地试参数"——省评价次数，但不省统计责任；它是加速器，不是生成器。</p></blockquote>
+<h3 id="4-4-全范式总表-十一种范式并排看">4.4 全范式总表：十一种范式并排看</h3>
+<div class="table-wrap"><table><thead><tr><th>范式</th><th>核心机制</th><th>因子表示</th><th>优化信号</th><th>代表框架</th><th>主要风险</th><th>深读</th></tr></thead><tbody><tr><td>手工规则 / 公式库</td><td>人写公式，预注册后验证</td><td>符号（AST）</td><td>无（人定）</td><td>WorldQuant Alpha、qlib Alpha158/360</td><td>覆盖率受想象力约束</td><td>第 6 章</td></tr><tr><td>遗传规划 GP</td><td>种群演化表达式树</td><td>符号（AST）</td><td>适应度序关系</td><td>gplearn、gpquant、FactorMiner</td><td>膨胀、多重检验放大</td><td>第 7 章</td></tr><tr><td>强化学习 RL</td><td>序列决策 + 策略梯度</td><td>符号（AST）</td><td>奖励的似然比梯度</td><td>AlphaGen、AlphaMaster、FactorMiner</td><td>奖励作弊、掩码缺失</td><td>第 8 章</td></tr><tr><td>大语言模型 LLM</td><td>假设→代码→反思闭环</td><td>神经-符号（代码）</td><td>上下文 / 反思更新</td><td>RD-Agent、LLM-Alpha-Mining</td><td>数据泄漏、幻觉、非确定</td><td>第 9 章</td></tr><tr><td>神经网络 NN</td><td>反向传播学隐藏通道</td><td>亚符号（张量）</td><td>损失梯度</td><td>AlphaForge、FactorMiner NN</td><td>黑盒、非平稳、边界混淆</td><td>第 10 章</td></tr><tr><td>确定性枚举</td><td>模板 × 参数网格展开</td><td>参数化公式</td><td>筛选（无学习）</td><td>crypto-factor-lab、alpha-mining-crypto</td><td>组合爆炸 = 隐式多重检验</td><td>本章</td></tr><tr><td>经典统计 / 稀疏</td><td>回归惩罚 / 矩阵分解</td><td>线性系数</td><td>惩罚损失梯度/闭式</td><td>LassoCV、Fama–MacBeth、FactorMiner 岭</td><td>表达力受限</td><td>基线对照</td></tr><tr><td>对抗生成 GAN</td><td>生成器 + 可微代理预测器</td><td>token 序列</td><td>代理分数梯度</td><td>AlphaForge</td><td>代理漂移、训练不稳</td><td>本章</td></tr><tr><td>蒙特卡洛树搜索</td><td>UCT 探索/利用 + rollout</td><td>搜索树路径</td><td>奖励反传</td><td>CosmosAlpha</td><td>评价昂贵、无 holdout</td><td>本章</td></tr><tr><td>聚类与集成选择</td><td>相关聚类 + 贪心/集成加权</td><td>因子子集 + 权重</td><td>IC_IR / 组合目标</td><td>greedy_forward、5 种 combiner</td><td>放大多重检验</td><td>第 11 章</td></tr><tr><td>贝叶斯优化</td><td>高斯过程 + EI 采集</td><td>最优配置</td><td>采集函数</td><td>AutoML/HPO（通用）</td><td>代理误差、检验分母</td><td>本章</td></tr></tbody></table></div>
+<h3 id="4-5-用四个维度给范式分类">4.5 用四个维度给范式分类</h3>
+<p>把总表转成可推理的坐标，更有用的是下面四个二分维度。每个范式都能在四维空间里定位，定位本身就能预判失败模式。</p>
 <div class="table-wrap"><table><thead><tr><th>维度</th><th>一端</th><th>另一端</th><th>直觉</th></tr></thead><tbody><tr><td>驱动方式</td><td>假设驱动（人定公式）</td><td>数据驱动（自动扫描）</td><td>谁先提出候选</td></tr><tr><td>表示形式</td><td>符号（可读公式）</td><td>亚符号（网络/系数）</td><td>产物人能不能读懂</td></tr><tr><td>优化方式</td><td>无梯度（演化/策略/枚举）</td><td>梯度（反向传播/回归）</td><td>用什么信号更新</td></tr><tr><td>搜索目标</td><td>单因子适应度</td><td>组合感知（池增益）</td><td>优化的是个体还是组合</td></tr></tbody></table></div>
-<p>据此可快速画像：手工规则 = 假设·符号·无梯度·单因子；GP = 数据·符号·无梯度·单因子；NN = 数据·亚符号·梯度·单因子（除非专门做组合）；RL = 数据·符号·无梯度·可组合；LLM = 数据·神经符号·无梯度·单因子；稀疏回归 = 数据·线性·梯度或闭式·单因子（但输出已是稀疏组合）。注意"数据驱动"≠"不用脑子"——LLM 与 GP 恰恰把人类知识编码进了先验（提示词、算子集、初始化），区别只是这些知识何时、以何种形式进入搜索。</p>
-<h3 id="4-5-统一抽象-所有范式共享的挖掘骨架">4.5 统一抽象：所有范式共享的挖掘骨架</h3>
-<p>尽管数学天差地别，六种范式在系统层面共享同一副骨架。看清楚这副骨架，后面读任何框架都只是"生成器与更新器换了实现"。</p>
+<p>据此快速画像：手工规则 = 假设·符号·无梯度·单因子；GP = 数据·符号·无梯度·单因子；NN = 数据·亚符号·梯度·单因子；RL = 数据·符号·无梯度·可组合；LLM = 数据·神经符号·无梯度·单因子；GAN = 数据·符号·梯度（代理）·单因子；MCTS = 数据·符号·无梯度·单因子（可扩为多目标）；枚举 = 数据·符号·无学习·单因子；稀疏统计 = 数据·线性·闭式·组合；聚类集成 = 数据·系数·无梯度·组合；BO = 数据·配置·代理梯度·单因子。</p>
+<p>注意"数据驱动"≠"不用脑子"——LLM 与 GP 恰恰把人类知识编码进了先验（提示词、算子集、初始化），区别只是这些知识何时、以何种形式进入搜索。</p>
+<h3 id="4-6-统一抽象-所有范式共享的挖掘骨架">4.6 统一抽象：所有范式共享的挖掘骨架</h3>
+<p>尽管数学天差地别，十一种范式在系统层面共享同一副骨架。看清楚这副骨架，后面读任何框架都只是"生成器与更新器换了实现"。</p>
 <pre><code>输入：行情面板 X（时间戳 × 标的 × 字段），标签 r（前瞻收益），统计闸门 G
-初始化：生成器参数/种群/提示词 = init()
+初始化：生成器参数 / 种群 / 提示词 / 搜索树 / 代理模型 = init()
 循环 until 停止准则：
-    候选 C = generate(参数)              # GP:采样AST / RL:采样轨迹 / LLM:采样代码 / NN:前向通道
+    候选 C = generate(参数)              # GP:采样AST / RL:采样轨迹 / LLM:采样代码
+                                        # NN:前向通道 / GAN:生成器输出 / MCTS:树路径
+                                        # 枚举:网格展开 / 聚类集成:选子集 / BO:采集函数选配置
     评价 V = evaluate(C, X, r)           # IC / RankIC / 分位收益 / 成本净收益
     闸门决策 promote? = G(V, num_trials) # 多重检验、HAC、FDR、零分布、DSR
     if promote?: 因子池 P = admit(C, V)
-    参数 = update(参数, V, C)            # GP:选择交叉变异 / RL:策略梯度 / LLM:反思 / NN:反向传播
+    参数 = update(参数, V, C)            # GP:选择交叉变异 / RL:策略梯度 / LLM:反思
+                                        # NN:反向传播 / GAN:对抗 / MCTS:反传 / BO:后验更新
 输出：通过闸门的因子池 P，及其全程可审计的试验次数 num_trials</code></pre>
 <p>这副骨架里，<strong>生成</strong>与<strong>更新</strong>是各范式真正分家的两格（第 5–10 章逐一替换），而<strong>评价</strong>与<strong>闸门</strong>是横切所有的通用层（第 3 章与第 12–14 章）。一个常见误解是把"生成器更强"当成"系统更强"——但骨架告诉我们：只要闸门不诚实，再花哨的生成器也只是在更快地生产 p-hacked 的因子。</p>
-<h3 id="4-6-选型决策-面对不同问题怎么选">4.6 选型决策：面对不同问题怎么选</h3>
-<p>没有"最好的范式"，只有"最适配当下约束的范式"。下面是一组可操作的判断，按优先级递减：</p>
-<ul><li><strong>你已有强经济假设</strong>（例如"低波动应该溢价"）→ 先用手工规则/公式库落地基线（第 6 章）。它是零搜索成本、最不容易翻车的起点，也能作为后续自动挖掘的对照。</li><li><strong>你要在广阔公式空间里广撒网找非线性</strong> → 遗传规划（第 7 章）。它产物可读、无需梯度、对算子集友好；前提是接受膨胀控制与多重检验的额外工程。</li><li><strong>你拥有海量面板、要端到端且不怕黑盒</strong> → 表征学习/深度网络（第 10 章）。它在高维非线性上最强，但要把"权重≠因子、训练张量≠可保存因子"的边界守死，并准备应对非平稳。</li><li><strong>你的目标本身就是"找一个能改善组合的新成员"</strong> → 强化学习或组合感知搜索（第 8 章）。让它优化"加入池后的组合增益"而非单因子 IC，但要配齐动作掩码与诚实 reward。</li><li><strong>你的假设以自然语言/常识形式存在，且想自动化研究过程</strong> → 大语言模型（第 9 章）。它最擅长把直觉变代码，但必须配沙盒与严格闸门，并默认它是非确定的。</li><li><strong>你需要稳健、低方差、可作为计量证据基座的结果</strong> → 经典稀疏/线性方法（基线对照）。它很少"惊艳"，却最难被证伪推翻。</li></ul>
-<p>实践中的高分组合往往是"<strong>GP 探索 + NN 精炼 + 稀疏做基线 + 手工做对照</strong>"，再用统一的评价与闸门层收口——这正是第 16 章端到端流水线要落实的事。</p>
-<h3 id="4-7-工程陷阱-选型层面">4.7 工程陷阱（选型层面）</h3>
-<ol><li><strong>把"工具能跑"当成"方法有效"</strong>：一个框架跑出漂亮的样本内 IC，不等于它的范式适合你的数据频率与标签定义；先问"它优化的是什么"，再问"它跑通了没有"。</li><li><strong>范式越新越好</strong>：LLM 与 RL 听起来先进，但在加密货币高频、小标的池、弱标签场景下，朴素 GP 加诚实闸门常常更稳。新颖度不是稳健度的代理。</li><li><strong>忽略数据频率对范式的约束</strong>：GP 在小样本上靠搜索易过拟合；NN 在小样本上根本学不动；稀疏回归在低信噪比下系数全塌。选范式前先看你的 <code>bars × 标的</code> 量级。</li><li><strong>组合驱动搜索在小样本下退化为单因子</strong>：AlphaGen 式"池增益"奖励需要足够多的池成员才有意义；池为空时它等价于单因子 IC，却仍按组合口径记账，制造虚假的"组合感知"。</li><li><strong>给每个范式配同一套闸门，却用不同分母</strong>：GP 的 <code>num_trials</code> 是种群×代数，LLM 的 <code>num_trials</code> 是采样次数（且易因重复采样悄悄烧光），NN 几乎无显式候选计数。闸门要按范式的真实试验次数归一，否则 FDR 失去意义。</li></ol>
-<h3 id="4-8-本章小结">4.8 本章小结</h3>
-<ol><li>区分<strong>范式</strong>（对"因子从哪来"的回答）与<strong>框架</strong>（具体实现）；一个范式可被多个框架实现，框架兴衰不改范式功过。</li><li>六个常见范式可归两条主轴：<strong>假设驱动 vs 数据驱动</strong>、<strong>符号 vs 亚符号</strong>；这两条轴预言了大部分优缺点。</li><li>手工规则可解释、可预注册、过拟合风险最低，但覆盖率受人类想象力约束；它是基线，不是挖掘结果。</li><li>遗传规划产物可读、无需梯度，但必须直面膨胀、多重检验放大与强闸门三道坎。</li><li>深度网络表达力最强却最黑盒、最怕非平稳；"网络权重不是因子，物化出的通道才是"是硬边界。</li><li>强化学习的关键是<strong>动作掩码</strong>与 <strong>reward 口径</strong>，不是 PPO 与 REINFORCE 的选型；大语言模型的关键是<strong>沙盒</strong>与<strong>防泄漏</strong>，不是模型大小。</li><li>所有范式共享"生成→评价→闸门→更新"的骨架；生成器再强，闸门不诚实也只会产生 p-hacked 因子。</li><li>选型看约束：强假设用手工、广撒网用 GP、端到端用 NN、组合感知用 RL、直觉自动化用 LLM、稳健基座用稀疏；高分组合是"GP 探索 + NN 精炼 + 稀疏基线 + 手工对照 + 统一闸门"。</li></ol>
-<h3 id="4-9-本书如何展开">4.9 本书如何展开</h3>
-<p>后面的章节严格按"表示→各范式深读→组合"推进，并在第三、第四篇落到全流程与工程：</p>
-<ul><li>第 5 章先讲<strong>表达式语言</strong>（算子、终端、AST），因为它是后面 GP/RL/LLM 共同的候选表示；</li><li>第 6 章讲<strong>手工公式库与确定性枚举</strong>（Alpha101/158/360）；</li><li>第 7、8、9、10 章分别深读 <strong>遗传规划、强化学习、大语言模型、神经网络</strong> 四种自动范式，每章都给原理推导、伪代码、竞品对照与 FactorMiner 实现；</li><li>第 11 章讲<strong>去重与因子池</strong>，把"一堆公式"收成"一个可交易组合"；</li><li>第三篇（第 12–16 章）讲<strong>全流程</strong>：过拟合数学、统计闸门、留出纪律、从 IC 到 PnL、端到端可复现流水线；</li><li>第四篇（第 17–20 章）讲<strong>工程实践与行业参照</strong>：系统架构、20+ 框架横向全景、反面模式与研究方法论。</li></ul>
+<h3 id="4-7-选型决策-面对不同问题怎么选">4.7 选型决策：面对不同问题怎么选</h3>
+<p>没有"最好的范式"，只有"最适配当下约束的范式"。下面是一组按优先级递减的判断：</p>
+<ul><li><strong>你已有强经济假设</strong>（例如"低波动应该溢价"）→ 手工规则 / 公式库（第 6 章）。零搜索成本、最不容易翻车，也是后续自动挖掘的对照。</li><li><strong>你要在广阔公式空间里广撒网找非线性</strong> → 遗传规划（第 7 章）。产物可读、无需梯度；前提是接受膨胀控制与多重检验的额外工程。</li><li><strong>你拥有海量面板、要端到端且不怕黑盒</strong> → 神经网络（第 10 章）。高维非线性最强，但要守死"权重≠因子、通道物化才是因子"的边界。</li><li><strong>你的目标本身是"找一个能改善组合的新成员"</strong> → 强化学习或聚类集成选择（第 8 / 11 章）。让奖励对齐组合增量，而非单因子 IC。</li><li><strong>你的假设以自然语言/常识形式存在</strong> → 大语言模型（第 9 章）。最擅长把直觉变代码，但必配沙盒与严格闸门，并默认它是非确定的。</li><li><strong>评价极贵、想少试几次</strong> → 贝叶斯优化或 GAN 代理预测器。用代理模型省评价次数，但别把代理分数当成真实结论。</li><li><strong>你想系统探索结构化空间、且目标不止一个</strong> → MCTS + Pareto。要有独立的验证窗口兜底。</li><li><strong>你需要稳健、可作为计量证据基座的结果</strong> → 经典稀疏 / 线性方法。很少"惊艳"，却最难被证伪推翻。</li></ul>
+<p>实践中的高分组合往往是"<strong>GP 探索 + NN 精炼 + 稀疏做基线 + 手工做对照 + 聚类集成收口</strong>"，再用统一的评价与闸门层收口——这正是第 16 章端到端流水线要落实的事。</p>
+<h3 id="4-8-工程陷阱-范式层面">4.8 工程陷阱（范式层面）</h3>
+<ol><li><strong>把"工具能跑"当成"方法有效"</strong>：框架跑出漂亮的样本内 IC，不等于范式适合你的数据频率与标签；先问"它优化什么"，再问"它跑通没有"。</li><li><strong>范式越新越好</strong>：LLM、GAN、MCTS 听起来先进，但在加密货币高频、小标的池、弱标签场景下，朴素 GP 加诚实闸门常常更稳。新颖度不是稳健度的代理。</li><li><strong>忽略数据频率对范式的约束</strong>：GP 在小样本上靠搜索易过拟合；NN 在小样本上学不动；稀疏回归在低信噪比下系数全塌。选范式前先看 <code>bars × 标的</code> 量级。</li><li><strong>组合驱动搜索在小样本下退化为单因子</strong>：AlphaGen 式"池增益"奖励需要足够多的池成员才有意义；池为空时它等价于单因子 IC，却仍按组合口径记账。</li><li><strong>代理优化脱离真实目标</strong>：GAN 的预测器、BO 的高斯过程都是"对真实评价的近似"；代理被优化过头，线上的真实 IC 会与代理分数脱节——必须定期用真实 evaluate 校准。</li><li><strong>不同范式用不同 <code>num_trials</code> 分母却套同一闸门</strong>：GP 是种群×代数，LLM 是采样次数（重复采样会悄悄烧光），枚举是网格规模，BO 是采集次数。闸门要按真实试验次数归一，否则 FDR 失去意义。</li></ol>
+<h3 id="4-9-本章小结">4.9 本章小结</h3>
+<ol><li>区分<strong>范式</strong>（对"因子从哪来"的回答）与<strong>框架</strong>（具体实现）；一个范式可被多个框架实现，框架兴衰不改范式功过。</li><li>十一种范式可归两条主轴：<strong>假设驱动 vs 数据驱动</strong>、<strong>符号 vs 亚符号</strong>；四条分类维度（驱动/表示/优化/目标）能预判每种范式的失败模式。</li><li><strong>GP</strong> 是语法树上的达尔文式搜索，产物可读但必过膨胀与多重检验两关；<strong>RL</strong> 是学出来的生成分布，关键在动作掩码与 reward 口径，不在 PPO/REINFORCE。</li><li><strong>NN</strong> 用梯度学黑盒表征、冻结通道成因子，表达力最强但边界在通道物化；<strong>LLM</strong> 用反思记忆更新上下文（非权重），成败在沙盒与防泄漏。</li><li>其余七种各有定位：手工规则是标尺、枚举用覆盖换发现、稀疏统计是稳健基座、GAN 用代理降成本、MCTS 做系统探索、聚类集成收口组合、贝叶斯优化省评价次数。</li><li><strong>所有范式共享"生成→评价→闸门→更新"骨架</strong>；生成与更新是分家处，评价与闸门是通用层。生成器再强，闸门不诚实也只会更快地产出 p-hacked 因子。</li><li><strong>每一次候选评价都是一次假设检验</strong>——无论来自演化、采样、网格还是采集函数。统一的 <code>num_trials</code> 记账是跨范式可比的唯一基础。</li><li>选型看约束：强假设用手工、广撒网用 GP、端到端用 NN、组合感知用 RL/聚类、直觉自动化用 LLM、评价贵用 BO/GAN、稳健基座用稀疏；高分组合是多范式互补 + 统一闸门。</li></ol>
+<h3 id="4-10-本书如何展开">4.10 本书如何展开</h3>
+<p>后面的章节按"表示→各范式深读→组合→全流程→工程"推进：</p>
+<ul><li>第 5 章讲<strong>表达式语言</strong>（算子、终端、AST），它是 GP/RL/LLM 共同的候选表示；</li><li>第 6 章讲<strong>手工公式库与确定性枚举</strong>（Alpha101/158/360）；</li><li>第 7、8、9、10 章分别深读 <strong>GP、RL、LLM、NN</strong> 四种主力自动范式，每章都给原理推导、伪代码、竞品对照与 FactorMiner 实现；</li><li>第 11 章讲<strong>去重与因子池</strong>（对应 4.3.6 的聚类集成选择）；</li><li>第三篇（第 12–16 章）讲<strong>全流程</strong>：过拟合数学、统计闸门、留出纪律、从 IC 到 PnL、端到端可复现流水线；</li><li>第四篇（第 17–20 章）讲<strong>工程实践与行业参照</strong>：系统架构、20+ 框架横向全景、反面模式与研究方法论。</li></ul>
 <p>如果你只想快速建立认知，建议路径是：本章 → 第 3 章（评价）→ 第 12 章（过拟合）→ 第 13 章（闸门）→ 第 18 章（竞品）→ 第 20 章（方法论）。</p></section>
 <section class="chapter" id="chapter-5" data-title="ch05"><h2 id="第-5-章-表达式语言-算子-终端与计算图">第 5 章 表达式语言：算子、终端与计算图</h2>
 <blockquote><p>本章回答：因子在代码里究竟是什么。我们把因子写成从面板到截面打分向量的函数，拆成算子、终端、组合规则与类型契约，说明符号化表达式为何必须可执行、可序列化、可复现；再对比五种表示法、逐行对齐 FactorMiner 的 59 个算子与递归求值算法，最后落到截面算子的语义陷阱与执行效率。</p></blockquote>
@@ -2069,7 +2182,7 @@ factorminer inspect --factor &quot;fac_xxxxxxxx&quot; --pairs &quot;BTC/USDT:USD
 
 # 4. 严格 OOS 组合回测：方向从样本内库学，因子值只取 OOS 重算库
 factorminer backtest --db-root factor_db_oos --orientation-db-root factor_db \
-    --start 2025-01-01 --end 2025-06-30 --real-funding
+    --start 2025-01-01 --end 2025-06-30   # 默认即真实资金费率(crypto_streams)；--constant-funding 回落常数网格
 
 # 5. 逐项核对 user_workspace/runs/&lt;run_id&gt;/report.md 的阴性结果与结论等级</code></pre>
 <p>四范式最小化验证（每范式一轮、真实 Feather 数据、至少落一个 metadata）可用：<code>python -B -m unittest discover -s tests -v</code>，项目里 <code>tests/test_cli_smoke.py</code> 为 MyCustomGP / MyCustomRL / MyCustomLLM / NN 分别创建了临时行情并跑通公开 CLI。</p>

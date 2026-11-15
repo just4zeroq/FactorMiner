@@ -209,6 +209,13 @@ def build_manifest(
             "test": feeds.get("test_period", []),
         },
         "n_trials_at_start": int(n_trials_at_start),
+        # L1.3: the pre-registered multiple-testing partition. Recording it in
+        # the manifest (not only in config) is what makes "this family's DSR
+        # denominator" auditable after the fact, and what stops a run from being
+        # re-labelled into a different family later.
+        "trial_family": exp.get("trial_family"),
+        "family_declared_at": exp.get("family_declared_at"),
+        "family_budget": exp.get("family_budget"),
         "environment": {
             "python": sys.version.split()[0],
             "platform": platform.platform(),

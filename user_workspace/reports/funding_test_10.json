@@ -1,0 +1,62 @@
+{
+ "0G/USDT:USDT": {
+  "ok": true,
+  "rows": 3895,
+  "error": null,
+  "secs": 2.5
+ },
+ "1000000MOG/USDT:USDT": {
+  "ok": true,
+  "rows": 4426,
+  "error": null,
+  "secs": 3.9
+ },
+ "1000BONK/USDT:USDT": {
+  "ok": true,
+  "rows": 6532,
+  "error": null,
+  "secs": 3.3
+ },
+ "1000CAT/USDT:USDT": {
+  "ok": true,
+  "rows": 4528,
+  "error": null,
+  "secs": 2.2
+ },
+ "1000CHEEMS/USDT:USDT": {
+  "ok": true,
+  "rows": 4319,
+  "error": null,
+  "secs": 3.3
+ },
+ "1000FLOKI/USDT:USDT": {
+  "ok": true,
+  "rows": 3867,
+  "error": null,
+  "secs": 2.3
+ },
+ "1000LUNC/USDT:USDT": {
+  "ok": true,
+  "rows": 4244,
+  "error": null,
+  "secs": 2.3
+ },
+ "1000PEPE/USDT:USDT": {
+  "ok": true,
+  "rows": 3870,
+  "error": null,
+  "secs": 2.3
+ },
+ "1000RATS/USDT:USDT": {
+  "ok": true,
+  "rows": 6394,
+  "error": null,
+  "secs": 3.8
+ },
+ "1000SATS/USDT:USDT": {
+  "ok": true,
+  "rows": 6412,
+  "error": null,
+  "secs": 3.4
+ }
+}

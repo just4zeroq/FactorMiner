@@ -81,6 +81,29 @@ class GPFactorMiner(BaseFactorMiner):
         self.elite_count = int(gp.get("elite_count", max(1, self.population_size // 10)))
         self.survival_count = int(self.config.get("survival_count", self.population_size // 2))
 
+        # F5 incremental mining: reuse the promoted library as the initial gene
+        # pool. ``seed_db_root`` defaults to the production library, which is the
+        # only place factors have earned a gate verdict.
+        self.seed_from_db = bool(gp.get("seed_from_db", False))
+        self.seed_top_k = int(gp.get("seed_top_k", 20) or 0)
+        self.seed_db_ratio = float(gp.get("seed_db_ratio", 0.25) or 0.25)
+        self.seed_db_root = str(gp.get("seed_db_root") or "factor_db")
+        self._db_seed_asts: List[Dict[str, Any]] = []
+        if self.seed_from_db:
+            from core.miner.seeding import load_seed_asts
+
+            self._db_seed_asts = load_seed_asts(
+                self.seed_db_root,
+                self.seed_top_k,
+                promoted_only=bool(gp.get("seed_promoted_only", True)),
+            )
+            if not self._db_seed_asts:
+                logger.info(
+                    "GP: seed_from_db is on but %s has no promoted AST yet; "
+                    "starting from scratch.",
+                    self.seed_db_root,
+                )
+
     def _data_panel(self):
         """Best-effort access to the panel the miners evaluate on."""
         try:
@@ -92,21 +115,35 @@ class GPFactorMiner(BaseFactorMiner):
             return None
 
     def _initial_population(self) -> List[FactorExpression]:
-        """First generation: crypto-native seeds first, random ASTs to fill."""
+        """First generation: promoted-library seeds, crypto seeds, random fill."""
         n = self.population_size
         seeds: List[FactorExpression] = []
+
+        # F5: continue from what already worked instead of restarting from zero.
+        if self.seed_from_db and self._db_seed_asts:
+            take = min(len(self._db_seed_asts), max(1, int(n * self.seed_db_ratio)))
+            for ast in self._db_seed_asts[:take]:
+                seeds.append(FactorExpressionAST(ast_dict=ast))
+            logger.info("GP: initial population seeded with %d promoted AST(s)", take)
+
         if self._crypto_asts and self.crypto_seed_ratio > 0:
-            n_seed = min(len(self._crypto_asts), int(round(n * self.crypto_seed_ratio)))
-            if n_seed > 0:
+            n_seed = min(
+                len(self._crypto_asts),
+                int(round(n * self.crypto_seed_ratio)),
+            )
+            if n_seed > 0 and len(seeds) < n:
                 picks = self.rng.sample(self._crypto_asts, n_seed)
-                seeds = [FactorExpressionAST(ast_dict=a) for a in picks]
+                seeds.extend(FactorExpressionAST(ast_dict=a) for a in picks)
         n_random = max(0, n - len(seeds))
         randoms = [
             FactorExpressionAST(ast_dict=self._random_ast()) for _ in range(n_random)
         ]
         if seeds:
             logger.info(
-                "GP: initial population seeded with %d crypto-native features", len(seeds)
+                "GP: initial population carries %d seed(s) (%d from the promoted "
+                "library), %d random",
+                len(seeds), len(seeds) - min(len(seeds), int(n * self.crypto_seed_ratio)),
+                n_random,
             )
         return seeds + randoms
 

@@ -23,24 +23,13 @@ def setup_parser():
     
     # End-to-end experiment (P5): pre-register -> data -> mine -> gates ->
     # walk-forward -> combine -> OOS recompute -> backtest -> report.
+    # The flag list lives in ``run_experiment._add_common`` so the standalone
+    # parser and the subcommand parser cannot drift apart.
     exp_parser = subparsers.add_parser("experiment", help="Run a complete reproducible factor-mining experiment")
-    exp_parser.add_argument("--config", type=str, required=True, help="Path to the JSON configuration file")
-    exp_parser.add_argument("--miner", type=str, default=None, help="Override the config's paradigm / miner class name")
-    exp_parser.add_argument("--iterations", type=int, default=None, help="Override max_iterations")
-    exp_parser.add_argument("--seed", type=int, default=None, help="Fix global RNG seed for reproducibility")
-    exp_parser.add_argument("--resume", action="store_true", help="Skip stages already completed for this config")
-    exp_parser.add_argument("--run-id", type=str, default=None, help="Explicit run id")
-    exp_parser.add_argument("--user-dir", type=str, default=None, help="Override the config's user workspace directory")
-    exp_parser.add_argument("--output-root", type=str, default=None, help="Override the runs root (mainly for tests)")
-    exp_parser.add_argument("--holdout-mode", type=str, default=None,
-                            choices=["strict", "audit", "off"],
-                            help="Override evaluation.gates.holdout_mode")
-    exp_parser.add_argument("--allow-holdout-reuse", action="store_true",
-                            help="Permit recomputing an already-revealed window (audited)")
-    exp_parser.add_argument("--data-root", type=str, default=None,
-                            help="Override data_feeds.data_root (shared by preflight and mining)")
-    exp_parser.add_argument("--preflight", action="store_true",
-                            help="Run the doctor checks first and abort on a FATAL issue")
+    from core.commands.run_experiment import _add_common as _add_experiment_args
+
+    _add_experiment_args(exp_parser)
+    exp_parser.add_argument("--json", action="store_true", help="Machine-readable output")
 
     # Download Subcommand
     dl_parser = subparsers.add_parser("download", help="Download historical market data")
@@ -70,6 +59,7 @@ def setup_parser():
     # Registered from their own modules so the parser and the implementation
     # cannot drift apart.
     from core.commands import doctor as _doctor_cmd
+    from core.commands import factor_db as _factor_db_cmd
     from core.commands import factors as _factors_cmd
     from core.commands import holdout as _holdout_cmd
     from core.commands import pipeline as _pipeline_cmd
@@ -81,6 +71,7 @@ def setup_parser():
     _holdout_cmd.add_parser(subparsers)
     _factors_cmd.add_parser(subparsers)
     _promote_cmd.add_parser(subparsers)
+    _factor_db_cmd.add_parser(subparsers)
     _pipeline_cmd.add_parser(subparsers)
 
     # Backtest Subcommand
@@ -167,7 +158,9 @@ def main(argv=None) -> int:
     elif args.command == "backtest":
         from core.commands import backtest as bt_main
         result = bt_main.run_backtest_cmd(args)
-    elif args.command in {"refresh", "doctor", "holdout", "factors", "promote", "pipeline"}:
+    elif args.command in {
+        "refresh", "doctor", "holdout", "factors", "promote", "pipeline", "factor-db",
+    }:
         # These register ``func`` on the namespace; call it so the command and
         # its parser live in one module.
         result = args.func(args)

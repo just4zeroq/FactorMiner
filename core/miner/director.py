@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 
 from core.miner.entities import FactorMetadata, EvaluationFeedback
 from core.storage.factor_storage import get_global_storage
-from core.evaluation.evaluator import ParallelEvaluator
+from core.evaluation.evaluator import ParallelEvaluator, DEFAULT_FITNESS_CFG
 from core.evaluation.annualisation import resolve_annualisation
 from core.evaluation.significance import apply_promotion_gates
 from core.evaluation.experiment_trace import (
@@ -17,6 +17,21 @@ from core.evaluation.experiment_trace import (
 from core.miner.paradigms.base import BaseFactorMiner
 
 logger = logging.getLogger(__name__)
+
+
+def _now() -> float:
+    """Monotonic clock stamp used by the stop probe."""
+    import time
+
+    return time.monotonic()
+
+
+def _time_since(started_at) -> float:
+    """Seconds since a ``_now()`` stamp (0.0 when unavailable)."""
+    if started_at is None:
+        return 0.0
+    return _now() - float(started_at)
+
 
 class FactorMinerDirector:
     """
@@ -57,6 +72,8 @@ class FactorMinerDirector:
         self.latest_factor_ids: List[str] = []
         # Filled in by _save_excellent_factors; surfaced by /api/gates/budget.
         self.hypothesis_budget: Dict[str, Any] = {}
+        # Stage-A funnel accounting (L1.1); empty when the screen is disabled.
+        self.funnel: Dict[str, Any] = {}
 
         # P1 reproducibility: the pipeline injects a built run manifest and an
         # explicit seed. Legacy callers (CLI mine / API launch) stay untouched
@@ -100,6 +117,11 @@ class FactorMinerDirector:
         # than to allow a second peek.
         self._enforce_holdout()
         logger.info(f"Starting FactorMiner loop for paradigm: {self.config.get('paradigm')}")
+
+        # E4: install the stop probe before mining starts so a wall-clock or
+        # candidate budget is honoured at the next epoch boundary.
+        self._started_at = _now()
+        self.miner.stop_check = self._stop_check
         
         # 委托给底层的通用范式引擎去跑 (它自带去重和生命周期)
         best_candidates = self.miner.mine(max_iterations, progress_callback=progress_callback)
@@ -109,6 +131,35 @@ class FactorMinerDirector:
 
         logger.info("FactorMiner loop completed.")
         return best_candidates
+
+    def _stop_check(self) -> Any:
+        """Return a human-readable reason to stop mining, or ``None``.
+
+        ``experiment.stop.max_candidates`` / ``max_wallclock`` are set from the
+        CLI (``--stop-after-candidates`` / ``--max-wallclock``). Stopping at an
+        epoch boundary keeps every downstream stage valid: the finalize, gating
+        and reporting path all still run.
+        """
+        cfg = (self.config.get("experiment") or {}).get("stop") or {}
+        max_candidates = cfg.get("max_candidates")
+        if max_candidates:
+            try:
+                if int(self.evaluator.total_evaluated) >= int(max_candidates):
+                    return (
+                        f"candidate budget {int(max_candidates)} reached "
+                        f"({self.evaluator.total_evaluated} evaluated)"
+                    )
+            except (TypeError, ValueError):
+                pass
+        max_wall = cfg.get("max_wallclock")
+        if max_wall:
+            try:
+                elapsed = _time_since(getattr(self, "_started_at", None))
+                if elapsed >= float(max_wall):
+                    return f"wall-clock budget {int(max_wall)}s reached ({elapsed:.0f}s)"
+            except (TypeError, ValueError):
+                pass
+        return None
 
     def _build_null_tstats(self, candidates, gate_cfg):
         """Per-candidate target-permutation |t| nulls for the P2 empirical gate.
@@ -230,11 +281,53 @@ class FactorMinerDirector:
         # multiple-testing control that was missing before; only factors whose
         # gates are all green become INSPECTED, the rest stay DISCOVERED_UNVERIFIED.
         metrics_list = [(getattr(c, "metrics", None) or {}) for c in candidates]
+
+        # L1.1 staged funnel: the target-permutation null costs ~4.6 s/candidate
+        # (97.8% of the whole evaluation) while the cheap screen is free — every
+        # input it needs is already on the metrics. Screen first, then spend the
+        # expensive statistics only on survivors. Rejected candidates are still
+        # persisted (auditable) but never gated, so no verdict is inferred from
+        # a statistic that was not computed.
+        gate_cfg = self.config.get("evaluation", {}).get("gates")
+        fit_cfg = {**DEFAULT_FITNESS_CFG, **(self.config.get("fitness") or {})}
+        funnel_state: Dict[str, Any] = {"enabled": False}
+        if fit_cfg.get("prefilter_enabled", True):
+            from core.evaluation.funnel import stage_a
+
+            outcome = stage_a(metrics_list, fit_cfg)
+            survivors = list(outcome["survivors"])
+            funnel_state = {
+                "enabled": True,
+                "n_input": len(metrics_list),
+                "n_survivors": len(survivors),
+                "n_rejected": len(outcome["rejected"]),
+                "reasons": dict(sorted(outcome["reasons"].items())),
+                "dropped_by_cap": int(outcome["dropped_by_cap"] or 0),
+            }
+            logger.info(
+                "Stage-A screen: %d/%d candidates kept for the permutation null "
+                "(%s)",
+                len(survivors), len(metrics_list),
+                ", ".join(f"{k}={v}" for k, v in outcome["reasons"].items()) or "none rejected",
+            )
+        else:
+            survivors = list(range(len(metrics_list)))
+            outcome = {"rejected": {}}
+        self.funnel = funnel_state
+
         # A1: OOS is consulted exactly ONCE here, on the frozen shortlist, and
         # only as gate evidence — never as a search signal. Without this the
         # promotion gate would silently lose its oos_consistent / oos_strength
         # evidence once the mining loop stopped reading the validation split.
-        metrics_list = self._attach_final_oos_metrics(candidates, metrics_list)
+        # Restricted to Stage-B survivors: reading the validation split for a
+        # candidate that cannot be promoted is pure cost (and extra reads).
+        if survivors:
+            oos_merged = self._attach_final_oos_metrics(
+                [candidates[i] for i in survivors],
+                [metrics_list[i] for i in survivors],
+            )
+            for pos, i in enumerate(survivors):
+                metrics_list[i] = oos_merged[pos]
         # DSR must be deflated by the *real* number of ideas tried: everything
         # recorded in the cross-run trace plus every candidate this run handed
         # to the evaluator (including the ones that never made the shortlist).
@@ -263,27 +356,59 @@ class FactorMinerDirector:
         if not isinstance(attempts, int) or isinstance(attempts, bool):
             attempts = 0
         trace_denominator = max(int(self.trace.num_trials), int(attempts))
-        base_trials, family, self.budget_snapshot = budget_sync.resolve(
+        # L1.3: a pre-registered trial family is the unit multiple-testing
+        # correction applies to. Declared before any data is seen and committed
+        # with the config, so "we searched five universes" cannot be silently
+        # reinterpreted as "we searched one universe five times deeper".
+        trial_family = (self.config.get("experiment") or {}).get("trial_family")
+        base_trials, family_p_values, self.budget_snapshot = budget_sync.resolve(
             trace_denominator,
             self.fdr_ledger.cumulative(),
             run_p_values,
+            family=str(trial_family) if trial_family else None,
         )
         n_trials = base_trials + run_trials
         # A1: the validation split is read ONCE (final shortlist evidence),
         # not once per candidate per generation. ``run_trials`` above is the
         # hypothesis-budget denominator (every in-sample candidate evaluated).
         self.val_read_count = 1
-        gate_cfg = self.config.get("evaluation", {}).get("gates")
         # P2: turn the target-permutation null from a library helper into an
         # actual promotion gate (off unless null_n_perm + empirical_p_max are set).
-        null_tstats = self._build_null_tstats(candidates, gate_cfg)
-        gates = apply_promotion_gates(
-            metrics_list,
+        # Only Stage-B survivors are permuted, so the 4.6 s/candidate statistic
+        # is spent on at most ``prefilter_keep`` candidates per run.
+        gates_survivors = apply_promotion_gates(
+            [metrics_list[i] for i in survivors],
             cfg=gate_cfg,
             n_trials=n_trials,
-            family_p_values=family or None,
-            null_tstats=null_tstats,
+            family_p_values=family_p_values or None,
+            null_tstats=self._build_null_tstats(
+                [candidates[i] for i in survivors], gate_cfg
+            ),
         )
+        # Re-expand to one gate verdict per candidate. Stage-A rejects are
+        # explicit: they are NOT promoted, and nothing is inferred from a
+        # statistic that was never computed.
+        rejected_reasons = outcome.get("rejected") or {}
+        gates: List[Dict[str, Any]] = []
+        by_index = dict(zip(survivors, gates_survivors))
+        for i in range(len(candidates)):
+            if i in by_index:
+                gates.append(by_index[i])
+                continue
+            reason = rejected_reasons.get(i, "prefilter_rejected")
+            metrics_list[i]["prefilter_reject"] = reason
+            gates.append({
+                "p_adj": 1.0,
+                "dsr": 0.0,
+                "empirical_p": None,
+                "gate": {
+                    "pass": False,
+                    "prefilter_pass": False,
+                    "gate_pass_unspecified": True,
+                },
+                "status": "DISCOVERED_UNVERIFIED",
+            })
+
         # Persist this run's hypotheses once; the ledger is idempotent per run.
         run_id = getattr(self, "_fdr_run_id", None)
         if not run_id:
@@ -295,7 +420,10 @@ class FactorMinerDirector:
             meta={"n_candidates": len(candidates), "n_trials": n_trials},
         )
         try:
-            budget_sync.sync(n_trials, run_p_values, increment_runs=True)
+            budget_sync.sync(
+                n_trials, run_p_values, increment_runs=True,
+                family=str(trial_family) if trial_family else None,
+            )
         except Exception as exc:  # pragma: no cover - reporting must not break a run
             logger.debug("Hypothesis budget snapshot skipped: %s", exc)
         if evaluator is not None and hasattr(evaluator, "run_p_values"):

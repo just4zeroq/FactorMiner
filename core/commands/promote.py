@@ -146,93 +146,189 @@ def plan_promotion(
     }
 
 
-def run_promote_cmd(args: argparse.Namespace) -> int:
-    try:
-        plan = plan_promotion(
-            args.run_id,
-            args.factor_id,
-            db_root=getattr(args, "db_root", "factor_db"),
-            user_dir=getattr(args, "user_dir", "user_workspace"),
-            output_root=getattr(args, "output_root", None),
-            force=bool(getattr(args, "force", False)),
+def select_inspected(
+    run_id: str,
+    *,
+    user_dir: str = "user_workspace",
+    output_root: Optional[str] = None,
+) -> List[str]:
+    """Factor ids in a run that are both INSPECTED and gate_pass (P0-2)."""
+    src_db = Path(
+        run_dir_for(run_id, user_dir=user_dir, output_root=output_root)
+    ) / "factor_db"
+    meta_dir = src_db / "metadata"
+    if not meta_dir.is_dir():
+        raise FileNotFoundError(
+            f"No factor metadata for run {run_id} at {meta_dir}. "
+            "Check --run-id / --user-dir."
         )
-        if getattr(args, "dry_run", False):
-            result = {
-                "dry_run": True,
-                "run_id": plan["run_id"],
-                "factor_id": plan["factor_id"],
-                "source_db": plan["source_db"],
-                "target_db": plan["target_db"],
-                "files": plan["files"],
-                "checks": plan["checks"],
-                "gate": plan["gate"],
-            }
-        else:
-            dst_db = Path(plan["target_db"])
-            written: List[str] = []
-            try:
-                for rel, content in plan["staged"].items():
-                    target = dst_db / rel
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    # Refuse to overwrite: another run may have published the
-                    # same id while this command was being prepared.
-                    with target.open("xb") as handle:
-                        handle.write(content)
-                    written.append(rel)
-            except FileExistsError as exc:
-                for rel in written:
-                    (dst_db / rel).unlink(missing_ok=True)
-                raise ValueError(
-                    f"Factor {plan['factor_id']} appeared in {dst_db} during promotion; "
-                    "nothing was changed. Inspect before retrying."
-                ) from exc
-            audit = _append_audit(
-                getattr(args, "user_dir", "user_workspace") or "user_workspace",
-                {
-                    "at": datetime.datetime.now().isoformat(timespec="seconds"),
-                    "event": "promote",
+    selected: List[str] = []
+    for path in sorted(meta_dir.glob("*.json")):
+        try:
+            meta = _load_meta(path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        metrics = meta.get("metrics") or {}
+        if not isinstance(metrics, dict):
+            metrics = {}
+        if (
+            bool(metrics.get("gate_pass", False))
+            and str(meta.get("lifecycle_status", "")).upper() == "INSPECTED"
+        ):
+            selected.append(str(meta.get("factor_id") or path.stem))
+    return selected
+
+
+def _commit(plan: Dict[str, Any], user_dir: str) -> Dict[str, Any]:
+    """Write a staged plan to disk. Raises on conflict, leaving no partial copy."""
+    dst_db = Path(plan["target_db"])
+    written: List[str] = []
+    try:
+        for rel, content in plan["staged"].items():
+            target = dst_db / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            # Refuse to overwrite: another run may have published the same id
+            # while this command was being prepared.
+            with target.open("xb") as handle:
+                handle.write(content)
+            written.append(rel)
+    except FileExistsError as exc:
+        for rel in written:
+            (dst_db / rel).unlink(missing_ok=True)
+        raise ValueError(
+            f"Factor {plan['factor_id']} appeared in {dst_db} during promotion; "
+            "nothing was changed. Inspect before retrying."
+        ) from exc
+    audit = _append_audit(
+        user_dir or "user_workspace",
+        {
+            "at": datetime.datetime.now().isoformat(timespec="seconds"),
+            "event": "promote",
+            "run_id": plan["run_id"],
+            "factor_id": plan["factor_id"],
+            "source_db": plan["source_db"],
+            "target_db": plan["target_db"],
+            "files": written,
+            "gate": plan["gate"],
+            "forced": plan["forced"],
+        },
+    )
+    return {
+        "dry_run": False,
+        "run_id": plan["run_id"],
+        "factor_id": plan["factor_id"],
+        "target_db": plan["target_db"],
+        "files": written,
+        "audit": audit,
+    }
+
+
+def run_promote_cmd(args: argparse.Namespace) -> int:
+    factor_ids: List[str] = []
+    if getattr(args, "all_inspected", False):
+        try:
+            factor_ids = select_inspected(
+                args.run_id,
+                user_dir=getattr(args, "user_dir", "user_workspace"),
+                output_root=getattr(args, "output_root", None),
+            )
+        except FileNotFoundError as exc:
+            print(f"promote: {exc}", file=sys.stderr)
+            return 1
+        if not factor_ids:
+            print(
+                f"promote: run {args.run_id} has no INSPECTED + gate_pass factor "
+                "to publish. Inspect `factors --run-id` for the reject reasons.",
+                file=sys.stderr,
+            )
+            return 1
+    else:
+        if not getattr(args, "factor_id", None):
+            print("promote: --factor-id or --all-inspected is required", file=sys.stderr)
+            return 2
+        factor_ids = [args.factor_id]
+
+    dry_run = bool(getattr(args, "dry_run", False))
+    as_json = bool(getattr(args, "json", False))
+    results: List[Dict[str, Any]] = []
+    failures: List[Dict[str, str]] = []
+    for factor_id in factor_ids:
+        try:
+            plan = plan_promotion(
+                args.run_id,
+                factor_id,
+                db_root=getattr(args, "db_root", "factor_db"),
+                user_dir=getattr(args, "user_dir", "user_workspace"),
+                output_root=getattr(args, "output_root", None),
+                force=bool(getattr(args, "force", False)),
+            )
+            if dry_run:
+                result = {
+                    "dry_run": True,
                     "run_id": plan["run_id"],
                     "factor_id": plan["factor_id"],
                     "source_db": plan["source_db"],
                     "target_db": plan["target_db"],
-                    "files": written,
+                    "files": plan["files"],
+                    "checks": plan["checks"],
                     "gate": plan["gate"],
-                    "forced": plan["forced"],
-                },
-            )
-            result = {
-                "dry_run": False,
-                "run_id": plan["run_id"],
-                "factor_id": plan["factor_id"],
-                "target_db": plan["target_db"],
-                "files": written,
-                "audit": audit,
-            }
-    except (FileNotFoundError, ValueError, OSError, json.JSONDecodeError) as exc:
-        print(f"promote: {exc}", file=sys.stderr)
-        return 1
+                }
+            else:
+                result = _commit(
+                    plan, getattr(args, "user_dir", "user_workspace")
+                )
+        except (FileNotFoundError, ValueError, OSError, json.JSONDecodeError) as exc:
+            # One bad factor must not abort the rest of the batch.
+            failures.append({"factor_id": factor_id, "error": str(exc)})
+            continue
+        results.append(result)
 
-    if getattr(args, "json", False):
-        print(json.dumps(result, indent=2, ensure_ascii=False, default=str))
+    payload = {
+        "run_id": args.run_id,
+        "requested": len(factor_ids),
+        "promoted": results,
+        "failed": failures,
+        "n_promoted": len(results),
+        "n_failed": len(failures),
+        "dry_run": dry_run,
+    }
+    if as_json:
+        print(json.dumps(payload, indent=2, ensure_ascii=False, default=str))
     else:
-        action = "would promote" if result["dry_run"] else "promoted"
+        action = "would promote" if dry_run else "promoted"
+        for result in results:
+            print(
+                f"{action} {result['factor_id']} from run {result['run_id']} "
+                f"-> {result['target_db']}"
+            )
+            if not dry_run:
+                print(f"  files: {len(result['files'])}  audit: {result['audit']}")
+        for failure in failures:
+            print(
+                f"FAILED {failure['factor_id']}: {failure['error']}", file=sys.stderr
+            )
         print(
-            f"{action} {result['factor_id']} from run {result['run_id']} "
-            f"-> {result['target_db']}"
+            f"{len(results)}/{len(factor_ids)} factor(s) "
+            f"{'validated' if dry_run else 'published'}, {len(failures)} failed"
         )
-        for rel in result["files"]:
-            print(f"  {rel}")
-        if not result["dry_run"]:
-            print(f"  audit: {result['audit']}")
+    if failures and not results:
+        return 1
     return 0
 
 
 def add_parser(subparsers) -> None:
     parser = subparsers.add_parser(
-        "promote", help="Publish one gated factor from a run into factor_db"
+        "promote", help="Publish gated factors from a run into factor_db"
     )
     parser.add_argument("--run-id", required=True, help="Run holding the factor")
-    parser.add_argument("--factor-id", required=True, help="Factor to publish")
+    parser.add_argument(
+        "--factor-id", default=None,
+        help="Factor to publish (omit when using --all-inspected)",
+    )
+    parser.add_argument(
+        "--all-inspected", action="store_true",
+        help="Publish every INSPECTED + gate_pass factor in the run (batch)",
+    )
     parser.add_argument("--db-root", default="factor_db", help="Production factor_db root")
     parser.add_argument("--user-dir", default="user_workspace", help="User workspace")
     parser.add_argument("--output-root", default=None, help="Override the runs root")

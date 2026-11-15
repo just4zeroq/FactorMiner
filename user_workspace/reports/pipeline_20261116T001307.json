@@ -1,0 +1,82 @@
+{
+  "config": "user_workspace/configs/configExperiment.json",
+  "data_root": "D:\\code\\github\\FactorMiner\\data",
+  "stale_is_fatal": false,
+  "started_at": "2026-11-16T00:12:08",
+  "stages": [
+    {
+      "stage": "refresh",
+      "exit_code": 0,
+      "detail": "dry-run"
+    },
+    {
+      "stage": "doctor",
+      "exit_code": 0,
+      "detail": "0 fatal, 1 warn"
+    },
+    {
+      "stage": "experiment",
+      "exit_code": 0,
+      "detail": "skipped (--dry-run)"
+    }
+  ],
+  "doctor": [
+    {
+      "check": "config",
+      "status": "OK",
+      "detail": "parsed and validated"
+    },
+    {
+      "check": "universe",
+      "status": "OK",
+      "detail": "20 pair(s) present @ 1d"
+    },
+    {
+      "check": "coverage",
+      "status": "OK",
+      "detail": "mine_period 2023-04-01..2026-06-30 covered by 20 pair(s)"
+    },
+    {
+      "check": "coverage",
+      "status": "OK",
+      "detail": "test_period 2026-07-01..2026-09-13 covered by 20 pair(s)"
+    },
+    {
+      "check": "freshness",
+      "status": "OK",
+      "detail": "newest closed bar 2026-11-14 (T-1 = 2026-11-14, lag 0d)"
+    },
+    {
+      "check": "crypto_streams",
+      "status": "OK",
+      "detail": "40 stream file(s) present"
+    },
+    {
+      "check": "data_quality",
+      "status": "OK",
+      "detail": "strict=true (critical issues abort the run)"
+    },
+    {
+      "check": "holdout",
+      "status": "OK",
+      "detail": "mode=strict, 1 revealed window(s), ledger=.holdout_ledger.json"
+    },
+    {
+      "check": "holdout_window",
+      "status": "WARN",
+      "detail": "0 ready / 0 planned; anchor 2026-11-16 (ledger_end_plus_one) -> 0/30 bars, last bar lands 2026-12-15 (revealable once it closes) (needs 30 more 1d bar(s))"
+    },
+    {
+      "check": "environment",
+      "status": "OK",
+      "detail": "FACTORMINER_PRODUCTION=0 (production OFF)"
+    },
+    {
+      "check": "storage",
+      "status": "OK",
+      "detail": "factor_db is writable"
+    }
+  ],
+  "finished_at": "2026-11-16T00:13:07",
+  "exit_code": 0
+}

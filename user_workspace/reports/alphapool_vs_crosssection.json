@@ -1,0 +1,235 @@
+{
+  "window": [
+    "2023-04-01",
+    "2026-06-30"
+  ],
+  "train_fraction": 0.6,
+  "hold_bars": 5,
+  "cost_model": "uniform 18bp round-trip",
+  "factors": [
+    "mom20",
+    "mom60",
+    "-mom5(reversal)",
+    "realized_vol20"
+  ],
+  "factor_preprocessing": "per-date cross-sectional z-score clipped to +/-3 (PIT)",
+  "method_A": {
+    "desc": "AlphaPool style: one scale-aware ridge on pooled (T*N) training rows, weights frozen OOS",
+    "weights_l1_normalized": [
+      -0.15203,
+      0.28521,
+      0.39016,
+      -0.1726
+    ],
+    "ridge_diagnostics": {
+      "method": "ridge",
+      "reason": null,
+      "fallback": false,
+      "n_obs": 116239,
+      "intercept": 0.00017145,
+      "intercept_standardized": 0.00018764,
+      "center": [
+        -0.01547988,
+        -0.02926429,
+        0.01279418,
+        -0.09876665
+      ],
+      "scale": [
+        0.82201073,
+        0.85316454,
+        0.80447468,
+        0.7863971
+      ],
+      "standardized_weights": [
+        -0.00012609,
+        0.00024553,
+        0.00031671,
+        -0.00013696
+      ],
+      "degenerate_columns": [],
+      "reg_lambda": 5.0,
+      "intercept_dropped_by_rank_consumers": true
+    }
+  },
+  "method_BCD": {
+    "desc": "Simulated skfolio CharacteristicsFactorModel core: per-date cross-sectional OLS on assets available that date, then premia mapped back through that date's exposures. B = trailing-60 mean of strictly prior factor returns; C = 50/50 shrink toward training-period prior; D = training-period prior only.",
+    "caveat": "Mechanism simulation, NOT skfolio (not installed). Omits AssetPanel active/estimation masks, alpha estimator, factor covariance construction, market-cap weighting, exposure winsorisation and the constrained optimizer. skfolio's factor_prior_estimator / shrinkage knobs correspond to C/D.",
+    "min_regression_assets": 30,
+    "premia_window": 60,
+    "factor_return_diagnostics": {
+      "per_date_factor_return_std": [
+        0.01156611,
+        0.0092112,
+        0.01068473,
+        0.01049083
+      ],
+      "per_date_factor_return_mean": [
+        0.00024539,
+        -3.748e-05,
+        0.00014981,
+        -0.00058529
+      ],
+      "lag1_autocorr": [
+        -0.0685,
+        0.034,
+        -0.0324,
+        0.0001
+      ]
+    }
+  },
+  "gate_warning": "Neither number is a promotion result: no BH-FDR, no DSR, no holdout, no funding cost. Only the A-vs-B difference is interpretable.",
+  "results": [
+    {
+      "n_obs": 475,
+      "median_width": 57.0,
+      "gross_per_bar": 0.00033487,
+      "turnover": 0.12529,
+      "cost_per_bar": 0.00022553,
+      "net_per_bar": 0.00010934,
+      "net_sharpe_ann": 0.1221,
+      "pool": "pit_top60",
+      "method": "A_alphapool_fixed_ridge",
+      "rankic": 0.03332,
+      "n_test_bars": 475,
+      "n_train_bars": 712,
+      "assets_per_bar_test": {
+        "min": 60,
+        "median": 60,
+        "max": 60
+      }
+    },
+    {
+      "n_obs": 475,
+      "median_width": 57.0,
+      "gross_per_bar": -0.00221668,
+      "turnover": 0.09714,
+      "cost_per_bar": 0.00017486,
+      "net_per_bar": -0.00239154,
+      "net_sharpe_ann": -2.3777,
+      "pool": "pit_top60",
+      "method": "B_cs_bare_daily",
+      "rankic": -0.00382,
+      "n_test_bars": 475,
+      "n_train_bars": 712,
+      "assets_per_bar_test": {
+        "min": 60,
+        "median": 60,
+        "max": 60
+      }
+    },
+    {
+      "n_obs": 475,
+      "median_width": 57.0,
+      "gross_per_bar": -0.00201823,
+      "turnover": 0.09617,
+      "cost_per_bar": 0.00017311,
+      "net_per_bar": -0.00219135,
+      "net_sharpe_ann": -2.1054,
+      "pool": "pit_top60",
+      "method": "C_cs_half_shrunk",
+      "rankic": 0.00574,
+      "n_test_bars": 475,
+      "n_train_bars": 712,
+      "assets_per_bar_test": {
+        "min": 60,
+        "median": 60,
+        "max": 60
+      }
+    },
+    {
+      "n_obs": 475,
+      "median_width": 57.0,
+      "gross_per_bar": -0.00056634,
+      "turnover": 0.05166,
+      "cost_per_bar": 9.298e-05,
+      "net_per_bar": -0.00065932,
+      "net_sharpe_ann": -0.5924,
+      "pool": "pit_top60",
+      "method": "D_cs_fixed_prior",
+      "rankic": 0.07365,
+      "n_test_bars": 475,
+      "n_train_bars": 712,
+      "assets_per_bar_test": {
+        "min": 60,
+        "median": 60,
+        "max": 60
+      }
+    },
+    {
+      "n_obs": 475,
+      "median_width": 391.0,
+      "gross_per_bar": 9.37e-05,
+      "turnover": 0.12803,
+      "cost_per_bar": 0.00023045,
+      "net_per_bar": -0.00013675,
+      "net_sharpe_ann": -0.2904,
+      "pool": "pit_all",
+      "method": "A_alphapool_fixed_ridge",
+      "rankic": 0.05701,
+      "n_test_bars": 475,
+      "n_train_bars": 712,
+      "assets_per_bar_test": {
+        "min": 283,
+        "median": 422,
+        "max": 439
+      }
+    },
+    {
+      "n_obs": 475,
+      "median_width": 391.0,
+      "gross_per_bar": -0.00026185,
+      "turnover": 0.10222,
+      "cost_per_bar": 0.00018399,
+      "net_per_bar": -0.00044584,
+      "net_sharpe_ann": -0.874,
+      "pool": "pit_all",
+      "method": "B_cs_bare_daily",
+      "rankic": 0.01302,
+      "n_test_bars": 475,
+      "n_train_bars": 712,
+      "assets_per_bar_test": {
+        "min": 283,
+        "median": 422,
+        "max": 439
+      }
+    },
+    {
+      "n_obs": 475,
+      "median_width": 391.0,
+      "gross_per_bar": -0.00038105,
+      "turnover": 0.10147,
+      "cost_per_bar": 0.00018264,
+      "net_per_bar": -0.00056369,
+      "net_sharpe_ann": -1.0956,
+      "pool": "pit_all",
+      "method": "C_cs_half_shrunk",
+      "rankic": 0.02355,
+      "n_test_bars": 475,
+      "n_train_bars": 712,
+      "assets_per_bar_test": {
+        "min": 283,
+        "median": 422,
+        "max": 439
+      }
+    },
+    {
+      "n_obs": 475,
+      "median_width": 391.0,
+      "gross_per_bar": -0.00111313,
+      "turnover": 0.05753,
+      "cost_per_bar": 0.00010356,
+      "net_per_bar": -0.00121669,
+      "net_sharpe_ann": -2.0953,
+      "pool": "pit_all",
+      "method": "D_cs_fixed_prior",
+      "rankic": 0.06787,
+      "n_test_bars": 475,
+      "n_train_bars": 712,
+      "assets_per_bar_test": {
+        "min": 283,
+        "median": 422,
+        "max": 439
+      }
+    }
+  ]
+}
