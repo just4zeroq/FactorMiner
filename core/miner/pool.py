@@ -27,6 +27,7 @@ import numpy as np
 import pandas as pd
 
 from core.evaluation.significance import ic_series, newey_west_tstat
+from core.miner.ridge_weights import fit_scale_aware_ridge
 
 
 # --------------------------------------------------------------------------- #
@@ -215,21 +216,32 @@ class AlphaPool:
     def _optimize_weights(self) -> None:
         if not self._panels:
             self._weights = []
+            self._ridge_diag: Dict[str, Any] = {}
             return
         K = len(self._panels)
         target = self._target_for_shift(self.weight_fit_shift)
         X = np.column_stack([p.reshape(-1) for p in self._panels])  # (T*N, K)
         y = target.reshape(-1)
         mask = np.isfinite(X).all(axis=1) & np.isfinite(y)
+
+        # M-02: raw panels span ~1e5 in scale, so a single lambda on X'X was
+        # infinite shrinkage for small columns and none for large ones. Fit on
+        # z-scores with an unpenalised intercept, then map back to raw space.
+        fit = None
         if mask.sum() < self.min_obs or len(np.unique(y[mask])) < 2 or X[mask].shape[1] != K:
             w = np.ones(K) / K  # fallback: equal weights
+            self._ridge_diag = {
+                "method": "equal", "fallback": True,
+                "reason": "insufficient_rows_or_constant_target",
+                "n_obs": int(mask.sum()),
+            }
         else:
-            Xm, ym = X[mask], y[mask]
-            XtX = Xm.T @ Xm + self.reg_lambda * np.eye(K)
-            try:
-                w = np.linalg.solve(XtX, Xm.T @ ym)
-            except np.linalg.LinAlgError:
-                w = np.ones(K) / K
+            fit = fit_scale_aware_ridge(
+                X[mask], y[mask], reg_lambda=self.reg_lambda,
+                min_obs=self.min_obs, equal_weights=np.ones(K) / K,
+            )
+            w = np.asarray(fit.weights, dtype=float)
+            self._ridge_diag = fit.diagnostics()
         if self.weight_norm == "l1":
             s = float(np.sum(np.abs(w)))
             w = w / s if s > 0 else np.ones(K) / K
@@ -288,4 +300,5 @@ class AlphaPool:
             "pooled_rankic": round(self.pooled_rankic(eval_shift), 5),
             "pooled_hac_t": round(self.pooled_hac_t(eval_shift), 3),
             "admit_log": self._admit_log,
+            "ridge": getattr(self, "_ridge_diag", {}),
         }

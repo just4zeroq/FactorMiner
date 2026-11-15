@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 from typing import List, Dict, Any, Union, Optional
 
+from core.miner.ridge_weights import fit_scale_aware_ridge
+
 class FactorExpression(ABC):
     """
     统一的因子中间体表达式
@@ -354,17 +356,11 @@ def fit_linear_combination(
 
     X = np.column_stack(cols)
     yv = np.asarray(y, dtype=float)
-    mask = np.isfinite(X).all(axis=1) & np.isfinite(yv)
-    if mask.sum() < min_obs or len(np.unique(yv[mask])) < 2:
-        return LinearCombinedFactor(sub_expressions=usable, weights=equal)
 
-    Xm = X[mask]
-    ym = yv[mask]
-    XtX = Xm.T @ Xm + reg_lambda * np.eye(Xm.shape[1])
-    try:
-        w = np.linalg.solve(XtX, Xm.T @ ym)
-    except np.linalg.LinAlgError:
-        return LinearCombinedFactor(sub_expressions=usable, weights=equal)
-    return LinearCombinedFactor(
-        sub_expressions=usable, weights=[float(x) for x in w]
+    # M-02: fit on masked, per-column z-scores with an unpenalised intercept,
+    # then map the slopes back to raw factor space so compute()/backtest keep
+    # evaluating sum(w_j * raw_factor_j) exactly as before.
+    fit = fit_scale_aware_ridge(
+        X, yv, reg_lambda=reg_lambda, min_obs=min_obs, equal_weights=equal
     )
+    return LinearCombinedFactor(sub_expressions=usable, weights=fit.weights)
