@@ -416,6 +416,54 @@ class DataRootContractTests(unittest.TestCase):
             self.assertTrue(client._mine_data is None or client._mine_data.empty)
 
 
+class HoldoutWindowMessageTests(unittest.TestCase):
+    """``0 ready`` must say *why*: anchor, progress, and when the 30th bar lands."""
+
+    def test_zero_windows_reports_the_anchor_and_the_eta(self):
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ledger = root / "ledger.json"
+            ledger.write_text(
+                json.dumps(
+                    [
+                        {
+                            "period_key": "holdout_60bars_2026",
+                            "start": "2026-09-16",
+                            "end": "2026-11-15",
+                            "at": "2026-11-15T13:11:49",
+                            "note": "",
+                        }
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            _write_tape(
+                root / "data", "BTC/USDT:USDT",
+                pd.date_range("2026-01-01", "2026-11-14", freq="D"),
+            )
+            spec = {
+                "label": "t", "rolling": True, "start": "auto",
+                "timeframe": "1d", "window_bars": 30, "embargo_bars": 5,
+            }
+            with mock.patch(
+                "core.evaluation.holdout_guard.default_ledger_path",
+                return_value=str(ledger),
+            ), mock.patch(
+                "core.evaluation.holdout_guard.load_window_spec", return_value=spec
+            ):
+                rows = doctor._check_holdout({}, data_root=str(root / "data"))
+
+        row = {r["check"]: r for r in rows}["holdout_window"]
+        self.assertEqual(row["status"], doctor.WARN)
+        # The anchor is the day after the burned window, so nothing before it
+        # can be chunked -- the message has to say that instead of "0 planned".
+        self.assertIn("anchor 2026-11-16", row["detail"])
+        self.assertIn("0/30", row["detail"])
+        self.assertIn("2026-12-15", row["detail"])
+
+
 class MineFlagTests(unittest.TestCase):
     """``mine`` must accept the same reproducibility flags as ``experiment``."""
 

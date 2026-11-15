@@ -181,6 +181,30 @@ class TestPlanWindows(unittest.TestCase):
         self.assertEqual(plan["current"]["accumulated"], 0)
         self.assertFalse(plan["current"]["ready"])
 
+    def test_eta_is_measured_from_the_anchor_not_from_the_last_bar(self):
+        """The ETA answers "when does bar 30 land", not "when would 30 more days be".
+
+        The anchor (2026-11-14) is in the future here, so counting 30 bars from
+        the last stored bar (2026-01-30) gave 2026-02-29 -- a date on which
+        nothing can possibly be ready. Counting from the anchor gives the
+        30th bar: 2026-11-14 + 29 days = 2026-12-13.
+        """
+        dates = pd.date_range("2026-01-01", periods=30, freq="D")
+        plan = self._plan(dates)
+        self.assertEqual(plan["current"]["anchor"], "2026-11-14")
+        self.assertEqual(plan["current"]["remaining"], 30)
+        self.assertEqual(plan["current"]["eta"], "2026-12-13")
+
+    def test_eta_reports_the_thirtieth_bar_when_a_window_is_filling(self):
+        # 40 bars: one full window (30), a 5-bar embargo, then 5 bars of the
+        # next one. The 25th remaining bar lands on 2027-01-17.
+        dates = pd.date_range("2026-11-14", periods=40, freq="D")
+        plan = self._plan(dates)
+        self.assertEqual(plan["n_ready"], 1)
+        self.assertEqual(plan["current"]["accumulated"], 5)
+        self.assertEqual(plan["current"]["remaining"], 25)
+        self.assertEqual(plan["current"]["eta"], "2027-01-17")
+
 
 class TestIntegration(unittest.TestCase):
     def test_freshness_delegates_to_rolling_planner(self):

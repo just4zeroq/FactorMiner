@@ -319,13 +319,21 @@ def _check_holdout(config: Dict[str, Any], data_root: str = "data"):
         results.append(_result("holdout_window", WARN, f"plan failed: {exc}"))
         return results
     ready = int(plan.get("n_ready", 0) or 0)
-    results.append(
-        _result(
-            "holdout_window",
-            OK if ready else WARN,
-            f"{ready} pre-registered window(s) ready, {len(plan.get('windows', []))} planned",
-        )
+    current = plan.get("current") or {}
+    anchor = plan.get("anchor") or {}
+    # "0 ready, 0 planned" on its own reads like a broken pre-registration. The
+    # honest message is *why*: windows are chunked forward from the anchor, and
+    # when the anchor is still in the future there is nothing to chunk yet.
+    detail = (
+        f"{ready} ready / {len(plan.get('windows', []))} planned; "
+        f"anchor {anchor.get('start')} ({anchor.get('source')}) -> "
+        f"{current.get('accumulated', 0)}/{current.get('min_bars')} bars"
     )
+    if current.get("eta") and not current.get("ready"):
+        detail += f", last bar lands {current.get('eta')} (revealable once it closes)"
+    if int(current.get("remaining", 0) or 0) and anchor.get("start"):
+        detail += f" (needs {current['remaining']} more {current.get('timeframe')} bar(s))"
+    results.append(_result("holdout_window", OK if ready else WARN, detail))
     return results
 
 

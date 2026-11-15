@@ -276,6 +276,7 @@ def plan_windows(
 
     last = timeline["last"]
     step = TF_DAYS.get(timeframe, 1.0)
+    bar = pd.Timedelta(seconds=round(step * 86400))
     if windows:
         cur = windows[-1]
         accumulated = cur["n_bars"]
@@ -284,19 +285,32 @@ def plan_windows(
         accumulated = 0
         cur_start = anchor["start"]
     remaining = max(0, window_bars - accumulated)
-    eta = None
+
+    # When does bar number ``window_bars`` land? The next bar can be no earlier
+    # than *both* the pre-registered anchor and the bar after the last stored
+    # one. Using ``last`` alone made the ETA one bar optimistic whenever the
+    # anchor was still in the future -- exactly the "0 windows yet" state, which
+    # is the only state an operator ever reads the ETA in: it said 2026-12-14
+    # for a 30th bar that lands on 2026-12-15.
+    first_future = pd.Timestamp(cur_start)
+    if last:
+        first_future = max(first_future, pd.Timestamp(last) + bar)
+
+    def _stamp(ts: pd.Timestamp) -> str:
+        # Sub-daily timeframes must not be rounded to a date: 30 hourly bars fit
+        # inside two days, so a date-only ETA is always "today" and useless.
+        return ts.strftime("%Y-%m-%d") if bar >= pd.Timedelta(days=1) else ts.strftime("%Y-%m-%d %H:%M")
+
     if remaining == 0 and last:
         eta = last
-    elif last:
-        base = pd.Timestamp(last)
-        eta = (base + datetime.timedelta(days=round(remaining * step))).strftime("%Y-%m-%d")
     else:
-        eta = (pd.Timestamp(cur_start)
-               + datetime.timedelta(days=round(window_bars * step) - 1)).strftime("%Y-%m-%d")
+        eta = _stamp(first_future + bar * (remaining - 1))
 
     current = {
         "label": spec.get("label", "rolling pre-registered window"),
         "start": cur_start,
+        "anchor": anchor["start"],
+        "anchor_source": anchor.get("source"),
         "min_bars": window_bars,
         "timeframe": timeframe,
         "accumulated": accumulated,
