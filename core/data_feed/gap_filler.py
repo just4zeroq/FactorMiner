@@ -11,7 +11,6 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import logging
 import threading
-import time
 
 from .health_checker import health_checker
 from .processor import data_processor
@@ -30,7 +29,7 @@ class DataGapFiller:
         self.task_lock = threading.Lock()
     
     def auto_fill_gaps(self, symbol: str, timeframe: str, trade_type: str = 'futures',
-                       data_dir: str = None) -> Dict:
+                       data_dir: str = None, downloader=None) -> Dict:
         """
         自动补全数据断层
         
@@ -74,11 +73,17 @@ class DataGapFiller:
                 }
             
             # 3. 执行补全任务
-            execution_result = self.execute_fill_tasks(tasks)
-            
+            execution_result = self.execute_fill_tasks(tasks, downloader=downloader)
+
+            # Propagate the real outcome: the old code hard-coded success=True
+            # here even when every fill task failed (or was only simulated).
             return {
-                'success': True,
-                'message': f'自动补全完成，发现 {len(gaps)} 个断层，创建 {len(tasks)} 个任务',
+                'success': bool(execution_result.get('success')),
+                'message': (
+                    execution_result.get('message')
+                    or execution_result.get('error')
+                    or f'自动补全完成，发现 {len(gaps)} 个断层，创建 {len(tasks)} 个任务'
+                ),
                 'gaps_found': len(gaps),
                 'tasks_created': len(tasks),
                 'tasks_executed': execution_result.get('executed_count', 0),
@@ -234,16 +239,18 @@ class DataGapFiller:
         else:
             return 'futures'  # 默认
     
-    def execute_fill_tasks(self, tasks: List[Dict], progress_callback=None) -> Dict:
-        """
-        执行补全任务
-        
-        Args:
-            tasks: 补全任务列表
-            progress_callback: 进度回调函数
-            
-        Returns:
-            执行结果
+    def execute_fill_tasks(self, tasks: List[Dict], progress_callback=None,
+                           downloader=None) -> Dict:
+        """Execute gap-fill tasks and report the *real* outcome.
+
+        ``downloader`` must be a callable taking one task dict and returning
+        either ``True``/``False`` or a dict with a ``success`` key (the shape
+        returned by ``SmartBatchDownloader.download_ohlcv_batch``).
+
+        The previous implementation incremented ``success_count`` for every
+        task while downloading nothing, then returned ``success=True``. That
+        made the data library look healthy after a no-op. Without a real
+        downloader we now fail loudly instead of faking a repair.
         """
         if not tasks:
             return {
@@ -251,57 +258,71 @@ class DataGapFiller:
                 'message': '没有需要执行的补全任务',
                 'executed_count': 0,
                 'success_count': 0,
-                'failed_count': 0
+                'failed_count': 0,
+                'errors': []
             }
-        
-        try:
-            executed_count = 0
-            success_count = 0
-            failed_count = 0
-            
+
+        if downloader is None or not callable(downloader):
+            message = (
+                '断层补全不可用：未提供真实下载器，拒绝上报模拟成功。'
+                ' Pass downloader=<callable(task)->bool|dict>.'
+            )
+            self.logger.error(message)
             if progress_callback:
-                progress_callback(0, f"开始执行 {len(tasks)} 个补全任务...")
-            
-            for i, task in enumerate(tasks):
-                try:
-                    executed_count += 1
-                    
-                    if progress_callback:
-                        progress = int((i + 1) / len(tasks) * 100)
-                        progress_callback(progress, f"执行任务 {i+1}/{len(tasks)}: {task['symbol']} {task['timeframe']}")
-                    
-                    # 这里应该调用实际的下载逻辑
-                    # 暂时模拟执行成功
-                    success_count += 1
-                    
-                    # 添加延迟避免过快执行
-                    time.sleep(0.1)
-                    
-                except Exception as e:
-                    failed_count += 1
-                    self.logger.error(f"执行补全任务失败: {e}")
-                    continue
-            
-            if progress_callback:
-                progress_callback(100, f"补全任务执行完成: 成功 {success_count}, 失败 {failed_count}")
-            
-            return {
-                'success': True,
-                'message': f'补全任务执行完成: 成功 {success_count}, 失败 {failed_count}',
-                'executed_count': executed_count,
-                'success_count': success_count,
-                'failed_count': failed_count
-            }
-            
-        except Exception as e:
-            self.logger.error(f"执行补全任务失败: {e}")
+                progress_callback(0, message)
             return {
                 'success': False,
-                'error': str(e),
+                'error': message,
                 'executed_count': 0,
                 'success_count': 0,
-                'failed_count': 0
+                'failed_count': len(tasks),
+                'errors': [message]
             }
+
+        executed_count = 0
+        success_count = 0
+        failed_count = 0
+        errors = []
+
+        if progress_callback:
+            progress_callback(0, f"开始执行 {len(tasks)} 个补全任务...")
+
+        for i, task in enumerate(tasks):
+            executed_count += 1
+            label = f"{task.get('symbol', '?')} {task.get('timeframe', '?')}"
+            try:
+                result = downloader(task)
+                if isinstance(result, dict):
+                    ok = bool(result.get('success'))
+                    reason = str(result.get('error') or 'downloader reported failure')
+                else:
+                    ok = bool(result)
+                    reason = 'downloader reported failure'
+                if not ok:
+                    raise RuntimeError(reason)
+                success_count += 1
+            except Exception as e:
+                failed_count += 1
+                errors.append(f"{label}: {e}")
+                self.logger.error(f"执行补全任务失败 {label}: {e}")
+
+            if progress_callback:
+                progress = int((i + 1) / len(tasks) * 100)
+                progress_callback(progress, f"执行任务 {i+1}/{len(tasks)}: {label}")
+
+        success = failed_count == 0
+        message = f'补全任务执行完成: 成功 {success_count}, 失败 {failed_count}'
+        if progress_callback:
+            progress_callback(100, message)
+
+        return {
+            'success': success,
+            'message': message,
+            'executed_count': executed_count,
+            'success_count': success_count,
+            'failed_count': failed_count,
+            'errors': errors
+        }
 
 
 # 创建全局实例

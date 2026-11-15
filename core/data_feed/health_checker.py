@@ -315,7 +315,7 @@ class DataHealthChecker:
                 (df['close'] > df['high'])
             )
             
-            invalid_count = invalid_ohlc.sum() if 'invalid_count' in locals() else 0
+            invalid_count = int(invalid_ohlc.sum())
             if invalid_count > 0:
                 invalid_ratio = invalid_count / len(df)
                 if invalid_ratio > self.health_thresholds['max_outlier_ratio']:

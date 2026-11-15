@@ -106,7 +106,10 @@ class DataProcessor:
             # 转换时间列并排序
             df_time = df.copy()
             df_time[time_col] = pd.to_datetime(df_time[time_col])
-            df_time = df_time.sort_values(time_col)
+            # ``large_gaps.items()`` yields the *index label*, but the gap
+            # boundaries are fetched with ``.iloc``. Reset so label == position
+            # even when the incoming frame has a non-trivial index.
+            df_time = df_time.sort_values(time_col).reset_index(drop=True)
             
             # 获取时间框架间隔
             expected_interval = self.timeframe_intervals.get(timeframe, pd.Timedelta('1 minute'))

@@ -56,10 +56,13 @@ def setup_parser():
         "backtest",
         help="Backtest stored factors as a cross-sectional long/short portfolio (ml4t-backtest)",
     )
-    bt_parser.add_argument("--factors", type=str, default=",".join([
-        "fac_c25e28c3", "fac_8af952ab", "fac_b66d17ce",
-        "fac_099a7eef", "fac_f20a1349", "fac_2017455e",
-    ]), help="Comma-separated factor IDs from factor_db (default: the 6 INSPECTED candidates)")
+    bt_parser.add_argument(
+        "--factors",
+        type=str,
+        default="",
+        help="Comma-separated factor IDs from factor_db "
+             "(default: discover every factor with a stored value snapshot)",
+    )
     bt_parser.add_argument("--config", type=str, default=None, help="Optional JSON with cost params (commission_rate, slippage_rate, funding_rate, rebalance_every, n_long, n_short, initial_cash)")
     bt_parser.add_argument("--start", type=str, default=None, help="Start date YYYY-MM-DD (default: factor snapshot min)")
     bt_parser.add_argument("--end", type=str, default=None, help="End date YYYY-MM-DD (default: factor snapshot max)")
@@ -85,28 +88,59 @@ def setup_parser():
 
     return parser
 
-def main():
+def _exit_code(result) -> int:
+    """Normalise the heterogeneous command return values into a shell exit code.
+
+    Commands historically returned ``None``, a dict payload, a bool or an int.
+    ``main()`` used to drop all of them, so ``factorminer backtest`` reported
+    success even when ``run_backtest_cmd`` returned 1. Anything that is not an
+    explicit failure is treated as 0 so legacy commands keep working.
+    """
+    if result is None:
+        return 0
+    if isinstance(result, bool):
+        return 0 if result else 1
+    if isinstance(result, int):
+        return int(result)
+    if isinstance(result, dict):
+        if result.get("success") is False or result.get("ok") is False:
+            return 1
+        if result.get("error"):
+            return 1
+        state = result.get("state")
+        if isinstance(state, dict):
+            status = str(state.get("status", "")).lower()
+            if status in {"failed", "error", "cancelled", "interrupted"}:
+                return 1
+        return 0
+    return 0
+
+
+def main(argv=None) -> int:
     parser = setup_parser()
-    args = parser.parse_args()
-    
+    args = parser.parse_args(argv)
+
     if args.command == "mine":
         from core.commands import mine as miner_main
-        miner_main.run_miner(args)
+        result = miner_main.run_miner(args)
     elif args.command == "experiment":
         from core.commands.run_experiment import run_experiment_cmd
-        run_experiment_cmd(args)
+        result = run_experiment_cmd(args)
     elif args.command == "download":
         from core.commands import download as dl_main
-        asyncio.run(dl_main.run_downloader(args))
+        result = asyncio.run(dl_main.run_downloader(args))
     elif args.command == "inspect":
         from core.commands import inspect as inspect_main
-        inspect_main.run_inspector(args)
+        result = inspect_main.run_inspector(args)
     elif args.command == "backtest":
         from core.commands import backtest as bt_main
-        bt_main.run_backtest_cmd(args)
+        result = bt_main.run_backtest_cmd(args)
     else:
         parser.print_help()
-        sys.exit(1)
+        return 2
+
+    return _exit_code(result)
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

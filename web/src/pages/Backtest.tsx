@@ -74,8 +74,25 @@ function fmt(value?: number, digits = 2) {
   return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : '—';
 }
 
+/** Values already scaled as percentages, e.g. total_return_pct = -17.87. */
 function pct(value?: number) {
   return typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(2)}%` : '—';
+}
+
+/** Ratios, e.g. cagr = -0.1788 -> -17.88%, volatility = 0.2075 -> 20.75%. */
+function pctRatio(value?: number) {
+  return typeof value === 'number' && Number.isFinite(value) ? `${(value * 100).toFixed(2)}%` : '—';
+}
+
+/** Drawdown is stored as a positive magnitude; show it as a loss. */
+function drawdownPct(value?: number) {
+  return typeof value === 'number' && Number.isFinite(value) ? `${(-Math.abs(value)).toFixed(2)}%` : '—';
+}
+
+// A-share / CN convention: up = red, down = green. Unknown values stay neutral.
+function toneClass(value?: number) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 'text-foreground';
+  return value >= 0 ? 'text-rose-400' : 'text-emerald-400';
 }
 
 function money(value?: number) {
@@ -301,14 +318,14 @@ export function Backtest() {
   const effectiveWeights: Record<string, number> = summary.effective_weights || {};
   const expanded: Record<string, any> = summary.expanded_combinations || {};
   const metricCards = [
-    { label: t('bt.totalReturn'), value: pct(summary.total_return_pct), icon: TrendingDown },
-    { label: t('bt.maxDrawdown'), value: pct(summary.max_drawdown_pct), icon: TrendingDown },
-    { label: t('bt.sharpe'), value: fmt(summary.sharpe, 2), icon: Activity },
-    { label: t('bt.cagr'), value: pct(summary.cagr), icon: Activity },
-    { label: t('bt.volatility'), value: pct(summary.volatility), icon: Activity },
-    { label: t('bt.trades'), value: fmt(summary.num_trades, 0), icon: Layers },
-    { label: t('bt.costs'), value: money(summary.total_costs), icon: Scale },
-    { label: t('bt.turnover'), value: fmt(summary.avg_turnover, 4), icon: RefreshCw },
+    { label: t('bt.totalReturn'), value: pct(summary.total_return_pct), icon: TrendingDown, tone: toneClass(summary.total_return_pct) },
+    { label: t('bt.maxDrawdown'), value: drawdownPct(summary.max_drawdown_pct), icon: TrendingDown, tone: 'text-emerald-400' },
+    { label: t('bt.sharpe'), value: fmt(summary.sharpe, 2), icon: Activity, tone: toneClass(summary.sharpe) },
+    { label: t('bt.cagr'), value: pctRatio(summary.cagr), icon: Activity, tone: toneClass(summary.cagr) },
+    { label: t('bt.volatility'), value: pctRatio(summary.volatility), icon: Activity, tone: '' },
+    { label: t('bt.trades'), value: fmt(summary.num_trades, 0), icon: Layers, tone: '' },
+    { label: t('bt.costs'), value: money(summary.total_costs), icon: Scale, tone: '' },
+    { label: t('bt.turnover'), value: fmt(summary.avg_turnover, 4), icon: RefreshCw, tone: '' },
   ];
 
   return (
@@ -524,7 +541,7 @@ export function Backtest() {
                   {metricCards.map((card) => (
                     <div key={card.label} className="rounded-lg border border-border bg-secondary/10 p-3">
                       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{card.label}</p>
-                      <p className="mt-1 text-lg font-semibold">{card.value}</p>
+                      <p className={`mt-1 text-lg font-semibold ${card.tone || ''}`}>{card.value}</p>
                     </div>
                   ))}
                 </div>
@@ -601,7 +618,11 @@ export function Backtest() {
                     </span>
                   </span>
                   <span className="shrink-0 text-right font-mono text-[11px]">
-                    <span className={Number(run.total_return_pct) >= 0 ? 'text-rose-400' : 'text-emerald-400'}>
+                    <span className={
+                      typeof run.total_return_pct === 'number' && Number.isFinite(run.total_return_pct)
+                        ? toneClass(run.total_return_pct)
+                        : 'text-muted-foreground'
+                    }>
                       {pct(run.total_return_pct)}
                     </span>
                     <span className="ml-2 text-muted-foreground">SR {fmt(run.sharpe, 2)}</span>

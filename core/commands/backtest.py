@@ -177,7 +177,8 @@ def run_backtest_cmd(args):
             overrides = json.load(f)
         logger.info("Loaded cost overrides from %s: %s", args.config, list(overrides))
 
-    factor_ids = [f.strip() for f in args.factors.split(",") if f.strip()]
+    raw_factors = getattr(args, "factors", "") or ""
+    factor_ids = [f.strip() for f in raw_factors.split(",") if f.strip()]
     if not factor_ids:
         factor_ids = _discover_factor_ids(args.db_root)
         if factor_ids:
