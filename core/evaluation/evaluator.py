@@ -681,7 +681,14 @@ class ParallelEvaluator:
             # 50/50 dollar-neutral) on the oriented factor and charge the cost
             # of its turnover, so `cost_adj_return` is a per-period net return
             # that is directly comparable to a backtest.
-            horizon = max(1, int(cfg.get("gate_rebalance_bars") or self.gate_rebalance_bars))
+            # P1-6: ``cfg`` is the DEFAULT_FITNESS_CFG-merged dict and that
+            # default declares ``gate_rebalance_bars: 1``, so the old
+            # ``cfg.get(...) or self.gate_rebalance_bars`` short-circuited to 1
+            # for every config that sets ``target.horizon_bars`` instead of an
+            # explicit fitness key — silently disabling the h>1 overlap
+            # discount. ``self.gate_rebalance_bars`` already resolves
+            # (explicit fitness key > target horizon) at construction time.
+            horizon = max(1, int(self.gate_rebalance_bars))
             ls = long_short_returns(
                 factor_values,
                 returns,
@@ -780,7 +787,9 @@ class ParallelEvaluator:
             return verdict
         orientation = 1.0 if corr >= 0 else -1.0
 
-        horizon = max(1, int(cfg.get("gate_rebalance_bars") or self.gate_rebalance_bars))
+        # P1-6: same short-circuit trap as the cross-sectional gate — read the
+        # horizon resolved at construction, not the merged default of 1.
+        horizon = max(1, int(self.gate_rebalance_bars))
         tm = timing_returns(
             factor_values,
             returns,

@@ -221,6 +221,40 @@ class BuildVerdictTest(unittest.TestCase):
         # DSR is deflated on the reduced count -> no more optimistic than h=1.
         self.assertLessEqual(h5["dsr"], h1["dsr"] + 1e-12)
 
+    def test_target_horizon_discount_applies_without_explicit_fitness_key(self):
+        """P1-6: the discount must follow ``target.horizon_bars`` too.
+
+        ``_build_verdict`` used to read the merged ``DEFAULT_FITNESS_CFG`` dict,
+        whose ``gate_rebalance_bars`` default is 1. ``cfg.get(...) or
+        self.gate_rebalance_bars`` therefore short-circuited to 1 for every
+        config that declares the horizon in the target block (the normal case),
+        so the M-08 overlap discount never actually fired. Resolving through
+        ``self.gate_rebalance_bars`` (explicit fitness key > target spec) fixes
+        it; this test pins the target-spec path.
+        """
+        rng = np.random.default_rng(32)
+        T, N = 500, 30
+        idx = pd.date_range("2020-01-01", periods=T, freq="D")
+        cols = [f"A{i}" for i in range(N)]
+        f = rng.standard_normal((T, N))
+        r = 0.002 * f + 0.01 * rng.standard_normal((T, N))
+        fdf = pd.DataFrame(f, index=idx, columns=cols)
+        rdf = pd.DataFrame(r, index=idx, columns=cols)
+
+        class _Spec:
+            horizon_bars = 5
+
+        class _Client:
+            def get_target_spec(self):
+                return _Spec()
+
+        evaluator = ParallelEvaluator(data_client=_Client(), config={})
+        self.assertEqual(evaluator.gate_rebalance_bars, 5)
+
+        v = evaluator._build_verdict(fdf, rdf, {})
+        self.assertLess(v["sr_n_obs"], v["n_obs"])
+        self.assertAlmostEqual(v["sr_n_obs"], int(np.ceil(v["n_obs"] / 5.0)))
+
 
 class EvaluateOnVerdictIntegrationTest(unittest.TestCase):
     def test_sequential_evaluate_on_sets_temporal_verdict(self):

@@ -119,7 +119,11 @@ class CLISmokeTests(unittest.TestCase):
                 env=environment,
                 capture_output=True,
                 text=True,
-                timeout=30,
+                # 30s was tight enough that the LLM smoke subprocess timed out
+                # whenever the full suite hogged the machine (measured ~29.8s
+                # standalone, and it flakes only in the full run). The bound is
+                # a hang detector, not a performance assertion.
+                timeout=90,
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + "\n" + result.stderr)
             self.assertIn("FactorMiner execution completed successfully.", result.stderr)

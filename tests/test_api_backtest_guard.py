@@ -112,6 +112,30 @@ class TestApiBacktestGuard(unittest.TestCase):
         _args, kwargs = calls[0]
         self.assertIsNone(kwargs.get("orientation_db_root"))
 
+    def test_request_model_keeps_oos_fields(self):
+        """P0-2: ``BacktestRequest`` must declare the two OOS switches.
+
+        ``backtest_runs`` reads ``holdout_mode`` / ``allow_holdout_reuse``, and
+        the React form posts them, but the Pydantic model never declared them —
+        with the default ``extra="ignore"`` both were dropped at the API
+        boundary, so every UI "strict OOS" run executed as ``explore`` with
+        reuse disabled. The previous test called ``_execute`` directly and
+        could not see the loss.
+        """
+        from api.main import BacktestRequest
+
+        dumped = BacktestRequest(
+            factor_ids=["fac_x"],
+            holdout_mode="strict",
+            allow_holdout_reuse=True,
+        ).model_dump()
+        self.assertEqual(dumped["holdout_mode"], "strict")
+        self.assertIs(dumped["allow_holdout_reuse"], True)
+        # Defaults must stay fail-safe: no mode override, reuse off.
+        default = BacktestRequest(factor_ids=["fac_x"]).model_dump()
+        self.assertIsNone(default["holdout_mode"])
+        self.assertIs(default["allow_holdout_reuse"], False)
+
 
 if __name__ == "__main__":
     unittest.main()

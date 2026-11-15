@@ -133,6 +133,12 @@ class BacktestRequest(BaseModel):
     end: str | None = None
     db_root: str = "factor_db"
     orientation_db_root: str | None = None
+    # W-08b: the Web form has always posted these two, but Pydantic's default
+    # ``extra="ignore"`` silently dropped them, so every UI "strict OOS" run
+    # actually executed as ``explore`` with reuse disabled. They must be
+    # declared here to survive ``model_dump()`` into ``backtest_runs``.
+    holdout_mode: str | None = None
+    allow_holdout_reuse: bool = False
     data_root: str = "data"
     exchange: str = "binance"
     timeframe: str = "1d"
