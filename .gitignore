@@ -160,3 +160,6 @@ user_workspace/reports/holdout_access.jsonl
 # It records which cross-sectional (asset) holdout splits have been revealed;
 # a fresh clone with an empty ledger would allow silently re-peeking at the
 # same reserved symbols and turn a universe holdout into in-sample data.
+
+# Advisory OS locks created by core/evaluation/experiment_trace.py (never commit)
+*.jsonl.lock

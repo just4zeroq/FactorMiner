@@ -45,7 +45,16 @@ logger = logging.getLogger(__name__)
 _PATH_LOCKS: Dict[str, threading.RLock] = {}
 _PATH_LOCKS_GUARD = threading.Lock()
 _LOCK_TIMEOUT_S = 10.0
-_LOCK_STALE_S = 60.0
+
+import sys as _sys
+if _sys.platform == "win32":
+    import msvcrt as _lock_impl
+    _LOCK_NB = _lock_impl.LK_NBLCK
+    _LOCK_UN = _lock_impl.LK_UNLCK
+else:
+    import fcntl as _lock_impl
+    _LOCK_NB = _lock_impl.LOCK_EX | _lock_impl.LOCK_NB
+    _LOCK_UN = _lock_impl.LOCK_UN
 
 
 def _path_lock(path: Optional[str]) -> threading.RLock:
@@ -60,12 +69,16 @@ def _path_lock(path: Optional[str]) -> threading.RLock:
 
 @contextmanager
 def _file_lock(path: Optional[str]):
-    """Coarse cross-process exclusive lock using an atomic lock file.
+    """Coarse cross-process exclusive lock via OS advisory file locking.
 
-    ``O_CREAT|O_EXCL`` is atomic on both Windows and POSIX, so no platform
-    specific fcntl/msvcrt branch is needed. A stale lock (from a killed process)
-    is reclaimed after ``_LOCK_STALE_S``; acquisition is bounded so a wedged
-    peer fails loudly instead of hanging a mining run forever.
+    The previous scheme used ``O_CREAT|O_EXCL`` plus ``os.remove`` to reclaim a
+    stale lock. That both tripped the environment's bulk-delete guard (every
+    lock release is a delete) and could deadlock on a lock left behind by a
+    killed process. We now open one persistent lock file and take an *advisory*
+    lock on it instead: the OS releases the lock automatically when the holding
+    process exits, so a crashed run never wedges a later one, and we never call
+    ``os.remove`` on a persistence file. The locked byte range — not the file's
+    existence — is the mutex.
     """
     if not path:
         yield
@@ -73,42 +86,36 @@ def _file_lock(path: Optional[str]):
     lock_path = f"{path}.lock"
     parent = os.path.dirname(os.path.abspath(lock_path))
     os.makedirs(parent, exist_ok=True)
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR)
     deadline = time.monotonic() + _LOCK_TIMEOUT_S
-    fd = None
-    while fd is None:
+    acquired = False
+    while not acquired:
         try:
-            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            os.write(fd, f"pid={os.getpid()} at={time.time()}".encode("ascii"))
-        except FileExistsError:
-            try:
-                age = time.time() - os.path.getmtime(lock_path)
-                if age > _LOCK_STALE_S:
-                    os.remove(lock_path)
-                    continue
-            except OSError:
-                pass
+            if _sys.platform == "win32":
+                # msvcrt.locking locks a byte range; LK_NBLCK fails at once if
+                # another process already holds it.
+                _lock_impl.locking(fd, _LOCK_NB, 1)
+            else:
+                _lock_impl.flock(fd, _LOCK_NB)
+            acquired = True
+        except (OSError, IOError):
             if time.monotonic() >= deadline:
+                os.close(fd)
                 raise RuntimeError(
                     f"Could not acquire persistence lock {lock_path} within "
                     f"{_LOCK_TIMEOUT_S:.0f}s; another writer may be stuck."
                 )
             time.sleep(0.01)
-        except OSError:
-            # Filesystem without O_EXCL support: fall back to the in-process
-            # lock only, but never silently pretend we have cross-process safety.
-            logger.warning("Cross-process lock unavailable for %s", path)
-            yield
-            return
     try:
         yield
     finally:
         try:
-            os.close(fd)
+            if _sys.platform == "win32":
+                _lock_impl.locking(fd, _LOCK_UN, 1)
+            else:
+                _lock_impl.flock(fd, _LOCK_UN)
         finally:
-            try:
-                os.remove(lock_path)
-            except OSError:  # pragma: no cover - another writer reclaimed it
-                pass
+            os.close(fd)
 
 
 def _comparable_bound(value: str) -> str:

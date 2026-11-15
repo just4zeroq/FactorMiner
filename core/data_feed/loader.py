@@ -284,8 +284,13 @@ class DataLoader:
             预处理后的数据
         """
         # 处理缺失值
+        # Forward-fill only (past -> future). A trailing/leading gap is filled
+        # from the *previous* observation, which is point-in-time safe. We
+        # deliberately do NOT back-fill: that would pull a future value into a
+        # past row and leak look-ahead information into any factor computed on
+        # this frame. Leading NaNs (before the first real observation) are left
+        # as NaN and handled downstream by reindex / dropna.
         data = data.fillna(method='ffill')
-        data = data.fillna(method='bfill')
         
         # 删除全为NaN的行
         data = data.dropna(how='all')
