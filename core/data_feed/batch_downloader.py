@@ -15,6 +15,7 @@ import logging
 from dataclasses import dataclass
 
 from .data_downloader import DataDownloader
+from .pagination import paginate_ohlcv
 from .health_checker import health_checker
 from .processor import data_processor
 from .naming import data_filename, data_path
@@ -128,83 +129,34 @@ class SmartBatchDownloader(DataDownloader):
                 progress_callback(0, f"开始分批下载 {symbol} {timeframe} 数据...")
                 progress_callback(0, f"总批次数: {total_batches}, 每批天数: {batch_days}")
             
-            # 分批下载数据
-            all_data = []
-            current_dt = start_dt
-            batch_count = 0
-            
-            while current_dt < end_dt:
-                try:
-                    batch_count += 1
-                    
-                    # 计算本次下载的结束时间
-                    batch_end = min(current_dt + timedelta(days=batch_days), end_dt)
-                    
-                    # 计算进度
-                    progress = min(95, int((current_dt - start_dt).days / (end_dt - start_dt).days * 90))
-                    
-                    if progress_callback:
-                        progress_callback(progress, f"下载第 {batch_count}/{total_batches} 批: "
-                                        f"{current_dt.strftime('%Y-%m-%d')} 到 {batch_end.strftime('%Y-%m-%d')}")
-                    
-                    # 下载数据
-                    ohlcv = exchange.fetch_ohlcv(
-                        symbol, 
-                        timeframe, 
-                        int(current_dt.timestamp() * 1000),
-                        limit=config.max_candles_per_batch
-                    )
-                    
-                    if ohlcv:
-                        all_data.extend(ohlcv)
-                        if progress_callback:
-                            progress_callback(progress + 5, f"第 {batch_count} 批完成，"
-                                            f"当前总计: {len(all_data)} 条数据")
-                    else:
-                        self.logger.warning(f"第 {batch_count} 批没有数据")
-                    
-                    # 移动到下一批
-                    current_dt = batch_end
-                    
-                    # 限速和延迟
-                    time.sleep(config.delay_seconds)
-                    
-                    # 检查是否需要重试
-                    if batch_count % 10 == 0:  # 每10批检查一次
-                        time.sleep(config.delay_seconds * 2)  # 额外延迟
-                    
-                except Exception as e:
-                    self.logger.error(f"第 {batch_count} 批下载失败: {e}")
-                    
-                    # 重试逻辑
-                    retry_count = 0
-                    while retry_count < config.retry_attempts:
-                        try:
-                            time.sleep(config.delay_seconds * 2)
-                            retry_count += 1
-                            
-                            if progress_callback:
-                                progress_callback(progress, f"第 {batch_count} 批重试 {retry_count}/{config.retry_attempts}")
-                            
-                            ohlcv = exchange.fetch_ohlcv(
-                                symbol, 
-                                timeframe, 
-                                int(current_dt.timestamp() * 1000),
-                                limit=config.max_candles_per_batch
-                            )
-                            
-                            if ohlcv:
-                                all_data.extend(ohlcv)
-                                break
-                            else:
-                                self.logger.warning(f"第 {batch_count} 批重试 {retry_count} 次后仍无数据")
-                                
-                        except Exception as retry_e:
-                            self.logger.error(f"第 {batch_count} 批重试 {retry_count} 失败: {retry_e}")
-                    
-                    # 如果重试失败，继续下一批
-                    current_dt = batch_end
-            
+            # D-02: cursor advances on the last returned candle. A wall-clock
+            # batch of N days with limit=1000 silently loses intraday data
+            # (1m: only 16.7h per batch) and the old retry path still moved the
+            # window forward after a failure, so a broken window was saved as
+            # a 100/100 "complete" file.
+            def _on_progress(pct: int, message: str):
+                if progress_callback:
+                    progress_callback(min(95, int(pct * 0.9)), message)
+
+            page = paginate_ohlcv(
+                exchange, symbol, timeframe,
+                int(start_dt.timestamp() * 1000),
+                int(end_dt.timestamp() * 1000),
+                timeframe_ms=exchange.parse_timeframe(timeframe) * 1000,
+                limit=config.max_candles_per_batch,
+                retry_attempts=config.retry_attempts,
+                delay_seconds=config.delay_seconds,
+                progress_callback=_on_progress,
+            )
+            if not page["complete"]:
+                detail = "; ".join(page["errors"][-3:]) or str(page["stopped"])
+                return {
+                    'success': False,
+                    'error': f"下载不完整（{page['stopped']}）: {detail}",
+                }
+
+            all_data = page["candles"]
+            batch_count = page["batches"]
             if not all_data:
                 return {'success': False, 'error': '没有下载到数据'}
             

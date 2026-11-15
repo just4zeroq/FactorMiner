@@ -18,7 +18,7 @@
     "max_corr": 0.90,
     "target": {
         "type": "forward_return",
-        "entry_price": "current_close",
+        "entry_price": "next_close",
         "exit_price": "close",
         "horizon_bars": 5,
         "return_type": "simple"

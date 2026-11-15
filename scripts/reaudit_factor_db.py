@@ -25,6 +25,7 @@ import os
 import shutil
 import statistics
 import sys
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -184,7 +185,7 @@ def _summarise(rows: List[Dict]) -> None:
         print(f"  {r['factor_id']}: {r['old']} -> {r['new']}  [{r['fail']}]")
 
 
-def _write_report(rows: List[Dict], n_trials: int, path: str) -> None:
+def _write_report(rows: List[Dict], n_trials: int, path: str) -> Dict[int, int]:
     ok = [r for r in rows if r.get("new") != "SKIP"]
     ok.sort(key=lambda r: -abs(r["rankic_is"]))
     lines = [
@@ -204,24 +205,38 @@ def _write_report(rows: List[Dict], n_trials: int, path: str) -> None:
             f"{r['rankic_is']:+.4f} | {r['rankic_oos']:+.4f} | {r['hac_t']:.2f} | "
             f"{r['p_adj']:.3g} | {r['dsr']:.3f} | {r['net']:+.6f} | {r['fail']} |"
         )
+    # T-05: derive every figure in the conclusions from `ok`, not from the
+    # 2026-11-14 run that happened when this script was written.
     passed = [r for r in ok if r["new"] == "INSPECTED"]
+    from collections import Counter
+    reasons = Counter(
+        part.strip()
+        for r in ok
+        if r["new"] != "INSPECTED"
+        for part in str(r["fail"]).split(",")
+        if part.strip() and part.strip() != "-"
+    )
+    top_reason, top_count = reasons.most_common(1)[0] if reasons else ("无", 0)
+    n_blocked = max(1, len(ok) - len(passed))
     lines += [
         "",
         "## 结论",
         f"- 通过闸门：**{len(passed)}** / {len(ok)}。",
-        "- 拦截原因以 `dsr_pass` 为主：库内因子都是在没有搜索预算记录的情况下挖出来的，"
+        f"- 拦截原因以 `{top_reason}` 为主（{top_count}/{n_blocked} 个被拦因子）："
+        f"库内因子都是在没有搜索预算记录的情况下挖出来的，"
         f"按 {n_trials} 次试验折减后，策略 Sharpe 普遍达不到多重检验的门槛。",
         "- 这是预期结果：闸门的作用不是保留存量，而是阻止不合格因子继续占用 `INSPECTED`。",
         "",
         "## 分母敏感性",
         "",
-        "`n_trials` 是多重检验的分母。84 个因子高度相关，真实独立试验数应小于 84，"
-        "但没有人记录过当时的搜索预算，所以下面给出不同分母下的通过率，"
-        "用于判断结论是否被分母单独决定。",
+        f"`n_trials` 是多重检验的分母。当前 {len(ok)} 个因子高度相关，"
+        "真实独立试验数应小于库规模，但没有人记录过当时的搜索预算，"
+        "所以下面给出不同分母下的通过率，用于判断结论是否被分母单独决定。",
         "",
         "| n_trials | 通过数 |",
         "|---|---|",
     ]
+    sensitivity: Dict[int, int] = {}
     for k in sorted({n_trials, 20, 6, 1}, reverse=True):
         cnt = 0
         for r in ok:
@@ -229,15 +244,21 @@ def _write_report(rows: List[Dict], n_trials: int, path: str) -> None:
                 [r["_gate_input"]], cfg=r["_gate_cfg"], n_trials=k
             )[0]
             cnt += res["status"] == "INSPECTED"
+        sensitivity[k] = cnt
         lines.append(f"| {k} | {cnt} / {len(ok)} |")
     lines.append("")
+    loose = sensitivity.get(1, 0)
+    neg_net = sum(1 for r in ok if float(r["net"]) <= 0)
+    weak_t = sum(1 for r in ok if abs(float(r.get("ls_t") or 0.0)) < 1.96)
     lines.append(
-        "即使把分母降到 1（完全不做多重检验），通过数也只有 1 个 —— "
-        "拦住它们的并不只是 DSR，还有成本后为负与 `ls_t` 不显著。"
+        f"即使把分母降到 1（完全不做多重检验），通过数也只有 **{loose}** / {len(ok)} —— "
+        f"拦住它们的并不只是 DSR：{neg_net} 个因子成本后净收益 ≤ 0，"
+        f"{weak_t} 个因子的多空 t 统计量 |t| < 1.96。"
     )
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(lines) + "\n")
     print(f"report -> {path}")
+    return sensitivity
 
 
 def _apply(rows: List[Dict], db_root: str) -> None:
@@ -257,7 +278,7 @@ def _apply(rows: List[Dict], db_root: str) -> None:
         metrics.update(r["_verdict"])
         metrics["p_adj"] = r["p_adj"]
         metrics["dsr"] = r["dsr"]
-        metrics["reaudited_at"] = "2026-11-14"
+        metrics["reaudited_at"] = datetime.now(timezone.utc).date().isoformat()
         meta["metrics"] = metrics
         meta["lifecycle_status"] = r["new"]
         with open(path, "w", encoding="utf-8") as fh:
@@ -266,7 +287,7 @@ def _apply(rows: List[Dict], db_root: str) -> None:
     print(f"updated {updated} metadata files; backup -> {backup}")
 
 
-def main() -> None:
+def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--db-root", default="factor_db")
     ap.add_argument("--oos-root", default="factor_db_oos")
@@ -280,12 +301,16 @@ def main() -> None:
     n_trials = args.n_trials or max(size, 1)
     oos_root = args.oos_root if os.path.isdir(args.oos_root) else None
     rows = audit(args.db_root, oos_root, n_trials, dict(DEFAULT_GATE_CFG))
+    if not rows:
+        print("[ERROR] 没有找到可重审的因子元数据，拒绝生成空报告", file=sys.stderr)
+        return 1
     _summarise(rows)
-    os.makedirs(os.path.dirname(args.report), exist_ok=True)
+    os.makedirs(os.path.dirname(args.report) or ".", exist_ok=True)
     _write_report(rows, n_trials, args.report)
     if args.apply:
         _apply(rows, args.db_root)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

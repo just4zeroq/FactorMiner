@@ -188,7 +188,7 @@ def _print_and_write_report(df: pd.DataFrame, n_trials: int = 787) -> int:
     blocked = (df["status"] == "DISCOVERED_UNVERIFIED").sum()
     total = len(df)
     print("\n" + "=" * 78)
-    print("PART 1 — OLD-FACTOR GATE AUDIT (6 previously-INSPECTED factors)")
+    print(f"PART 1 — OLD-FACTOR GATE AUDIT ({total} previously-INSPECTED factors)")
     print("=" * 78)
     with pd.option_context("display.max_columns", None, "display.width", 160):
         print(df.to_string(index=False))
@@ -196,7 +196,7 @@ def _print_and_write_report(df: pd.DataFrame, n_trials: int = 787) -> int:
 
     md = ["# 闸门验证报告 · 旧因子复核（Part 1）", ""]
     md.append("## 方法")
-    md.append("- 6 个曾在 `INSPECTED` 状态、但严格 OOS（2025H1）全亏的 GP 因子。")
+    md.append(f"- {total} 个曾在 `INSPECTED` 状态的 GP 因子（严格 OOS 表现见下方回测数据）。")
     md.append("- 从 `factor_db/values` 与 `factor_db_oos/values` 读取样本内/样本外面板的因子值与前瞻收益，")
     md.append("  用与 `ParallelEvaluator._build_verdict` 完全一致的算法重算 `hac_t / p_value / dsr / cost_adj_return`，")
     md.append("  并按**样本内学出的方向**先定向（负 IC 因子等价于反向多空，不再被符号误杀），")
@@ -235,21 +235,53 @@ def _print_and_write_report(df: pd.DataFrame, n_trials: int = 787) -> int:
             reasons.append("成本后收益<=0（无 alpha）")
         md.append(f"- **{r['factor_id']}**：{'；'.join(reasons) or '全部通过'} → {r['status']}")
     md.append("")
+    # T-05: derive every figure from `df` and the actual backtest summary,
+    # instead of freezing the 2025 narrative into the report text.
+    dsr_blocked = int((~df["dsr_pass"].fillna(False).astype(bool)).sum())
+    dsr_lo = float(df["dsr"].min()) if len(df) else float("nan")
+    dsr_hi = float(df["dsr"].max()) if len(df) else float("nan")
+    try:
+        loose_df = audit_old_factors(n_trials=1)
+        loose_pass = int((loose_df["status"] == "INSPECTED").sum())
+        loose_total = int(len(loose_df))
+    except Exception:
+        loose_pass, loose_total = None, total
+    oos_summary_path = os.path.join(
+        "user_workspace", "reports", "backtest_oos_strict", "summary.csv"
+    )
+    if os.path.isfile(oos_summary_path):
+        oos_ret = float(pd.read_csv(oos_summary_path).iloc[0]["total_return_pct"])
+        oos_txt = f"{oos_ret:.2f}%"
+    else:
+        oos_txt = "n/a（未找到严格 OOS 回测 summary.csv）"
+    loose_txt = f"{loose_pass}/{loose_total}" if loose_pass is not None else "n/a（复算失败）"
+
     md.append("## 结论与重要更正")
-    md.append(f"在真实搜索预算（n_trials={n_trials}）下，6 个因子全部被 **DSR<0.90** 拦在 `DISCOVERED_UNVERIFIED`。")
-    md.append("它们的 HAC t / BH-FDR / OOS 方向 / OOS 强度都能过，卡住的是‘这么多轮搜索后还剩下多少可信度’。")
+    md.append(
+        f"在真实搜索预算（n_trials={n_trials}）下，{blocked}/{total} 个因子被拦在 "
+        f"`DISCOVERED_UNVERIFIED`，其中 {dsr_blocked} 个卡在 **DSR<0.90**。"
+    )
+    md.append(
+        f"当前 DSR 范围 {dsr_lo:.3f}–{dsr_hi:.3f}；HAC t / BH-FDR / OOS 方向 / OOS 强度"
+        "的通过情况见上表，卡住的是‘这么多轮搜索后还剩下多少可信度’。"
+    )
     md.append("")
     md.append("**更正**：早期版本的复核脚本在算 DSR / 成本后收益时保留了 IC 的原始符号，")
-    md.append("导致所有负 IC 因子被‘符号误杀’，于是得到‘6/6 拦截’的结论。")
-    md.append("修正定向后，若用宽松分母（n_trials=1），6 个里有 5 个能过闸门 —— 说明之前那次‘全拦’")
-    md.append("并非闸门真的识别了失效因子，而是符号 bug 的副作用。")
+    md.append(f"导致所有负 IC 因子被‘符号误杀’，于是得到‘{blocked}/{total} 拦截’的结论。")
+    md.append(
+        f"修正定向后，若用宽松分母（n_trials=1），{loose_txt} 个因子能过闸门 —— "
+        "说明之前那次‘全拦’并非闸门真的识别了失效因子，而是符号 bug 的副作用。"
+    )
     md.append("")
-    md.append("**分母敏感性**：n_trials=84（当前库规模）仍 6/6 拦截（DSR 0.50–0.70）；")
-    md.append("只有把分母降到个位数，部分因子才会过线。真正起作用的是 DSR 的搜索预算。")
+    md.append(
+        f"**分母敏感性**：n_trials={n_trials} 下仍 {blocked}/{total} 拦截"
+        f"（DSR {dsr_lo:.2f}–{dsr_hi:.2f}）；只有把分母降到个位数，部分因子才会过线。"
+    )
     md.append("")
-    md.append("**更重要的限制**：即使闸门在 IC 层面判定显著，2025H1 严格 OOS 回测仍然亏损 11.18%。")
+    md.append(f"**更重要的限制**：即使闸门在 IC 层面判定显著，严格 OOS 回测总收益仍为 {oos_txt}。")
     md.append("P0 复验（`user_workspace/reports/p0_holdout/README.md`）复现了同一现象：")
-    md.append("OOS RankIC 显著（t≈4.2）但含成本组合 -6.4%。因此‘IC 显著’不能替代‘组合可交易’，")
+    md.append("OOS RankIC 显著但含成本组合仍亏损（具体数值以该报告为准，不在本脚本写死）。"
+              "因此‘IC 显著’不能替代‘组合可交易’，")
     md.append("下一步必须把成本闸门改成收益口径（见 optimization_plan 0c 的 P0.5）。")
     md_path = "user_workspace/reports/gate_validation.md"
     with open(md_path, "w", encoding="utf-8") as fh:

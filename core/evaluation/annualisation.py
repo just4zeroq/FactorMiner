@@ -51,12 +51,22 @@ _UNIT_MINUTES = {
     "w": 10080.0, "wk": 10080.0, "week": 10080.0, "weeks": 10080.0,
 }
 
+# CCXT / pandas use case to distinguish minutes from months: "1m" is one
+# minute, "1M" is one MONTH. Lower-casing everything made ``1M`` resolve to
+# 525600 periods/year instead of ~12, inflating annualised Sharpe by ~209x.
+_CASE_SENSITIVE_UNIT_MINUTES = {
+    "M": MINUTES_PER_YEAR / 12.0,   # 43800 minutes -> 12 periods/year
+    "Y": float(MINUTES_PER_YEAR),
+    "y": float(MINUTES_PER_YEAR),
+}
+
 
 def timeframe_minutes(timeframe: Any) -> Optional[float]:
     """Minutes in one bar for strings like ``5m``, ``1h``, ``4H``, ``1d``.
 
-    Returns ``None`` for anything unparseable so callers can fall back to the
-    index spacing instead of silently guessing.
+    Case matters: ``1m`` is one minute, ``1M`` is one month (CCXT/pandas
+    convention). Returns ``None`` for anything unparseable so callers can fall
+    back to the index spacing instead of silently guessing.
     """
     if timeframe is None:
         return None
@@ -68,8 +78,10 @@ def timeframe_minutes(timeframe: Any) -> Optional[float]:
     if not match:
         return None
     value = float(match.group(1))
-    unit = match.group(2).lower()
-    minutes = _UNIT_MINUTES.get(unit)
+    unit = match.group(2)
+    minutes = _CASE_SENSITIVE_UNIT_MINUTES.get(unit)
+    if minutes is None:
+        minutes = _UNIT_MINUTES.get(unit.lower())
     if minutes is None or value <= 0:
         return None
     return value * minutes

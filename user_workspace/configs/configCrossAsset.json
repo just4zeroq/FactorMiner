@@ -23,6 +23,7 @@
     "hook": "my_bear_market_hunter"
   },
   "target": {
+    "entry_price": "next_close",
     "type": "forward_return",
     "horizon_bars": 1
   },

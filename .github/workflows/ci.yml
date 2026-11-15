@@ -40,6 +40,20 @@ jobs:
           python -V
           python -c "import ml4t.backtest as b; print('ml4t.backtest ->', b.__file__)"
 
+      # T-08: the research/report scripts are not covered by normal unit tests.
+      # Compile them all, and assert that an unusable input produces a
+      # non-zero exit code instead of a silent "successful" report.
+      - name: Smoke-check research scripts
+        run: |
+          python -m compileall -q scripts user_workspace/experiment_tools
+          mkdir -p "$RUNNER_TEMP/empty_factor_db/metadata"
+          if python scripts/reaudit_factor_db.py \
+              --db-root "$RUNNER_TEMP/empty_factor_db" \
+              --report "$RUNNER_TEMP/reaudit.md"; then
+            echo "expected a non-zero exit when the factor library is empty"
+            exit 1
+          fi
+
       - name: Run test suite
         run: python -m pytest tests/ -q
 

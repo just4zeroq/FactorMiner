@@ -62,13 +62,24 @@ def _ts_zscore(series: Any, window: int = 20) -> Any:
 
 
 def _ts_rank(series: Any, window: int = 20) -> Any:
+    """Percentile rank of the latest value inside a trailing window.
+
+    Must agree with ``pandas.rank(pct=True)``: the largest value is 1.0 and
+    ties receive their average rank. The old implementation counted values
+    strictly GREATER than the last one, so a rising series produced 0.0 for
+    every window — exactly inverted.
+    """
     w = int(window)
 
     def _rank(x: np.ndarray) -> float:
         if len(x) < 2:
             return float("nan")
         last = x[-1]
-        return float((x > last).sum()) / (len(x) - 1)
+        less = int(np.sum(x < last))
+        equal = int(np.sum(x == last))
+        # 1-based average rank of the tied group containing `last`.
+        rank = less + (equal + 1) / 2.0
+        return float(rank / len(x))
 
     return series.rolling(w, min_periods=_min_periods(w)).apply(_rank, raw=True)
 

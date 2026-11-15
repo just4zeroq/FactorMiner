@@ -1,4 +1,11 @@
 {
+	"target": {
+		"type": "forward_return",
+		"entry_price": "next_close",
+		"exit_price": "close",
+		"horizon_bars": 1,
+		"return_type": "simple"
+	},
 	"miner": "AdvancedSampleGP",
 	"population_size": 20,
 	"max_iterations": 5,

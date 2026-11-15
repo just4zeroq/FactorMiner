@@ -1,4 +1,11 @@
 {
+  "target": {
+    "type": "forward_return",
+    "entry_price": "next_close",
+    "exit_price": "close",
+    "horizon_bars": 1,
+    "return_type": "simple"
+  },
   "_comment": "Temporary P0 integration test config (throwaway db_root).",
   "population_size": 12,
   "max_iterations": 2,

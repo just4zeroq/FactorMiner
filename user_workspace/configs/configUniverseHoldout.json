@@ -52,6 +52,7 @@
     "coverage_floor": 0.2
   },
   "target": {
+    "entry_price": "next_close",
     "type": "forward_return",
     "horizon_bars": 1
   },

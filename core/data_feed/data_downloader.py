@@ -17,6 +17,7 @@ from config.user_config import config_manager
 from .health_checker import health_checker
 from .processor import data_processor
 from .naming import data_filename, data_path, parse_data_filename
+from .pagination import paginate_ohlcv
 
 
 class DataDownloader:
@@ -140,47 +141,28 @@ class DataDownloader:
             # 获取时间框架的毫秒数
             timeframe_ms = exchange.parse_timeframe(timeframe) * 1000
 
-            # 计算需要下载的数据点数量
-            total_ms = (end_dt - start_dt).total_seconds() * 1000
-            total_candles = int(total_ms / timeframe_ms)
-
             if progress_callback:
                 progress_callback(0, f"开始下载 {symbol} {timeframe} 数据...")
 
-            # 分批下载数据
-            all_data = []
-            current_dt = start_dt
-
-            while current_dt < end_dt:
-                try:
-                    # 计算本次下载的结束时间
-                    batch_end = min(current_dt + timedelta(days=30), end_dt)
-
-                    # 下载数据
-                    ohlcv = exchange.fetch_ohlcv(
-                        symbol,
-                        timeframe,
-                        int(current_dt.timestamp() * 1000),
-                        limit=1000
-                    )
-
-                    if ohlcv:
-                        all_data.extend(ohlcv)
-
-                    # 更新进度
-                    progress = min(100, int((current_dt - start_dt).total_seconds() / (end_dt - start_dt).total_seconds() * 100))
-                    if progress_callback:
-                        progress_callback(progress, f"已下载 {len(all_data)} 条数据...")
-
-                    # 移动到下一批
-                    current_dt = batch_end
-
-                    # 限速
-                    time.sleep(exchange.rateLimit / 1000)
-
-                except Exception as e:
-                    self.logger.error(f"下载批次失败: {e}")
-                    break
+            # D-02: advance on the last candle actually returned, not on a
+            # 30-day wall-clock window (that dropped ~29 days per 1m batch).
+            # D-01: empty responses must still move the cursor.
+            page = paginate_ohlcv(
+                exchange, symbol, timeframe,
+                int(start_dt.timestamp() * 1000),
+                int(end_dt.timestamp() * 1000),
+                timeframe_ms=timeframe_ms,
+                limit=1000,
+                delay_seconds=float(getattr(exchange, "rateLimit", 0) or 0) / 1000.0,
+                progress_callback=progress_callback,
+            )
+            if not page["complete"]:
+                detail = "; ".join(page["errors"][-3:]) or str(page["stopped"])
+                return {
+                    'success': False,
+                    'error': f"下载不完整（{page['stopped']}）: {detail}",
+                }
+            all_data = page["candles"]
 
             if not all_data:
                 return {'success': False, 'error': '没有下载到数据'}
@@ -586,43 +568,25 @@ class DataDownloader:
                     start_timestamp = int(start_time.timestamp() * 1000)
                     end_timestamp = int(end_time.timestamp() * 1000)
 
-                    # 分批下载缺失数据
-                    missing_data = []
-                    current_ts = start_timestamp
-
-                    while current_ts < end_timestamp:
-                        # 计算剩余时间区间
-                        remaining_time = end_timestamp - current_ts
-                        timeframe_ms = exchange.parse_timeframe(timeframe) * 1000
-
-                        # 计算理论上剩余的数据条数
-                        remaining_candles = remaining_time // timeframe_ms
-
-                        # 动态设置 limit，但不超过1000
-                        dynamic_limit = min(remaining_candles, 1000)
-                        #print(f"dynamic_limit: {dynamic_limit}")
-
-                        ohlcv = exchange.fetch_ohlcv(
-                            symbol,
-                            timeframe,
-                            current_ts,
-                            limit=dynamic_limit
+                    # D-01: bounded, cursor-based pagination. The old loop
+                    # `continue`d on an empty response without advancing
+                    # current_ts (infinite loop), and passed limit=0 when the
+                    # remaining interval was shorter than one bar.
+                    page = paginate_ohlcv(
+                        exchange, symbol, timeframe,
+                        start_timestamp, end_timestamp,
+                        timeframe_ms=exchange.parse_timeframe(timeframe) * 1000,
+                        limit=1000,
+                        delay_seconds=float(getattr(exchange, "rateLimit", 0) or 0) / 1000.0,
+                    )
+                    if not page["complete"]:
+                        self.logger.warning(
+                            "补全间断 %s..%s 未完成（%s），跳过该间断: %s",
+                            start_time, end_time, page["stopped"],
+                            "; ".join(page["errors"][-2:]),
                         )
-
-                        if not ohlcv:
-                            print(f"没有数据，继续用当前的current_ts尝试下载")
-                            # 如果没有数据，继续用当前的current_ts尝试下载
-                            # 不要推进时间，因为可能这个时间点确实没有数据
-                            continue
-                        else:
-                            # 如果有数据，使用最后一条数据的时间戳推进
-                            missing_data.extend(ohlcv)
-                            last_timestamp = ohlcv[-1][0]  # 最后一条数据的时间戳
-                            #print(f"last_timestamp: {last_timestamp}")
-                            current_ts = last_timestamp + timeframe_ms
-
-                        # 限速
-                        time.sleep(exchange.rateLimit / 1000)
+                        continue
+                    missing_data = page["candles"]
 
                     if missing_data:
                         # 转换为DataFrame

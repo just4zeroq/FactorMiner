@@ -1,4 +1,11 @@
 {
+  "target": {
+    "type": "forward_return",
+    "entry_price": "next_close",
+    "exit_price": "close",
+    "horizon_bars": 1,
+    "return_type": "simple"
+  },
   "_comment": "Reproducible real LLM experiment. Credentials are read from the environment and are never stored in this file.",
   "paradigm": "MyCustomLLM",
   "population_size": 3,
