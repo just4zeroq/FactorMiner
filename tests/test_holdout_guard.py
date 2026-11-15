@@ -239,21 +239,29 @@ class EntryPointCoverageTests(unittest.TestCase):
 
 
 class CanonicalLedgerTests(unittest.TestCase):
+    # The canonical (committed) ledger must carry the one-time strict holdout
+    # that was intentionally established for this repo. It was originally the
+    # P0-b 16-month burn (holdout_2025H2_2026); on 2026-11-15 it was reset to a
+    # 60-bar lock (holdout_60bars_2026) so the rolling-forward anchor sits at the
+    # latest real bar instead of 16 months in the past. This pin tracks whatever
+    # the *current* canonical reveal is.
+    CANONICAL_KEY = "holdout_60bars_2026"
+
     def setUp(self):
-        # This class inspects the *real* canonical ledger (the P0-b bootstrap
+        # This class inspects the *real* canonical ledger (the bootstrap
         # reveal), so it must opt out of the conftest isolation fixture that
         # redirects the ledger to a temp dir. We only read, never write, so the
         # real working tree is not polluted.
         os.environ.pop("FACTORMINER_HOLDOUT_LEDGER_PATH", None)
 
-    def test_default_ledger_is_absolute_and_contains_the_p0_reveal(self):
+    def test_default_ledger_is_absolute_and_contains_the_canonical_reveal(self):
         path = holdout_guard.default_ledger_path()
         self.assertTrue(os.path.isabs(path))
         self.assertTrue(path.endswith(".holdout_ledger.json"))
-        self.assertTrue(os.path.exists(path), "P0-b bootstrap ledger is missing")
+        self.assertTrue(os.path.exists(path), "canonical holdout ledger is missing")
         ledger = HoldoutLedger(path)
         keys = [r["period_key"] for r in ledger.snapshot()]
-        self.assertIn(BURNED[0], keys)
+        self.assertIn(self.CANONICAL_KEY, keys)
 
     def test_holdout_ledger_default_matches_the_guard(self):
         self.assertEqual(HoldoutLedger().path, holdout_guard.default_ledger_path())

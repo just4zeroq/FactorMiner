@@ -68,6 +68,9 @@ const DEFAULTS = {
   nLong: '5',
   nShort: '5',
   cash: '1000000',
+  orientationDbRoot: '',
+  holdoutMode: 'explore',
+  allowHoldoutReuse: false,
 };
 
 function fmt(value?: number, digits = 2) {
@@ -240,6 +243,12 @@ export function Backtest() {
       if (params.end) body.end = params.end;
       const weights = resolveWeights();
       if (weights) body.weights = weights;
+      // P0-b / #5: surface the OOS controls so a Web run is never silently an
+      // in-sample (LEAKY) backtest. orientation_db_root != db_root is what makes
+      // run_backtest report strict_oos=true.
+      if (params.orientationDbRoot.trim()) body.orientation_db_root = params.orientationDbRoot.trim();
+      body.holdout_mode = params.holdoutMode;
+      body.allow_holdout_reuse = params.allowHoldoutReuse;
 
       const response = await apiFetch(`/api/backtest`, {
         method: 'POST',
@@ -447,7 +456,7 @@ export function Backtest() {
                   {field.label}
                   <input
                     type={field.type}
-                    value={(params as Record<string, string>)[field.key]}
+                    value={(params as Record<string, any>)[field.key]}
                     onChange={(event) =>
                       setParams((current) => ({ ...current, [field.key]: event.target.value }))
                     }
@@ -455,6 +464,54 @@ export function Backtest() {
                   />
                 </label>
               ))}
+            </div>
+
+            {/* OOS / holdout controls — never let a Web run silently be in-sample */}
+            <div className="mt-4 rounded-lg border border-amber-800/50 bg-amber-950/20 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-amber-300">
+                样本外验证 (OOS)
+              </p>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                默认是探索式 (explore)，方向/窗口可能来自评估样本，结论有乐观偏差。要得到严格 OOS，
+                需提供与因子库不同的「方向学习库根路径」(orientation_db_root)，并选择 strict。
+              </p>
+              <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-2">
+                <label className="text-[11px] text-muted-foreground">
+                  方向学习库根路径 (orientation_db_root)
+                  <input
+                    value={params.orientationDbRoot}
+                    onChange={(event) =>
+                      setParams((current) => ({ ...current, orientationDbRoot: event.target.value }))
+                    }
+                    placeholder="留空 = 探索式 / 与因子库相同"
+                    className="mt-1 w-full rounded-md border border-border bg-background/60 px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+                  />
+                </label>
+                <label className="text-[11px] text-muted-foreground">
+                  holdout 模式
+                  <select
+                    value={params.holdoutMode}
+                    onChange={(event) =>
+                      setParams((current) => ({ ...current, holdoutMode: event.target.value }))
+                    }
+                    className="mt-1 w-full rounded-md border border-border bg-background/60 px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary"
+                  >
+                    <option value="explore">explore（探索）</option>
+                    <option value="strict">strict（严格）</option>
+                  </select>
+                </label>
+              </div>
+              <label className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={params.allowHoldoutReuse}
+                  onChange={(event) =>
+                    setParams((current) => ({ ...current, allowHoldoutReuse: event.target.checked }))
+                  }
+                  className="h-3.5 w-3.5 accent-amber-500"
+                />
+                允许复用已揭示 (revealed) 的 holdout 窗口（仅用于复算已发表数字）
+              </label>
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -544,6 +601,29 @@ export function Backtest() {
                       <p className={`mt-1 text-lg font-semibold ${card.tone || ''}`}>{card.value}</p>
                     </div>
                   ))}
+                </div>
+
+                {/* OOS verdict banner — makes the explore/strict distinction explicit */}
+                <div
+                  className={`rounded-lg border p-3 text-xs ${
+                    summary.strict_oos
+                      ? 'border-emerald-800 bg-emerald-950/30 text-emerald-200'
+                      : 'border-amber-800 bg-amber-950/30 text-amber-200'
+                  }`}
+                >
+                  <p className="font-bold">
+                    {summary.strict_oos
+                      ? '✓ 严格样本外 (strict OOS) — 方向来自独立样本，结论可信'
+                      : '⚠ 探索式 (explore) — 方向/窗口可能来自评估样本，结论含乐观偏差，非严格 OOS'}
+                  </p>
+                  {summary.orientation_sources && Object.keys(summary.orientation_sources).length > 0 && (
+                    <p className="mt-1 break-all text-[10px] text-muted-foreground">
+                      方向来源:{' '}
+                      {Object.entries(summary.orientation_sources)
+                        .map(([k, v]) => `${k}=${String(v)}`)
+                        .join(', ')}
+                    </p>
+                  )}
                 </div>
 
                 {chartOption ? (

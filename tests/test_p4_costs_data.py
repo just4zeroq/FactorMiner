@@ -64,6 +64,25 @@ class TestRealFunding(unittest.TestCase):
         self.assertEqual(float(grid.loc[0, "rate"]), 0.0002)
         self.assertEqual(grid.attrs["funding_source"], "constant")
 
+    def test_daily_rate_scaled_to_per_bar_by_timeframe(self):
+        # #3 regression: a *daily* funding rate must be spread across bars so
+        # intraday backtests are not overcharged 24x / 288x.
+        prices = pd.DataFrame({
+            "timestamp": pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]),
+            "asset": ["BTC/USDT:USDT"] * 3,
+        })
+        for timeframe, factor in (("1d", 1.0), ("1h", 1 / 24.0), ("5m", 1 / 288.0)):
+            with self.subTest(timeframe=timeframe):
+                grid = build_funding(prices, 0.0001, timeframe=timeframe)
+                expected = round(0.0001 * factor, 12)
+                self.assertAlmostEqual(float(grid.loc[0, "rate"]), expected, places=12)
+                self.assertAlmostEqual(grid.attrs["funding_per_bar_rate"], expected, places=12)
+                self.assertEqual(grid.attrs["funding_timeframe"], timeframe)
+        # 1d must stay byte-for-byte identical to the legacy constant grid.
+        grid_1d = build_funding(prices, 0.0002, timeframe="1d")
+        self.assertEqual(float(grid_1d.loc[0, "rate"]), 0.0002)
+
+
     def test_missing_stream_is_reported(self):
         out = load_funding_series(
             str(self.root), "binance", "futures", "1d", ["ETH/USDT:USDT"]

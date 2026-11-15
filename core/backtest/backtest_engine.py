@@ -246,7 +246,20 @@ def load_factor_signals(
         if expanded:
             logger.info("Expanded %d linear-combination factor(s) into members", len(expanded))
     else:
-        weight_list = [1.0] * len(factor_ids)
+        # Combination expansion is off, but explicit weights must still reach the
+        # ensemble. Otherwise a user-supplied --weights is silently ignored and
+        # the book collapses to equal weight (the original #4 defect).
+        if isinstance(weights, Mapping):
+            weight_list = [float(weights.get(fid, 1.0)) for fid in factor_ids]
+        elif weights is not None:
+            seq = list(weights)
+            if len(seq) != len(factor_ids):
+                raise ValueError(
+                    f"weights has {len(seq)} entries but {len(factor_ids)} factor ids were given"
+                )
+            weight_list = [float(w) for w in seq]
+        else:
+            weight_list = [1.0] * len(factor_ids)
     weight_map = {fid: w for fid, w in zip(factor_ids, weight_list)}
 
     frames: list[pd.DataFrame] = []
@@ -401,6 +414,14 @@ _FUNDING_FREQ = {
     "15m": "15min", "5m": "5min", "1m": "1min",
 }
 
+# Minutes per bar for each supported timeframe. Used to convert a *daily*
+# funding rate into a per-bar rate so the constant funding grid is charged
+# correctly on intraday timeframes (1h -> 1/24 of a day, 5m -> 1/288, ...).
+_TIMEFRAME_MINUTES = {
+    "1d": 1440, "4h": 240, "1h": 60,
+    "15m": 15, "5m": 5, "1m": 1,
+}
+
 
 def load_funding_series(
     data_root: str,
@@ -457,19 +478,29 @@ def build_funding(
     prices: pd.DataFrame,
     rate: float = 0.0001,
     funding_series: Optional[Mapping[str, pd.Series]] = None,
+    timeframe: str = DEFAULT_TIMEFRAME,
 ) -> pd.DataFrame:
     """Perpetual-funding grid aligned to the traded timestamps/assets.
 
-    P4: pass ``funding_series`` from :func:`load_funding_series` to charge the
-    *real* 8h funding history. Without it the historical constant grid is kept
-    (backward compatible); ``funding_source`` in ``attrs`` makes the choice
+    ``rate`` is a *daily* funding rate. It is spread across bars via
+    :data:`_TIMEFRAME_MINUTES` so each bar is charged for the fraction of a day
+    it actually covers. This keeps the constant grid correct on intraday
+    timeframes (1h -> rate/24, 5m -> rate/288) instead of overcharging intraday
+    P&L by 24x / 288x. ``funding_series`` from :func:`load_funding_series`
+    overrides the scaled constant for matched assets with the *real* 8h history.
+    ``funding_source`` / ``funding_per_bar_rate`` in ``attrs`` make the choice
     auditable in the run report.
     """
     grid = pd.MultiIndex.from_product(
         [prices["timestamp"].drop_duplicates(), prices["asset"].drop_duplicates()],
         names=["timestamp", "asset"],
     ).to_frame(index=False)
-    grid["rate"] = float(rate)
+    bar_minutes = _TIMEFRAME_MINUTES.get(str(timeframe).lower(), 1440)
+    # Spread the *daily* rate across the bars of one day. Rounding to 12 places
+    # removes the 1e-17 floating-point drift of the 1d identity case
+    # (rate*1440/1440) while leaving intraday rates (rate/24, rate/288, ...) intact.
+    per_bar_rate = round(float(rate) * bar_minutes / 1440.0, 12)
+    grid["rate"] = per_bar_rate
     matched = 0
     if funding_series:
         for asset, series in funding_series.items():
@@ -478,12 +509,15 @@ def build_funding(
                 continue
             values = grid.loc[mask, "timestamp"].map(series)
             if values.notna().any():
-                grid.loc[mask, "rate"] = values.fillna(float(rate)).astype(float)
+                grid.loc[mask, "rate"] = values.fillna(per_bar_rate).astype(float)
                 matched += 1
     grid.attrs["funding_source"] = (
         f"crypto_streams ({matched} assets)" if matched else "constant"
     )
     grid.attrs["funding_assets_matched"] = matched
+    grid.attrs["funding_daily_rate"] = float(rate)
+    grid.attrs["funding_per_bar_rate"] = per_bar_rate
+    grid.attrs["funding_timeframe"] = str(timeframe)
     return grid
 
 
@@ -613,7 +647,9 @@ def run_backtest(
         )
         if use_real_funding else {}
     )
-    funding = build_funding(prices, funding_rate, funding_series=funding_series or None)
+    funding = build_funding(
+        prices, funding_rate, funding_series=funding_series or None, timeframe=timeframe
+    )
     # A reserved universe holdout is often much smaller than the mining
     # universe. The default 5-long/5-short book silently produces ZERO trades
     # when only 6 assets exist (the strategy's min_assets gate rejects every

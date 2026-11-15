@@ -167,6 +167,30 @@ class WeightedSignalTests(unittest.TestCase):
             ) / 2.0
             self.assertAlmostEqual(self._rank_of(mixed, asset, ts), expected, places=9)
 
+    def test_explicit_weights_honored_without_combination_expansion(self):
+        # #4 regression: when resolve_combinations is False the old code silently
+        # discarded --weights and collapsed to equal weight. It must still apply.
+        ts = pd.Timestamp("2025-01-05")
+        only_strong = load_factor_signals(
+            ["strong", "weak"], db_root=self.root,
+            weights={"strong": 1.0, "weak": 0.0},
+            resolve_combinations=False, allow_inferred_orientation=True)
+        single = load_factor_signals(
+            ["strong"], db_root=self.root, allow_inferred_orientation=True)
+        for asset in ("X", "Y", "Z"):
+            self.assertAlmostEqual(
+                self._rank_of(only_strong, asset, ts), self._rank_of(single, asset, ts), places=9)
+        self.assertAlmostEqual(only_strong.attrs["effective_weights"]["strong"], 1.0)
+        self.assertAlmostEqual(only_strong.attrs["effective_weights"]["weak"], 0.0)
+
+    def test_positional_weights_must_align_without_expansion(self):
+        # The no-expansion branch must still validate weight length (not silently
+        # fall back to equal weight when the count is wrong).
+        with self.assertRaises(ValueError):
+            load_factor_signals(
+                ["strong", "weak"], db_root=self.root,
+                weights=[0.5], resolve_combinations=False, allow_inferred_orientation=True)
+
 
 if __name__ == "__main__":
     unittest.main()
