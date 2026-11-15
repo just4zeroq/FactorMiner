@@ -1,9 +1,9 @@
 [
   {
-    "period_key": "holdout_2025H2_2026",
-    "start": "2025-07-01",
-    "end": "2026-11-13",
-    "at": "2026-11-14T10:06:07",
-    "note": "strict holdout final verification (merged from .holdout_ledger_p0.json during P0-b bootstrap)"
+    "period_key": "holdout_60bars_2026",
+    "start": "2026-09-16",
+    "end": "2026-11-15",
+    "at": "2026-11-15T13:11:49",
+    "note": "one-time strict holdout = last 60 bars on 1d (end = latest real bar <= current time). 60-bar lock is timeframe-relative: when switching to 1h, recompute as 60 1h bars ending at the latest 1h bar. Frees 2026-01..2026-09 for legitimate OOS. Rolling-forward anchor = end+1."
   }
 ]

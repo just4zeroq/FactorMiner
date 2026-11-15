@@ -154,6 +154,8 @@ user_workspace/reports/holdout_access.jsonl
 # NOTE: user_workspace/.holdout_ledger.json is deliberately NOT ignored.
 # It is the one-time reveal ledger that P0-b's guard reads; a fresh clone with
 # an empty ledger would silently allow re-peeking at burned holdout windows.
+# Backups of a previous ledger (kept locally for audit) are ignored.
+user_workspace/.holdout_ledger.json.bak*
 # Override records (reports/holdout_overrides.jsonl) are likewise kept visible
 # in git status so every deliberate reuse has to be reviewed.
 # NOTE: user_workspace/.universe_ledger.json is deliberately NOT ignored either.
