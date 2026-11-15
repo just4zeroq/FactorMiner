@@ -1,9 +1,7 @@
-import os
 import logging
 import pandas as pd
 from typing import Dict, List, Any
-from pathlib import Path
-from core.data_feed.naming import data_path
+from core.data_feed.naming import data_path, resolve_data_root
 from core.evaluation.targets import ForwardReturnTarget, target_from_config
 
 logger = logging.getLogger(__name__)
@@ -16,6 +14,12 @@ class RealDataClient:
         self.exchange = self.data_feed_config.get("exchange", "binance")
         self.instrument_type = self.data_feed_config.get("instrument_type", "futures")
         self.timeframe = self.data_feed_config.get("timeframe", "1m")
+        # ``data_feeds.data_root`` is the single source of truth.  Honouring it
+        # here keeps the panel the miner reads identical to the directory the
+        # ``doctor`` preflight and ``refresh`` command validated; before this the
+        # client silently hardcoded ``cwd/data`` and a ``--data-root`` override
+        # validated a directory nothing ever read.
+        self.data_root = resolve_data_root(self.data_feed_config.get("data_root"))
         self.pairs = self.data_feed_config.get("pairs", [])
         self.required_streams = self.data_feed_config.get("required_streams", [])
         # Crypto-native streams (funding_rate / open_interest / basis /
@@ -136,12 +140,25 @@ class RealDataClient:
         if not periods:
             return pd.DataFrame()
             
-        project_root = Path(os.getcwd())
         file_path = data_path(
-            project_root / "data", self.exchange, pair, self.timeframe, self.instrument_type
+            self.data_root, self.exchange, pair, self.timeframe, self.instrument_type
         )
         
         if not file_path.exists():
+            # The downloader writes under the project's canonical ``data/`` tree.
+            # When ``data_root`` points somewhere else, an implicit download
+            # would land in a directory this client never reads -- the run would
+            # then die on a phantom "file still missing" error after a
+            # multi-minute download. Refuse up front instead.
+            canonical = resolve_data_root()
+            if self.data_root.resolve() != canonical.resolve():
+                logger.error(
+                    "Data file not found: %s (data_root=%s differs from the downloader's "
+                    "%s; run `factorminer refresh --data-root %s` first).",
+                    file_path, self.data_root, canonical, self.data_root,
+                )
+                return pd.DataFrame()
+
             logger.warning(f"Data file not found: {file_path}. Attempting to download automatically...")
             
             # 收集所有需要的数据段以计算最大的时间范围
@@ -264,7 +281,7 @@ class RealDataClient:
             return df
         from core.data_feed.crypto_streams import load_crypto_streams
 
-        data_root = Path(os.getcwd()) / "data"
+        data_root = self.data_root
         try:
             streams = load_crypto_streams(
                 data_root,

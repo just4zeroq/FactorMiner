@@ -24,6 +24,10 @@ def parse_args(argv=None):
     p.add_argument("--run-id", default=None, help="Explicit run id (default: generated)")
     p.add_argument("--user-dir", default=None, help="Override the config's user workspace directory")
     p.add_argument("--output-root", default=None, help="Override the runs root (mainly for tests)")
+    p.add_argument("--data-root", default=None,
+                   help="Override data_feeds.data_root (the directory the panel is read from)")
+    p.add_argument("--preflight", action="store_true",
+                   help="Run the doctor checks first and abort on any FATAL finding")
     p.add_argument("--holdout-mode", default=None,
                    choices=["strict", "audit", "off"],
                    help="Override evaluation.gates.holdout_mode for this run")
@@ -57,12 +61,38 @@ def run_experiment_cmd(args):
         exp.setdefault("user_dir", "user_workspace")
     if args.seed is not None:
         exp["seed"] = int(args.seed)
+
+    # One resolved data root for the preflight, the miner and the refresh step.
+    # Leaving them to disagree made ``experiment --data-root`` validate a
+    # directory the panel loader never opened.
+    from core.data_feed.naming import resolve_data_root
+
+    feeds = config.setdefault("data_feeds", {})
+    data_root = resolve_data_root(
+        getattr(args, "data_root", None) or feeds.get("data_root")
+    )
+    feeds["data_root"] = str(data_root)
+
     if getattr(args, "holdout_mode", None) or getattr(args, "allow_holdout_reuse", False):
         gates = ((config.setdefault("evaluation", {})).setdefault("gates", {}))
         if getattr(args, "holdout_mode", None):
             gates["holdout_mode"] = args.holdout_mode
         if getattr(args, "allow_holdout_reuse", False):
             gates["allow_holdout_reuse"] = True
+
+    if getattr(args, "preflight", False):
+        from core.commands import doctor as doctor_cmd
+
+        rows = doctor_cmd.run_checks(
+            args.config,
+            data_root=str(data_root),
+            user_dir=exp.get("user_dir", "user_workspace"),
+            miner=config.get("paradigm"),
+        )
+        doctor_cmd._print_table(rows)
+        if any(r["status"] == doctor_cmd.FATAL for r in rows):
+            print("\npreflight failed: fix the FATAL checks above.", flush=True)
+            raise SystemExit(1)
 
     from pathlib import Path
     from core.experiment.pipeline import run_experiment

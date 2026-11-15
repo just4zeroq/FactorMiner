@@ -17,6 +17,8 @@ def parse_args():
     parser.add_argument("--config", type=str, required=True, help="Path to the JSON configuration file")
     parser.add_argument("--iterations", type=int, default=None, help="Optional: Number of iterations (overrides config)")
     parser.add_argument("--user-dir", type=str, default="user_workspace", help="Path to the user workspace directory")
+    parser.add_argument("--seed", type=int, default=None, help="Fix the global RNG seed for reproducibility")
+    parser.add_argument("--data-root", type=str, default=None, help="Override data_feeds.data_root")
     return parser.parse_args()
 
 def run_miner(args):
@@ -39,6 +41,12 @@ def run_miner(args):
     config_dict["paradigm"] = args.miner
     if args.iterations is not None:
         config_dict["max_iterations"] = args.iterations
+    # The director seeds the global RNGs as soon as ``experiment.seed`` is set,
+    # so forwarding the flag here is enough to make a ``mine`` run replayable.
+    if getattr(args, "seed", None) is not None:
+        config_dict.setdefault("experiment", {})["seed"] = int(args.seed)
+    if getattr(args, "data_root", None):
+        config_dict.setdefault("data_feeds", {})["data_root"] = args.data_root
     
     # 2. 动态加载用户目录 (Freqtrade 范式的核心！)
     logger.info(f"Loading user modules from {args.user_dir}...")

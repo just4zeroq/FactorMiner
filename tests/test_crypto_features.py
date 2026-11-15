@@ -368,9 +368,12 @@ class TestRealClientAttach(unittest.TestCase):
         client.instrument_type = "futures"
         client.timeframe = "1h"
         client.crypto_streams = ["funding_rate"]
+        # The attach step now reads the client's resolved root instead of
+        # hardcoding ``cwd/data``, so the streams and the OHLCV panel cannot
+        # come from different directories.
+        client.data_root = tmp / "data"
 
-        with mock.patch("core.data_feed.real_client.os.getcwd", return_value=str(tmp)):
-            out = client._attach_crypto_streams(df, "BTC/USDT:USDT")
+        out = client._attach_crypto_streams(df, "BTC/USDT:USDT")
 
         self.assertIn("funding_rate", out.columns)
         self.assertAlmostEqual(out["funding_rate"].iloc[0], 1e-4)
@@ -378,8 +381,7 @@ class TestRealClientAttach(unittest.TestCase):
         self.assertAlmostEqual(out["funding_rate"].iloc[10], 2e-4)
         # Missing dir must not raise and must leave the frame unchanged.
         client.crypto_streams = ["open_interest"]
-        with mock.patch("core.data_feed.real_client.os.getcwd", return_value=str(tmp)):
-            same = client._attach_crypto_streams(df.copy(), "BTC/USDT:USDT")
+        same = client._attach_crypto_streams(df.copy(), "BTC/USDT:USDT")
         self.assertNotIn("open_interest", same.columns)
 
 

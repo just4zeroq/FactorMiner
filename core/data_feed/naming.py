@@ -5,8 +5,33 @@ All V4 data files use ``{safe_symbol}-{timeframe}-{trade_type}.feather``.
 ``BTC/USDT:USDT`` becomes ``BTC_USDT_USDT``.
 """
 
+import os
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
+
+
+DEFAULT_DATA_ROOT = "data"
+
+
+def resolve_data_root(
+    value: Optional[Union[str, Path]] = None, *, cwd: Optional[Union[str, Path]] = None
+) -> Path:
+    """Resolve a data root to an absolute path.
+
+    One definition for the whole system, so the directory the preflight
+    validates is the directory the miner actually reads.  A relative value
+    (including the default ``"data"``) is anchored at ``cwd`` -- the project
+    root for a CLI run -- and an empty/``None`` value falls back to the
+    default.
+    """
+    base = Path(cwd) if cwd is not None else Path(os.getcwd())
+    raw = str(value).strip() if value is not None else ""
+    if not raw:
+        raw = DEFAULT_DATA_ROOT
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        path = base / path
+    return path
 
 
 def safe_symbol(symbol: str) -> str:

@@ -14,6 +14,12 @@ def setup_parser():
     miner_parser.add_argument("--config", type=str, required=True, help="Path to the JSON configuration file")
     miner_parser.add_argument("--iterations", type=int, default=None, help="Optional: Number of iterations (overrides config)")
     miner_parser.add_argument("--user-dir", type=str, default="user_workspace", help="Path to the user workspace directory")
+    # ``experiment`` could already be replayed bit-for-bit; ``mine`` could not,
+    # and it is the command people use for a single paradigm. Without this the
+    # fallback RNGs (GP/RL sampling, the LLM offline stub) drew fresh numbers
+    # on every invocation.
+    miner_parser.add_argument("--seed", type=int, default=None, help="Fix the global RNG seed for reproducibility")
+    miner_parser.add_argument("--data-root", type=str, default=None, help="Override data_feeds.data_root")
     
     # End-to-end experiment (P5): pre-register -> data -> mine -> gates ->
     # walk-forward -> combine -> OOS recompute -> backtest -> report.
@@ -31,6 +37,10 @@ def setup_parser():
                             help="Override evaluation.gates.holdout_mode")
     exp_parser.add_argument("--allow-holdout-reuse", action="store_true",
                             help="Permit recomputing an already-revealed window (audited)")
+    exp_parser.add_argument("--data-root", type=str, default=None,
+                            help="Override data_feeds.data_root (shared by preflight and mining)")
+    exp_parser.add_argument("--preflight", action="store_true",
+                            help="Run the doctor checks first and abort on a FATAL issue")
 
     # Download Subcommand
     dl_parser = subparsers.add_parser("download", help="Download historical market data")
@@ -55,6 +65,17 @@ def setup_parser():
     inspect_parser.add_argument("--user-dir", type=str, default="user_workspace", help="Path to user workspace directory")
     inspect_parser.add_argument("--allow-holdout-reuse", action="store_true", help="Permit inspecting an already-revealed holdout window (audited).")
     inspect_parser.add_argument("--holdout-mode", type=str, default=None, choices=["strict", "audit", "off"], help="Override the holdout guard mode (default: strict)")
+
+    # Production operations: preflight, data refresh and the unattended loop.
+    # Registered from their own modules so the parser and the implementation
+    # cannot drift apart.
+    from core.commands import doctor as _doctor_cmd
+    from core.commands import pipeline as _pipeline_cmd
+    from core.commands import refresh as _refresh_cmd
+
+    _refresh_cmd.add_parser(subparsers)
+    _doctor_cmd.add_parser(subparsers)
+    _pipeline_cmd.add_parser(subparsers)
 
     # Backtest Subcommand
     bt_parser = subparsers.add_parser(
@@ -140,6 +161,10 @@ def main(argv=None) -> int:
     elif args.command == "backtest":
         from core.commands import backtest as bt_main
         result = bt_main.run_backtest_cmd(args)
+    elif args.command in {"refresh", "doctor", "pipeline"}:
+        # These register ``func`` on the namespace; call it so the command and
+        # its parser live in one module.
+        result = args.func(args)
     else:
         parser.print_help()
         return 2

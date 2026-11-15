@@ -114,6 +114,11 @@ class CLISmokeTests(unittest.TestCase):
                     str(USER_WORKSPACE),
                     "--iterations",
                     "1",
+                    # Pin the seed: the LLM paradigm has no API key here, so it
+                    # falls back to random expressions and an unseeded run picked
+                    # an unusable one about half the time -- a flake, not a bug.
+                    "--seed",
+                    "20260101",
                 ],
                 cwd=root,
                 env=environment,
