@@ -17,7 +17,10 @@ Exit codes: ``0`` everything ran, ``1`` a blocking failure (doctor fatal or the
 experiment failed), ``2`` usage error. A *refresh* failure alone is a warning —
 mining still proceeds on whatever is locally current, and the summary records
 exactly which symbols were stale, so a nightly job can page someone without
-losing the run.
+losing the run. ``--stale-is-fatal`` turns both signals into a hard stop before
+mining. The data root is read from ``data_feeds.data_root`` unless explicitly
+overridden: defaulting it to ``data`` once again let the doctor check one
+library while the miner opened another.
 """
 
 from __future__ import annotations
@@ -59,7 +62,7 @@ def _refresh_namespace(args: argparse.Namespace) -> argparse.Namespace:
         start=None,
         symbols=None,
         timeframe=None,
-        data_root=getattr(args, "data_root", "data"),
+        data_root=getattr(args, "data_root", None),
         retries=getattr(args, "retries", 3),
         report_dir=None,
         dry_run=bool(getattr(args, "dry_run", False)),
@@ -79,6 +82,34 @@ def _write_summary(summary: Dict[str, Any], directory: str) -> Optional[str]:
         return None
 
 
+def _resolve_root(args: argparse.Namespace) -> str:
+    """One data root for refresh + doctor + experiment (config unless overridden)."""
+    from core.data_feed.naming import resolve_data_root
+
+    config: Dict[str, Any] = {}
+    try:
+        with open(args.config, "r", encoding="utf-8-sig") as handle:
+            config = json.load(handle) or {}
+    except (OSError, json.JSONDecodeError):
+        pass  # doctor will report the unreadable config as FATAL
+    declared = getattr(args, "data_root", None) or (config.get("data_feeds") or {}).get("data_root")
+    return str(resolve_data_root(declared))
+
+
+def _abort_stale(
+    summary: Dict[str, Any], reason: str, summary_dir: str
+) -> int:
+    """Stop before mining when --stale-is-fatal is set and data is not current."""
+    summary["stale"] = reason
+    summary["finished_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+    summary["exit_code"] = 1
+    print(f"\nRefusing to mine on stale data: {reason}", flush=True)
+    path = _write_summary(summary, summary_dir)
+    if path:
+        print(f"summary: {path}", flush=True)
+    return 1
+
+
 def run_pipeline_cmd(args: argparse.Namespace) -> int:
     from core.commands import doctor as doctor_cmd
     from core.commands import refresh as refresh_cmd
@@ -86,8 +117,11 @@ def run_pipeline_cmd(args: argparse.Namespace) -> int:
 
     started = datetime.datetime.now()
     stages: List[Dict[str, Any]] = []
+    data_root = _resolve_root(args)
     summary: Dict[str, Any] = {
         "config": args.config,
+        "data_root": data_root,
+        "stale_is_fatal": bool(getattr(args, "stale_is_fatal", False)),
         "started_at": started.isoformat(timespec="seconds"),
         "stages": stages,
     }
@@ -105,6 +139,14 @@ def run_pipeline_cmd(args: argparse.Namespace) -> int:
                 "dry-run" if getattr(args, "dry_run", False) else ("ok" if code == 0 else "stale symbols remain"),
             )
         )
+        if (
+            code != 0
+            and getattr(args, "stale_is_fatal", False)
+            and not getattr(args, "dry_run", False)
+        ):
+            return _abort_stale(
+                summary, "refresh could not bring every symbol up to T-1", args.summary_dir
+            )
 
     # 2. doctor ------------------------------------------------------------
     if getattr(args, "skip_doctor", False):
@@ -113,7 +155,7 @@ def run_pipeline_cmd(args: argparse.Namespace) -> int:
         print("\n=== [2/3] DOCTOR ===", flush=True)
         rows = doctor_cmd.run_checks(
             args.config,
-            data_root=getattr(args, "data_root", "data"),
+            data_root=data_root,
             user_dir=getattr(args, "user_dir", None) or "user_workspace",
         )
         doctor_cmd._print_table(rows)
@@ -134,6 +176,9 @@ def run_pipeline_cmd(args: argparse.Namespace) -> int:
             if path:
                 print(f"summary: {path}", flush=True)
             return 1
+        stale_rows = [r["detail"] for r in rows if r["check"] == "freshness" and r["status"] == doctor_cmd.WARN]
+        if stale_rows and getattr(args, "stale_is_fatal", False):
+            return _abort_stale(summary, f"freshness: {stale_rows[0]}", args.summary_dir)
 
     if getattr(args, "dry_run", False):
         stages.append(_stage("experiment", 0, "skipped (--dry-run)"))
@@ -208,7 +253,10 @@ def add_parser(subparsers) -> None:
     parser.add_argument("--run-id", default=None, help="Explicit run id")
     parser.add_argument("--user-dir", default=None, help="Override the user workspace")
     parser.add_argument("--output-root", default=None, help="Override the runs root")
-    parser.add_argument("--data-root", default="data", help="Local data root")
+    parser.add_argument(
+        "--data-root", default=None,
+        help="Override data_feeds.data_root (default: honour the config)",
+    )
     parser.add_argument("--until", default=None, help="Refresh up to this date (default: yesterday)")
     parser.add_argument("--retries", type=int, default=3, help="Download attempts per symbol")
     parser.add_argument("--holdout-mode", default=None, choices=["strict", "audit", "off"])
@@ -229,6 +277,11 @@ def add_parser(subparsers) -> None:
         "--fail-if-no-promotion",
         action="store_true",
         help="Exit non-zero when the gates promoted nothing (for alerting)",
+    )
+    parser.add_argument(
+        "--stale-is-fatal",
+        action="store_true",
+        help="Abort before mining when refresh fails or freshness is WARN",
     )
     parser.add_argument(
         "--summary-dir",

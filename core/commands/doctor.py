@@ -44,21 +44,6 @@ def _load_report(user_dir: str):
         _LOAD_REPORTS[key] = load_user_modules(user_dir)
     return _LOAD_REPORTS[key]
 
-# Loading user modules compiles every plugin in the workspace; a preflight runs
-# several checks against the same directory, so keep the report for the process
-# lifetime instead of re-importing on every call.
-_LOAD_REPORTS: Dict[str, Any] = {}
-
-
-def _load_report(user_dir: str):
-    from core.utils.dynamic_loader import load_user_modules
-
-    key = os.path.abspath(user_dir)
-    if key not in _LOAD_REPORTS:
-        _LOAD_REPORTS[key] = load_user_modules(user_dir)
-    return _LOAD_REPORTS[key]
-
-
 def _result(check: str, status: str, detail: str) -> Dict[str, str]:
     return {"check": check, "status": status, "detail": detail}
 

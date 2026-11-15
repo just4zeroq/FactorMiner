@@ -1,7 +1,8 @@
 # 生产 CLI 运维手册
 
-三条命令构成一条无人值守的流水线：**refresh → doctor → experiment**。
-它们共用同一份配置（`user_workspace/configs/*.json`），彼此只通过数据与账本解耦。
+生产闭环由七条命令组成：**refresh → doctor → experiment**（产出）→
+**factors**（诊断）→ **promote**（发布）→ **holdout plan/reveal**（一次性确认）。
+它们共用同一份配置（`user_workspace/configs/*.json`），彼此只通过数据、run 库与账本解耦。
 
 ```bash
 # 一次性跑完（推荐；定时任务就调这一条）
@@ -85,6 +86,9 @@ refresh → doctor（FATAL 则中止）→ experiment → 写 summary
 
 - `--skip-refresh` / `--skip-doctor`：跳过某一步（离线调试用）。
 - `--dry-run`：只做 refresh 计划 + doctor，不挖矿。
+- `--data-root`：默认 **不传**，即沿用 `data_feeds.data_root`；显式传值才覆盖。
+- `--stale-is-fatal`：refresh 失败或 `doctor` 的 `freshness` 为 WARN 时，
+  在开跑前中止并返回 1（summary 里写 `stale`）。默认关闭——保留"用本地最新数据继续跑"的旧纪律。
 - `--fail-if-no-promotion`：闸门没有晋升任何因子时返回 1 —— 给告警用；
   **默认关闭**，因为"0 晋升"在信号弱的阶段是正常结果，不是故障。
 - 每次运行都会写 `user_workspace/reports/pipeline_<UTC时间戳>.json`：
@@ -92,10 +96,60 @@ refresh → doctor（FATAL 则中止）→ experiment → 写 summary
   `promoted`、`exit_code`。告警系统读这个文件比抓 stdout 稳。
 
 退出码：`0` 正常；`1` doctor FATAL 或 experiment 失败；`2` 用法错误。
-**refresh 单独失败不会中止挖矿**（用本地已有的数据继续跑），但 summary 里会记录，
-所以"数据没补全"仍然可以被监控到。
+**refresh 单独失败不会中止挖矿**（用本地已有的数据继续跑），但 summary 里会记录；
+需要硬停时加 `--stale-is-fatal`。
 
-## 5. 生产环境开关
+## 5. `factors` — 为什么这轮 0 晋升
+
+实验把每个候选的闸门判定写在 `<run>/factor_db/metadata/*.json` 的
+`metrics.gate_checks` / `metrics.gate_pass`。命令行直接读它，不重算：
+
+```bash
+venv/Scripts/python.exe -m core.cli factors --run-id run_20261115T052211Z_61ffe5
+venv/Scripts/python.exe -m core.cli factors --run-id <id> --show-rejects --json
+```
+
+输出：候选数 / 通过数、各生命周期状态、**按闸门统计的失败次数**（例如
+`dsr_pass=71, empirical_null_pass=66`）、按 fitness 排序的明细。
+`--json` 给出每个因子的 HAC t / p_adj / DSR / empirical_p / 失败项，供告警或看板消费。
+
+## 6. `promote` — 把通过的因子发布到生产库
+
+实验刻意写进 `<run>/factor_db`，避免坏 run 污染共享库；因此通过的因子还不在
+`factor_db/` 里。发布命令把 **metadata + values 快照 + 引用的源码/权重/模型**
+作为一组复制，并追加 `user_workspace/reports/promotions.jsonl` 审计：
+
+```bash
+venv/Scripts/python.exe -m core.cli promote --run-id <id> --factor-id fac_xxxx \
+  --db-root factor_db --dry-run          # 先看会复制哪些文件
+venv/Scripts/python.exe -m core.cli promote --run-id <id> --factor-id fac_xxxx
+```
+
+安全规则：
+
+- 必须 `metrics.gate_pass=true` **且** `lifecycle_status=INSPECTED`；
+- 目标已存在同 id 一律拒绝（含 `--force` 时也不覆盖）；
+- `--force` 只用于绕过闸门状态检查，会在 lineage 与审计里记 `forced=true`；
+- `metadata.data_lineage.promotion` 记下 run_id / 源库 / 时间 / 闸门指标。
+
+## 7. `holdout plan|reveal` — 一次性确认窗口
+
+`experiment_window.json` 预注册的滚动窗口必须**从命令行揭示**，否则等到 ETA 也用不上。
+`plan` 只读，`reveal` 才写账本（`holdout_guard(purpose="final")`）：
+
+```bash
+venv/Scripts/python.exe -m core.cli holdout plan --json
+venv/Scripts/python.exe -m core.cli holdout reveal --window 1 --dry-run
+venv/Scripts/python.exe -m core.cli holdout reveal --window 1
+```
+
+- `--window N` 是 `plan` 里的序号；不传则选**第一个已就绪且未揭示**的窗口。
+- 未就绪（bar 数不足）或已揭示都会拒绝；重复揭示需要 `--allow-holdout-reuse`，
+  且只应用于复算已发布结果（会写审计）。
+- 账本 key 用 `rolling_<start>_<end>`，因此揭示**不会**移动预注册锚点。
+- `FACTORMINER_PRODUCTION=1` 时禁止 `audit/off` 与 reuse 覆盖。
+
+## 8. 生产环境开关
 
 ```bash
 export FACTORMINER_PRODUCTION=1
@@ -108,7 +162,7 @@ export FACTORMINER_PRODUCTION=1
 理由：这两个开关是研究期便利设施，在生产里静默生效等于把一次性 holdout 变成可复用的验证集。
 拒绝发生在 `guard()` 内部，因此 CLI、实验流水线、API 三条入口同时受约束。
 
-## 6. 定时任务
+## 9. 定时任务
 
 Linux (cron，每天 08:10 UTC 补数据并跑一次)：
 
@@ -130,9 +184,10 @@ $env:FACTORMINER_PRODUCTION = "1"
 建议的告警规则：
 - `pipeline_*.json` 的 `exit_code != 0` → 立即告警；
 - `doctor` 里 `freshness` 为 WARN 连续 2 天 → 告警（数据源/网络问题）；
-- `stages[refresh].exit_code != 0` → 提醒（可能仍挖矿，但面板开始落后）。
+- `stages[refresh].exit_code != 0` → 提醒（可能仍挖矿，但面板开始落后；`--stale-is-fatal` 下直接停）。
+- 发布前核对 `factors --run-id <id>` 的拒绝原因；`promote` 只接受 `INSPECTED`。
 
-## 7. 常见问题
+## 10. 常见问题
 
 | 现象 | 原因 | 处理 |
 |---|---|---|
@@ -141,4 +196,6 @@ $env:FACTORMINER_PRODUCTION = "1"
 | `holdout_window: 0 ready` | 预注册窗口还没攒够 bar | 正常，看 `eta`；不要手工揭示 |
 | `refresh: 1 pair(s) not current` | 网络或交易所限频 | 重试；连续失败看 `--retries` 与代理配置 |
 | `data_root ... differs from the downloader's` | `--data-root` 指向非 `cwd/data`，且该根下缺文件 | 先 `refresh --data-root <同一个根>`；不要指望挖掘器自动下载 |
-| `pipeline` 退出 1 但 experiment 成功 | 你开了 `--fail-if-no-promotion` | 关掉该开关，或接受这是"本轮无晋升" |
+| `pipeline` 退出 1 但 experiment 成功 | 你开了 `--fail-if-no-promotion` 或 `--stale-is-fatal` | 看 summary 的 `no_promotion` / `stale` 字段 |
+| `holdout reveal: no ready, unrevealed window` | 锚点之后还没攒够 bar | 看 `holdout plan` 的 ETA；不要手工指定日期绕过 |
+| `promote: Refusing to promote ...` | 闸门未通过或目标已存在 | `factors --run-id` 看原因；不要用 `--force` 掩盖弱信号 |

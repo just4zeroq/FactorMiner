@@ -70,11 +70,17 @@ def setup_parser():
     # Registered from their own modules so the parser and the implementation
     # cannot drift apart.
     from core.commands import doctor as _doctor_cmd
+    from core.commands import factors as _factors_cmd
+    from core.commands import holdout as _holdout_cmd
     from core.commands import pipeline as _pipeline_cmd
+    from core.commands import promote as _promote_cmd
     from core.commands import refresh as _refresh_cmd
 
     _refresh_cmd.add_parser(subparsers)
     _doctor_cmd.add_parser(subparsers)
+    _holdout_cmd.add_parser(subparsers)
+    _factors_cmd.add_parser(subparsers)
+    _promote_cmd.add_parser(subparsers)
     _pipeline_cmd.add_parser(subparsers)
 
     # Backtest Subcommand
@@ -161,7 +167,7 @@ def main(argv=None) -> int:
     elif args.command == "backtest":
         from core.commands import backtest as bt_main
         result = bt_main.run_backtest_cmd(args)
-    elif args.command in {"refresh", "doctor", "pipeline"}:
+    elif args.command in {"refresh", "doctor", "holdout", "factors", "promote", "pipeline"}:
         # These register ``func`` on the namespace; call it so the command and
         # its parser live in one module.
         result = args.func(args)

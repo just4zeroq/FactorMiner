@@ -235,6 +235,7 @@ def guard(
     source: str = "",
     note: str = "",
     context: Optional[Dict[str, Any]] = None,
+    period_key: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Check (and, for ``final``, register) access to one evaluation window.
 
@@ -361,7 +362,11 @@ def guard(
     if purpose == "final":
         spec = load_window_spec()
         digest = result["context"]
-        period_key = f"holdout_{lo}_{hi}" + (f"_{digest}" if digest else "")
+        # A pre-registered rolling window carries its ``rolling_*`` id from
+        # windows.plan_windows(). resolve_anchor() ignores those ids when
+        # computing the next anchor; if we recorded them as plain ``holdout_*``
+        # the first reveal would silently move the pre-registered boundary.
+        key = period_key or (f"holdout_{lo}_{hi}" + (f"_{digest}" if digest else ""))
         label = spec.get("label")
         # The window spec may declare a sentinel start ("auto"/"ledger"/"")
         # meaning "anchor is derived from the ledger last-reveal day" (see
@@ -388,17 +393,18 @@ def guard(
                     "a re-used in-sample period.", lo, declared_start, label,
                 )
         ledger.reveal(
-            period_key,
+            key,
             lo,
             hi,
             note=note or f"one-time final verification via {source or 'guard'}"
                         + (f" [{label}]" if label else ""),
         )
+        result["period_key"] = key
         result["revealed"] = True
         result["reason"] = "revealed"
-        _log_access(result, "revealed", period_key=period_key)
+        _log_access(result, "revealed", period_key=key)
         logger.info("Holdout guard: registered one-time reveal %s (%s..%s)",
-                    period_key, lo, hi)
+                    key, lo, hi)
 
     return result
 
