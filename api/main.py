@@ -311,7 +311,10 @@ def _factor_logic(metadata):
         return {"kind": "ast", "ast": ast, "display": _ast_display(ast)}
 
     if logic_type == "python_source":
-        source_file = logic_ref.get("source_file", "")
+        # A-06: ``source_file`` came from persisted metadata and went straight
+        # into a path; ``../../`` or an absolute path let the endpoint echo any
+        # file on disk. Pin to the basename, like the model_file branch does.
+        source_file = Path(str(logic_ref.get("source_file") or "")).name
         source_path = Path("factor_db") / "sources" / source_file
         source = None
         if source_file and source_path.is_file():
@@ -817,23 +820,34 @@ async def run_batch_download_task_background(task_id: str, exchange: str, symbol
     
     total_tasks = len(symbols) * len(timeframes) * len(trade_types)
     current_task = 0
+    # A-04: ``progress_callback`` is invoked from the ``asyncio.to_thread``
+    # worker, where ``get_running_loop()`` raises RuntimeError. Capture the
+    # event loop here (this function IS a coroutine) and use the thread-safe
+    # bridge, exactly like the mining task does. Keep future references alive so
+    # they are not garbage-collected before completion.
+    main_loop = asyncio.get_running_loop()
+    pending_futures: set = set()
 
     def get_progress_callback(symbol_name, task_index):
-        def progress_callback(progress, message):
+        def progress_callback(progress, message, status="running"):
             # Scale progress across all tasks
             overall_progress = int(((task_index + (progress / 100)) / total_tasks) * 100)
-            
+            payload = {
+                "type": "download_progress",
+                "task_id": task_id,
+                "symbol": symbol_name,
+                "progress": overall_progress,
+                "status": status,
+                "message": f"[{task_index + 1}/{total_tasks}] {symbol_name}: {message}",
+            }
             try:
-                loop = asyncio.get_running_loop()
-                loop.create_task(manager.broadcast({
-                    "type": "download_progress",
-                    "task_id": task_id,
-                    "symbol": symbol_name,
-                    "progress": overall_progress,
-                    "message": f"[{task_index + 1}/{total_tasks}] {symbol_name}: {message}"
-                }))
+                future = asyncio.run_coroutine_threadsafe(
+                    manager.broadcast(payload), main_loop
+                )
             except RuntimeError:
-                pass
+                return
+            pending_futures.add(future)
+            future.add_done_callback(pending_futures.discard)
         return progress_callback
 
     for symbol, timeframe, trade_type in itertools.product(symbols, timeframes, trade_types):
@@ -870,13 +884,17 @@ async def run_batch_download_task_background(task_id: str, exchange: str, symbol
             )
             
             if isinstance(result, dict) and not result.get('success', True):
-                callback(100, f"Error: {result.get('error', 'Unknown error')}")
+                # A-04: a failed download used to emit progress=100 with no
+                # status, so the UI reported success and the button stayed
+                # locked. Report the failure without claiming completion.
+                callback(0, f"Error: {result.get('error', 'Unknown error')}",
+                         status="failed")
             else:
-                callback(100, "Successfully completed!")
-                
+                callback(100, "Successfully completed!", status="completed")
+
         except Exception as e:
             callback = get_progress_callback(symbol, current_task)
-            callback(100, f"Error: {str(e)}")
+            callback(0, f"Error: {str(e)}", status="failed")
             
         current_task += 1
 

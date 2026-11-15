@@ -63,6 +63,28 @@ def _as_frame(x: Any) -> Optional[pd.DataFrame]:
     return None
 
 
+def _net_moments(x: np.ndarray) -> tuple[float, float]:
+    """Skewness and *Pearson* kurtosis (normal == 3) of a return series.
+
+    DSR adjusts the Sharpe variance for non-normal returns. Passing the empirical
+    moments instead of the normal defaults (0, 3) stops the test from being
+    systematically optimistic on the fat-tailed / negatively-skewed books that
+    crypto factors routinely produce.
+    """
+    x = np.asarray(x, float)
+    x = x[np.isfinite(x)]
+    if x.size < 3:
+        return 0.0, 3.0
+    mu = float(np.mean(x))
+    sd = float(np.std(x, ddof=1))
+    if sd <= 0:
+        return 0.0, 3.0
+    z = (x - mu) / sd
+    skew = float(np.mean(z ** 3))
+    kurt = float(np.mean(z ** 4))  # Pearson kurtosis; normal == 3
+    return skew, kurt
+
+
 def long_short_returns(
     factor: Any,
     returns: Any,
@@ -95,6 +117,13 @@ def long_short_returns(
         "n_assets_long": 0,
         "gross": 1.0,
         "ls_t": 0.0,
+        "ls_t_gross": 0.0,
+        "net_mean_return": 0.0,
+        "net_std_return": 0.0,
+        "net_sharpe": 0.0,
+        "net_hit_rate": 0.0,
+        "net_skew": 0.0,
+        "net_kurtosis": 3.0,
     }
     f_df = _as_frame(factor)
     r_df = _as_frame(returns)
@@ -178,6 +207,21 @@ def long_short_returns(
     sharpe = (
         (mean_ret / std_ret) * np.sqrt(float(annualisation)) if std_ret > 0 else 0.0
     )
+    # P1-M9: per-period net return series drives the DSR skew/kurtosis
+    # adjustment. Gross `ls` minus the turnover cost actually paid each bar.
+    net_series = ls - turnover_series * float(cost_rate)
+    net_skew, net_kurt = _net_moments(net_series)
+
+    # E-05: the gate's ``ls_significant`` claims to test the NET return, but
+    # ls_t used to be the HAC t of the GROSS series while cost_adj_return /
+    # net_skew / net_kurtosis used the net one. Higher turnover then inflated
+    # significance. ``ls_t`` is now the net t; gross diagnostics remain
+    # available for audit and the gross fields above keep their meaning.
+    net_mean = float(np.mean(net_series))
+    net_std = float(np.std(net_series, ddof=1)) if net_series.size > 1 else 0.0
+    net_sharpe = (
+        (net_mean / net_std) * np.sqrt(float(annualisation)) if net_std > 0 else 0.0
+    )
     return {
         "mean_return": mean_ret,
         "std_return": std_ret,
@@ -189,7 +233,14 @@ def long_short_returns(
         "n_obs": int(ls.size),
         "n_assets_long": int(np.median(n_long[finite])) if finite.any() else 0,
         "gross": 1.0,
-        "ls_t": ls_t_stat(ls, lags=max(5, hold)),
+        "ls_t": ls_t_stat(net_series, lags=max(5, hold)),
+        "ls_t_gross": ls_t_stat(ls, lags=max(5, hold)),
+        "net_mean_return": net_mean,
+        "net_std_return": net_std,
+        "net_sharpe": float(net_sharpe),
+        "net_hit_rate": float(np.mean(net_series > 0)),
+        "net_skew": net_skew,
+        "net_kurtosis": net_kurt,
     }
 
 
@@ -225,6 +276,13 @@ def timing_returns(
         "n_assets_long": 1,
         "gross": 1.0,
         "ls_t": 0.0,
+        "ls_t_gross": 0.0,
+        "net_mean_return": 0.0,
+        "net_std_return": 0.0,
+        "net_sharpe": 0.0,
+        "net_hit_rate": 0.0,
+        "net_skew": 0.0,
+        "net_kurtosis": 3.0,
         "exposure": 0.0,
     }
     if not isinstance(factor, pd.Series) or not isinstance(returns, pd.Series):
@@ -274,6 +332,9 @@ def timing_returns(
     sharpe = (
         (mean_ret / std_ret) * np.sqrt(float(annualisation)) if std_ret > 0 else 0.0
     )
+    # P1-M9: empirical skew/kurtosis for the DSR correction (see long_short_returns).
+    net_series = strat - turnover_series * float(cost_rate)
+    net_skew, net_kurt = _net_moments(net_series)
     return {
         "mean_return": mean_ret,
         "std_return": std_ret,
@@ -285,8 +346,20 @@ def timing_returns(
         "n_obs": int(strat.size),
         "n_assets_long": 1,
         "gross": 1.0,
-        "ls_t": ls_t_stat(strat, lags=max(5, hold)),
+        # E-05: net-return t, consistent with cost_adj_return and net moments.
+        "ls_t": ls_t_stat(net_series, lags=max(5, hold)),
+        "ls_t_gross": ls_t_stat(strat, lags=max(5, hold)),
+        "net_mean_return": float(np.mean(net_series)),
+        "net_std_return": float(np.std(net_series, ddof=1)) if net_series.size > 1 else 0.0,
+        "net_hit_rate": float(np.mean(net_series > 0)),
+        "net_sharpe": float(
+            (float(np.mean(net_series)) / float(np.std(net_series, ddof=1)))
+            * np.sqrt(float(annualisation))
+            if net_series.size > 1 and float(np.std(net_series, ddof=1)) > 0 else 0.0
+        ),
         "exposure": float(np.mean(position != 0)),
+        "net_skew": net_skew,
+        "net_kurtosis": net_kurt,
     }
 
 

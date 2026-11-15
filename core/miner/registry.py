@@ -1,6 +1,9 @@
 import inspect
 from typing import Callable, Dict
 
+import numpy as np
+import pandas as pd
+
 
 class ExtensionRegistrationError(ValueError):
     """Raised when a user extension cannot satisfy its registry contract."""
@@ -17,6 +20,37 @@ def _validate_callable_arity(func: Callable, expected_arity: int, extension_type
             f"{extension_type} '{name}' must accept at least {expected_arity} positional argument(s): {exc}"
         ) from exc
 
+def _validate_operator_causality(func: Callable, arity: int, name: str) -> None:
+    """M-08/A2: a custom operator must be point-in-time causal.
+
+    The AST sandbox only governs LLM *code*; a plugin registered with
+    ``lambda s: s.shift(-1)`` bypassed it entirely. Recompute the operator on
+    a tail-truncated tape: a causal operator's early rows cannot change.
+    """
+    try:
+        idx = pd.RangeIndex(60)
+        base = pd.Series(np.arange(60, dtype=float), index=idx)
+        args = [base] if arity == 1 else [base, base * 0.5 + 1.0]
+        full = np.asarray(func(*args), dtype=float)
+        cut_args = [a.iloc[:-5] for a in args]
+        cut = np.asarray(func(*cut_args), dtype=float)
+        if full.ndim != cut.ndim or full.shape[0] < 6:
+            return  # non-series output: nothing comparable
+        if not np.allclose(full[:-5], cut[:full.shape[0] - 5],
+                           rtol=1e-8, atol=1e-10, equal_nan=True):
+            raise ExtensionRegistrationError(
+                f"Custom operator '{name}' is not point-in-time causal: "
+                "truncating the last 5 bars changed earlier values "
+                "(negative shift / full-sample rank / bfill are forbidden)"
+            )
+    except ExtensionRegistrationError:
+        raise
+    except Exception:
+        # A plugin that cannot be probed on synthetic data is governed by the
+        # runtime probe / static AST checks instead of blocking registration.
+        return
+
+
 class OperatorRegistry:
     _registry = {}
     
@@ -29,6 +63,7 @@ class OperatorRegistry:
 
         def decorator(func: Callable):
             _validate_callable_arity(func, arity, "Custom operator")
+            _validate_operator_causality(func, arity, func.__name__)
             cls._registry[func.__name__] = {"func": func, "arity": arity}
             return func
         return decorator

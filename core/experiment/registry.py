@@ -18,7 +18,10 @@ from typing import Any, Dict, List, Optional
 RUNS_DIR = Path("user_workspace") / "runs"
 INDEX_NAME = "index.jsonl"
 
-TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
+# X-06: ``failed`` must NOT be terminal. A failed stage is precisely the run
+# you want to resume; treating it as terminal made ``find_resumable`` skip it
+# and forced a brand-new run (losing the pre-registered windows and budget).
+TERMINAL_STATUSES = {"completed", "cancelled"}
 STAGE_ORDER = (
     "created",
     "data_checked",
@@ -26,9 +29,11 @@ STAGE_ORDER = (
     "gated",
     "validated",
     "combined",
+    "oos_prepared",
     "backtested",
     "completed",
 )
+_STAGE_RANK = {name: i for i, name in enumerate(STAGE_ORDER)}
 
 _lock = threading.RLock()
 
@@ -60,7 +65,15 @@ def create_run(
     base = Path(root) if root else RUNS_DIR
     rid = manifest["run_id"]
     path = base / rid
-    path.mkdir(parents=True, exist_ok=True)
+    # X-06: ``exist_ok=True`` let a colliding run_id silently overwrite the
+    # previous run's manifest/config/status and orphan its factor_db.
+    try:
+        path.mkdir(parents=True, exist_ok=False)
+    except FileExistsError as exc:
+        raise FileExistsError(
+            f"Run id '{rid}' already exists at {path}; refusing to overwrite a "
+            "pre-registered run. Use a fresh --run-id or resume the existing one."
+        ) from exc
     _atomic_json(path / "manifest.json", manifest)
     _atomic_json(path / "config.json", config)
     status = {
@@ -104,15 +117,37 @@ def update_status(
     error: Optional[str] = None,
     root: Optional[Path] = None,
 ) -> Dict[str, Any]:
-    """Advance the stage ledger. Idempotent: re-reporting a stage is a no-op."""
+    """Advance the stage ledger. Idempotent: re-reporting a stage is a no-op.
+
+    X-06: ``write_artifact`` used to call this with the *current* stage, which
+    silently flipped a completed run back to ``running``; and an out-of-order
+    stage could rewind the ledger. Both are now rejected while artifacts still
+    get merged.
+    """
     with _lock:
         current = read_status(run_id, root=root)
         completed = list(current.get("completed_stages", []))
-        if stage not in completed:
+        prev_stage = str(current.get("stage", "created"))
+        terminal = current.get("status") in TERMINAL_STATUSES
+        rank = _STAGE_RANK.get(stage, -1)
+        prev_rank = _STAGE_RANK.get(prev_stage, -1)
+        regresses = (
+            rank >= 0 and prev_rank >= 0 and rank < prev_rank and stage not in completed
+        )
+        if regresses:
+            stage = prev_stage
+        elif stage not in completed:
             completed.append(stage)
+        if terminal and status not in TERMINAL_STATUSES:
+            # A terminal run may be *artifact-augmented*, never reopened.
+            new_status = current["status"]
+        else:
+            new_status = status or (
+                "completed" if stage == "completed" else "running"
+            )
         current.update({
-            "status": status or ("completed" if stage == "completed" else "running"),
-            "stage": stage,
+            "status": new_status,
+            "stage": prev_stage if regresses else stage,
             "updated_at": _now(),
             "completed_stages": completed,
         })
@@ -120,6 +155,8 @@ def update_status(
             current.setdefault("artifacts", {}).update(artifacts)
         if error:
             current["error"] = error
+        elif new_status == "running":
+            current.pop("error", None)
         base = Path(root) if root else RUNS_DIR
         _atomic_json(base / run_id / "status.json", current)
         return current
@@ -153,6 +190,15 @@ def find_resumable(config_hash: str, *, root: Optional[Path] = None) -> Optional
     return None
 
 
+def save_manifest(run_id: str, manifest: Dict[str, Any], *,
+                  root: Optional[Path] = None) -> Path:
+    """Atomically refresh the stored manifest (X-02 resume re-verification)."""
+    base = Path(root) if root else RUNS_DIR
+    path = base / run_id / "manifest.json"
+    _atomic_json(path, manifest)
+    return path
+
+
 def write_artifact(
     run_id: str,
     name: str,
@@ -165,9 +211,12 @@ def write_artifact(
     path = base / run_id / name
     path.parent.mkdir(parents=True, exist_ok=True)
     if isinstance(payload, str):
-        path.write_text(payload, encoding="utf-8")
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        tmp.write_text(payload, encoding="utf-8")
+        os.replace(tmp, path)
     else:
         _atomic_json(path, payload)
-    update_status(run_id, read_status(run_id, root=root).get("stage", "created"),
+    current = read_status(run_id, root=root)
+    update_status(run_id, current.get("stage", "created"),
                   artifacts={name: str(path)}, root=root)
     return path

@@ -32,11 +32,22 @@ class OperatorRuntimeError(ValueError):
 
 
 def _safe_divide(left: Any, right: Any) -> Any:
+    """A5: a zero denominator is MISSING data, not a tiny number.
+
+    Replacing 0 with 1e-9 multiplied the numerator by ~1e9 and produced
+    snapshots with std up to 5.67e19 (31/84 factors), which then polluted
+    Pearson IC, turnover, the AlphaPool gram matrix and rank signals.
+    """
     if hasattr(right, "replace"):
-        right = right.replace(0, 1e-9)
-    elif right == 0:
-        right = 1e-9
-    return left / right
+        right = right.replace(0, np.nan)
+    elif isinstance(right, (int, float, np.number)) and right == 0:
+        return left * np.nan
+    out = left / right
+    if hasattr(out, "replace"):
+        out = out.replace([np.inf, -np.inf], np.nan)
+    elif isinstance(out, (int, float, np.number)) and not np.isfinite(out):
+        return np.nan
+    return out
 
 
 def _min_periods(window: int) -> int:
@@ -148,7 +159,12 @@ def _ts_ema(series: Any, window: int = 20) -> Any:
 
 def _ts_ref(series: Any, n: int = 1) -> Any:
     """Lag operator: value n bars ago (n=1 is the classic delay)."""
-    return series.shift(int(n))
+    lag = int(n)
+    if lag < 0:
+        raise OperatorRuntimeError(
+            f"Negative lag {lag} is forbidden: it reads future bars (A2)"
+        )
+    return series.shift(lag)
 
 
 def _ts_sum(series: Any, window: int = 20) -> Any:
@@ -510,17 +526,23 @@ POWERED_OPERATORS = {op for op, specs in OPERATOR_PARAM_SPECS.items()
 PARAM_KEYS = ("window", "p", "n", "q", "lo", "hi")
 
 
-def sample_operator_params(op: str) -> Dict[str, Any]:
-    """Randomly sample parameter values for an operator (used by GP mutation)."""
+def sample_operator_params(op: str, rng: Any = None) -> Dict[str, Any]:
+    """Randomly sample parameter values for an operator (used by GP mutation).
+
+    G-05: ``rng`` is the miner's private, seed-derived RNG. Without it the
+    parameter draw would escape the reproducible trajectory even after every
+    other GP random call was moved onto an instance RNG.
+    """
     import random as _random
 
+    r = rng if rng is not None else _random
     specs = OPERATOR_PARAM_SPECS.get(op, [])
     out: Dict[str, Any] = {}
     for name, lo, hi, kind in specs:
         if kind == "int":
-            out[name] = int(_random.randint(int(lo), int(hi)))
+            out[name] = int(r.randint(int(lo), int(hi)))
         else:
-            out[name] = round(_random.uniform(lo, hi), 4)
+            out[name] = round(r.uniform(lo, hi), 4)
     return out
 
 

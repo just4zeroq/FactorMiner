@@ -113,7 +113,7 @@ class ResolveWeightsTests(unittest.TestCase):
             resolve_signal_weights(["a", "b"], db_root=self.root, weights=[0.5])
 
     def test_signals_record_effective_weights(self):
-        signals = load_factor_signals(["combo"], db_root=self.root)
+        signals = load_factor_signals(["combo"], db_root=self.root, allow_inferred_orientation=True)
         effective = signals.attrs["effective_weights"]
         self.assertAlmostEqual(effective["a"], 0.75)
         self.assertAlmostEqual(effective["b"], -0.25)
@@ -136,12 +136,11 @@ class WeightedSignalTests(unittest.TestCase):
 
     def test_zero_weight_removes_a_factor_from_the_ensemble(self):
         ts = pd.Timestamp("2025-01-05")
-        equal = load_factor_signals(["strong", "weak"], db_root=self.root)
+        equal = load_factor_signals(["strong", "weak"], db_root=self.root, allow_inferred_orientation=True)
         only_strong = load_factor_signals(
-            ["strong", "weak"], db_root=self.root, weights={"strong": 1.0, "weak": 0.0}
-        )
+            ["strong", "weak"], db_root=self.root, weights={"strong": 1.0, "weak": 0.0}, allow_inferred_orientation=True)
         # With weak zeroed out the signal must equal the single-factor signal.
-        single = load_factor_signals(["strong"], db_root=self.root)
+        single = load_factor_signals(["strong"], db_root=self.root, allow_inferred_orientation=True)
         for asset in ("X", "Y", "Z"):
             self.assertAlmostEqual(
                 self._rank_of(only_strong, asset, ts), self._rank_of(single, asset, ts), places=9
@@ -158,12 +157,10 @@ class WeightedSignalTests(unittest.TestCase):
     def test_negative_weight_inverts_a_factor_contribution(self):
         ts = pd.Timestamp("2025-01-05")
         mixed = load_factor_signals(
-            ["strong", "weak"], db_root=self.root, weights={"strong": 1.0, "weak": -1.0}
-        )
+            ["strong", "weak"], db_root=self.root, weights={"strong": 1.0, "weak": -1.0}, allow_inferred_orientation=True)
         inverted_weak = load_factor_signals(
-            ["weak"], db_root=self.root, weights={"weak": -1.0}
-        )
-        strong = load_factor_signals(["strong"], db_root=self.root)
+            ["weak"], db_root=self.root, weights={"weak": -1.0}, allow_inferred_orientation=True)
+        strong = load_factor_signals(["strong"], db_root=self.root, allow_inferred_orientation=True)
         for asset in ("X", "Y", "Z"):
             expected = (
                 self._rank_of(strong, asset, ts) + self._rank_of(inverted_weak, asset, ts)

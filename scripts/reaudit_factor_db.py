@@ -141,28 +141,45 @@ def audit(
             "RankIC_oos": abs(rankic_oos),
             "oos_enabled": oos_consistent is not None,
         }
-        res = apply_promotion_gates([gate_input], cfg=local_cfg, n_trials=n_trials)[0]
-        failed = [k for k, v in res["gate"].items() if v is False and k != "pass"]
+        # A4: do NOT call apply_promotion_gates per factor. A one-element
+        # family makes BH-FDR return the raw p-value, which is exactly why the
+        # previous re-audit reported p_adj == p_value for 84/84 factors.
+        # Stash the inputs and gate the WHOLE library in one batch below.
+        gate_input["_gate_cfg"] = local_cfg
         rows.append({
             "factor_id": fid,
             "old": meta.get("lifecycle_status"),
-            "new": res["status"],
+            "new": "PENDING",
             "mode": mode,
             "rankic_is": rankic_is,
             "rankic_oos": rankic_oos,
             "hac_t": verdict["hac_t"],
-            "p_adj": res["p_adj"],
-            "dsr": res["dsr"],
+            "p_adj": 0.0,
+            "dsr": 0.0,
             "net": verdict["cost_adj_return"],
             "ls_t": verdict.get("ls_t", 0.0),
             "turnover": verdict.get("ls_turnover", 0.0),
             "oos": oos_note,
-            "fail": ",".join(failed) or "-",
+            "fail": "-",
             "_verdict": verdict,
             "_gate_input": gate_input,
             "_gate_cfg": local_cfg,
             "_meta_path": path,
         })
+
+    gated = [r for r in rows if r.get("_gate_input") is not None]
+    if gated:
+        inputs = [r["_gate_input"] for r in gated]
+        family = [float(g.get("p_value", 1.0)) for g in inputs]
+        results = apply_promotion_gates(
+            inputs, cfg=gate_cfg, n_trials=n_trials, family_p_values=family
+        )
+        for row, res in zip(gated, results):
+            failed = [k for k, v in res["gate"].items() if v is False and k != "pass"]
+            row["new"] = res["status"]
+            row["p_adj"] = res["p_adj"]
+            row["dsr"] = res["dsr"]
+            row["fail"] = ",".join(failed) or "-"
     return rows
 
 
@@ -237,15 +254,17 @@ def _write_report(rows: List[Dict], n_trials: int, path: str) -> Dict[int, int]:
         "|---|---|",
     ]
     sensitivity: Dict[int, int] = {}
+    # A4: batch the whole library so BH-FDR sees the real family here too.
+    sens_inputs = [r["_gate_input"] for r in ok if r.get("_gate_input") is not None]
+    sens_family = [float(g.get("p_value", 1.0)) for g in sens_inputs]
     for k in sorted({n_trials, 20, 6, 1}, reverse=True):
-        cnt = 0
-        for r in ok:
-            res = apply_promotion_gates(
-                [r["_gate_input"]], cfg=r["_gate_cfg"], n_trials=k
-            )[0]
-            cnt += res["status"] == "INSPECTED"
+        results = apply_promotion_gates(
+            sens_inputs, cfg=DEFAULT_GATE_CFG, n_trials=k,
+            family_p_values=sens_family,
+        )
+        cnt = sum(1 for res in results if res["status"] == "INSPECTED")
         sensitivity[k] = cnt
-        lines.append(f"| {k} | {cnt} / {len(ok)} |")
+        lines.append(f"| {k} | {cnt} / {len(sens_inputs)} |")
     lines.append("")
     loose = sensitivity.get(1, 0)
     neg_net = sum(1 for r in ok if float(r["net"]) <= 0)

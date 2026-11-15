@@ -6,8 +6,9 @@ import ast
 import multiprocessing
 import traceback
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any, Dict, Optional, Union
 
+import numpy as np
 import pandas as pd
 
 
@@ -208,7 +209,49 @@ class FactorCodePolicy(ast.NodeVisitor):
                 )
         self.generic_visit(node)
 
+    @classmethod
+    def _literal_value(cls, node: ast.AST) -> Optional[float]:
+        """Fold a literal-only arithmetic subtree, or return None.
+
+        E-06: checking each constant individually is not enough —
+        ``999999 * 999999 * 999999`` passes ``visit_Constant`` (each <= 1e6)
+        and used to allocate an unbounded range/list on Windows, where
+        RLIMIT_AS/RLIMIT_CPU are unavailable.
+        """
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) \
+                and not isinstance(node.value, bool):
+            return float(node.value)
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.USub, ast.UAdd)):
+            inner = cls._literal_value(node.operand)
+            if inner is None:
+                return None
+            return -inner if isinstance(node.op, ast.USub) else inner
+        if isinstance(node, ast.BinOp):
+            left = cls._literal_value(node.left)
+            right = cls._literal_value(node.right)
+            if left is None or right is None:
+                return None
+            try:
+                if isinstance(node.op, ast.Mult):
+                    return left * right
+                if isinstance(node.op, ast.Add):
+                    return left + right
+                if isinstance(node.op, ast.Sub):
+                    return left - right
+                if isinstance(node.op, ast.Pow):
+                    return left ** right
+            except (OverflowError, ValueError, ZeroDivisionError):
+                return float("inf")
+        return None
+
     def visit_BinOp(self, node: ast.BinOp) -> None:
+        folded = self._literal_value(node)
+        if folded is not None and abs(folded) > _MAX_NUMERIC_CONSTANT:
+            raise SecurityError(
+                "Literal arithmetic exceeds the allowed magnitude "
+                f"({_MAX_NUMERIC_CONSTANT}); large precomputed constants can "
+                "exhaust memory before the wall-clock timeout fires."
+            )
         if isinstance(node.op, ast.Pow) and isinstance(node.right, ast.Constant):
             exponent = node.right.value
             if (
@@ -227,12 +270,57 @@ class FactorCodePolicy(ast.NodeVisitor):
             raise SecurityError(f"Attribute '{node.attr}' is not allowed")
         self.visit(node.value)
 
+    @staticmethod
+    def _is_negative_number(node: ast.AST) -> bool:
+        """True for ``-1`` / ``-0.5`` / any unary-minus expression."""
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+            return True
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)) \
+                and not isinstance(node.value, bool):
+            return node.value < 0
+        return False
+
     def visit_Call(self, node: ast.Call) -> None:
         if isinstance(node.func, ast.Name):
             if node.func.id not in _SAFE_BUILTINS:
                 raise SecurityError(f"Call to '{node.func.id}' is not allowed")
+            # E-06: no RLIMIT_AS on Windows, so cap allocation-heavy builtins.
+            if node.func.id in ("range", "list", "tuple") and node.args:
+                bound = self._literal_value(node.args[0])
+                if bound is not None and abs(bound) > _MAX_NUMERIC_CONSTANT:
+                    raise SecurityError(
+                        f"{node.func.id}() with {bound:.0f} elements exceeds the "
+                        f"allowed allocation size ({_MAX_NUMERIC_CONSTANT})."
+                    )
         elif not isinstance(node.func, ast.Attribute):
             raise SecurityError("Only approved builtin and attribute calls are allowed")
+
+        # A2: a negative lag turns ``close.shift(-1)/close-1`` into a perfect
+        # copy of the forward-return label. The whitelist used to check only
+        # *parameter names*, never their values or signs.
+        if isinstance(node.func, ast.Attribute):
+            attr = node.func.attr
+            if attr in ("bfill", "backfill"):
+                raise SecurityError(
+                    "Backward filling uses future bars and is forbidden"
+                )
+            if attr in ("shift", "diff", "pct_change", "rolling", "ewm", "expanding"):
+                lag_args = list(node.args) + [
+                    kw.value for kw in node.keywords
+                    if kw.arg in ("periods", "n", "window", "lag", "span")
+                ]
+                for arg in lag_args:
+                    if self._is_negative_number(arg):
+                        raise SecurityError(
+                            "Negative time displacement is forbidden (look-ahead)"
+                        )
+            if attr == "fillna":
+                for kw in node.keywords:
+                    if kw.arg == "method" and isinstance(kw.value, ast.Constant) \
+                            and str(kw.value.value).lower() in ("bfill", "backfill"):
+                        raise SecurityError(
+                            "fillna(method='bfill') uses future bars and is forbidden"
+                        )
         self.visit(node.func)
         for argument in node.args:
             self.visit(argument)
@@ -316,6 +404,60 @@ def validate_llm_factor_output(
     return value
 
 
+def causality_probe(
+    code: Any,
+    globals_: Dict[str, Any],
+    data: Any,
+    output: Union[pd.Series, pd.DataFrame],
+    tail: int = 5,
+) -> None:
+    """A2: recompute on a tail-truncated tape and demand identical early rows.
+
+    Static AST checks cannot see ``n = -1; df.close.shift(n)``, a full-sample
+    ``rank(pct=True)``, or any other indirectly constructed look-ahead. A
+    causal factor's value at time t may only depend on rows <= t, so removing
+    the last ``tail`` rows must not change ANY of the earlier values.
+    """
+    try:
+        n_rows = len(data.index) if isinstance(data, pd.DataFrame) else len(
+            next(iter(data.values())).index
+        )
+    except Exception:
+        return  # cannot determine a timeline; static checks still apply
+    cut = n_rows - tail
+    if cut < max(20, tail * 2):
+        return  # too short for a meaningful comparison
+
+    if isinstance(data, pd.DataFrame):
+        truncated = data.iloc[:cut]
+    else:
+        truncated = {k: v.iloc[:cut] for k, v in data.items()}
+
+    local_vars = {"df": truncated}
+    try:
+        exec(code, dict(globals_), local_vars)
+    except Exception as exc:
+        raise SecurityError(f"Causality probe recomputation failed: {exc}") from exc
+    replay = local_vars.get("factor")
+    if replay is None or not hasattr(replay, "to_numpy"):
+        raise SecurityError("Causality probe produced no factor output")
+
+    try:
+        expected = np.asarray(output.iloc[:cut], dtype=float)
+        actual = np.asarray(replay, dtype=float)
+    except Exception as exc:
+        raise SecurityError(f"Causality probe could not compare outputs: {exc}") from exc
+    if expected.shape != actual.shape:
+        raise SecurityError(
+            f"Causality probe shape mismatch: {actual.shape} vs {expected.shape}"
+        )
+    if not np.allclose(actual, expected, rtol=1e-8, atol=1e-10, equal_nan=True):
+        raise SecurityError(
+            "Factor is not point-in-time causal: truncating the last "
+            f"{tail} bars changed earlier factor values"
+        )
+
+
 def _apply_resource_limits(limits: SandboxLimits) -> None:
     try:
         import resource
@@ -350,6 +492,9 @@ def _sandbox_worker(connection, code_str: str, data: Any, limits: SandboxLimits)
         compiled = compile(code_str, "<llm-factor>", "exec")
         exec(compiled, safe_globals, local_vars)
         output = validate_llm_factor_output(local_vars.get("factor"), data)
+        # A2: dynamic point-in-time check. Static AST rules cannot see an
+        # indirectly constructed negative lag or a full-sample rank.
+        causality_probe(compiled, safe_globals, data, output)
         connection.send({"status": "success", "output": output})
     except Exception as exc:
         connection.send(

@@ -158,6 +158,61 @@ class FactorMinerDirector:
             logger.warning("Target-permutation null unavailable: %s", exc)
             return None
 
+    def _attach_final_oos_metrics(self, candidates, metrics_list):
+        """One-shot OOS evidence for the frozen shortlist (A1).
+
+        ``ParallelEvaluator.evaluate()`` no longer reads the validation split
+        during search. This is the ONLY place OOS returns are touched before
+        promotion, and its output feeds the gate rather than the fitness loop.
+        Clients without a test split keep their legacy metrics (a warning is
+        emitted) so library-only / synthetic runs remain usable.
+        """
+        tgetter = getattr(self.data_client, "get_test_data", None)
+        rgetter = getattr(self.data_client, "get_test_returns", None)
+        if not callable(tgetter) or not callable(rgetter):
+            logger.warning(
+                "No validation split on data client; promotion has no OOS evidence"
+            )
+            return metrics_list
+        try:
+            test_data, test_returns = tgetter(), rgetter()
+        except Exception as exc:
+            logger.warning("Final OOS evaluation unavailable: %s", exc)
+            return metrics_list
+        if test_data is None or test_returns is None:
+            return metrics_list
+
+        merged_list = []
+        for cand, metrics in zip(candidates, metrics_list):
+            m = dict(metrics or {})
+            try:
+                oos = self.evaluator._compute_oos_metrics(
+                    cand, test_data, test_returns
+                )
+            except Exception as exc:  # pragma: no cover - one bad factor
+                logger.debug("Final OOS metric failed for a candidate: %s", exc)
+                oos = None
+            if oos:
+                rankic_in = float(m.get("RankIC", 0.0) or 0.0)
+                rankic_oos = float(oos.get("RankIC", 0.0) or 0.0)
+                m["RankIC_oos"] = rankic_oos
+                m["IC_oos"] = float(oos.get("IC", 0.0) or 0.0)
+                m["oos_enabled"] = True
+                m["oos_consistent"] = (
+                    rankic_in * rankic_oos > 0 and abs(rankic_in) > 1e-9
+                )
+            else:
+                m["oos_enabled"] = False
+                m["oos_consistent"] = False
+                m["RankIC_oos"] = 0.0
+            if isinstance(getattr(cand, "metrics", None), dict):
+                cand.metrics.update({
+                    k: m[k] for k in
+                    ("RankIC_oos", "IC_oos", "oos_enabled", "oos_consistent")
+                })
+            merged_list.append(m)
+        return merged_list
+
     def _save_excellent_factors(self, candidates):
         import uuid
         from datetime import datetime
@@ -168,6 +223,11 @@ class FactorMinerDirector:
         # multiple-testing control that was missing before; only factors whose
         # gates are all green become INSPECTED, the rest stay DISCOVERED_UNVERIFIED.
         metrics_list = [(getattr(c, "metrics", None) or {}) for c in candidates]
+        # A1: OOS is consulted exactly ONCE here, on the frozen shortlist, and
+        # only as gate evidence — never as a search signal. Without this the
+        # promotion gate would silently lose its oos_consistent / oos_strength
+        # evidence once the mining loop stopped reading the validation split.
+        metrics_list = self._attach_final_oos_metrics(candidates, metrics_list)
         # DSR must be deflated by the *real* number of ideas tried: everything
         # recorded in the cross-run trace plus every candidate this run handed
         # to the evaluator (including the ones that never made the shortlist).
@@ -186,16 +246,26 @@ class FactorMinerDirector:
         from core.experiment import budget as budget_sync
 
         run_p_values = list(getattr(evaluator, "run_p_values", []) or [])
+        # E-04: a repeated expression is still a fresh hypothesis *test*. The
+        # trace keeps both the distinct-hypothesis count and the full attempt
+        # journal; use the stricter of the two as the DSR/BH denominator so
+        # re-running winners cannot keep the multiple-testing bar flat.
+        attempts = getattr(self.trace, "num_attempts", 0)
+        # Mocks / legacy trace implementations may not expose the journal
+        # count; never let a non-integer sentinel inflate the denominator.
+        if not isinstance(attempts, int) or isinstance(attempts, bool):
+            attempts = 0
+        trace_denominator = max(int(self.trace.num_trials), int(attempts))
         base_trials, family, self.budget_snapshot = budget_sync.resolve(
-            int(self.trace.num_trials),
+            trace_denominator,
             self.fdr_ledger.cumulative(),
             run_p_values,
         )
         n_trials = base_trials + run_trials
-        # Every candidate handed to the evaluator reads the OOS/validation split.
-        # This is the count AlphaMaster never recorded; surfacing it makes val
-        # reuse a governed quantity instead of an invisible one.
-        self.val_read_count = int(run_trials)
+        # A1: the validation split is read ONCE (final shortlist evidence),
+        # not once per candidate per generation. ``run_trials`` above is the
+        # hypothesis-budget denominator (every in-sample candidate evaluated).
+        self.val_read_count = 1
         gate_cfg = self.config.get("evaluation", {}).get("gates")
         # P2: turn the target-permutation null from a library helper into an
         # actual promotion gate (off unless null_n_perm + empirical_p_max are set).
@@ -289,6 +359,11 @@ class FactorMinerDirector:
             cand.metrics["gate_checks"] = {
                 k: v for k, v in g["gate"].items() if k != "pass"
             }
+            # P0-H3: also surface the promotion verdict on the candidate so the
+            # pipeline report can count promotions. Without this the verdict lives
+            # only on FactorMetadata and pipeline.py reads None -> n_promoted=0
+            # even when every gate passed.
+            cand.metrics["lifecycle_status"] = g["status"]
             metadata = FactorMetadata(
                 factor_id=factor_id,
                 miner_type=self.config.get("paradigm"),

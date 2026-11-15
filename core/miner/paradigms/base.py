@@ -176,6 +176,15 @@ class BaseFactorMiner(ABC):
         self.data = data           
         self.config = config       
         self.state = MinerState()
+        # G-05 / C1: every miner owns private RNGs derived from the run seed.
+        # GP used the global ``random`` while RL mixed ``random`` with
+        # ``np.random``; any unrelated global draw in the process broke
+        # reproducibility. With no declared seed these ARE the legacy global
+        # modules, so ad-hoc runs keep their previous behaviour.
+        from core.experiment.manifest import derive_rngs
+        self.rng, self.np_rng = derive_rngs(
+            config or {}, salt=str((config or {}).get("paradigm", ""))
+        )
         # 预留统一的回测评价器接口（由外部 Director 或自身子类初始化时注入）
         self.evaluator = None 
         # 全局名人堂（Hall of Fame）：记录历史上出现过的全量最高分因子
@@ -404,7 +413,12 @@ class BaseFactorMiner(ABC):
                 len(selected),
                 [round(float(w), 4) for w in combined.weights],
             )
-            return [combined] + selected
+            # P1-M6: prepend the combination but keep the *whole* hall of fame.
+            # Returning only [combined] + selected (top-K) silently discarded the
+            # other discovered factors: they never reached the promotion gate or
+            # factor_db, so the run reported ~4 factors from a ~100-candidate
+            # search. Gate/DSR/FDR must see every candidate to stay honest.
+            return [combined] + candidates
         except Exception as exc:
             logger.warning("Linear combination finalize failed: %s", exc)
             return candidates
@@ -424,7 +438,10 @@ class BaseFactorMiner(ABC):
         cfg = self.config
         capacity = int(cfg.get("alphapool_capacity", 10))
         mutual_max = float(cfg.get("alphapool_mutual_ic_max", 0.99))
-        shift = int(cfg.get("alphapool_weight_fit_shift", 21))
+        # P1-M8: align with the native label horizon (1 bar). The old 21-step
+        # default was AlphaForge's monthly-horizon guard and mismatched our
+        # forward_return horizon, so pool weights were fit on the wrong target.
+        shift = int(cfg.get("alphapool_weight_fit_shift", 0))
         reg = float(cfg.get("alphapool_reg_lambda", 5.0))
         top_m = int(cfg.get("alphapool_top_m", 30))
 

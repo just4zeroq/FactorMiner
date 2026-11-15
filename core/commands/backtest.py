@@ -78,18 +78,53 @@ def _discover_factor_ids(db_root: str) -> list[str]:
 
 
 def _parse_weights(raw: str | None, factor_ids: list[str]) -> dict[str, float] | None:
-    """Parse ``--weights`` as ``id=w,id=w`` or a positional ``w,w,w`` list."""
+    """Parse ``--weights`` as ``id=w,id=w`` or a positional ``w,w,w`` list.
+
+    K-07: the old parser silently accepted unknown ids (a typo became an
+    unweighted factor), mixed formats (uncaught ValueError) and NaN/inf/all-zero
+    weights. All of those produce a backtest that looks valid but is not.
+    """
     if not raw:
         return None
+    import math
+
     parts = [p.strip() for p in raw.split(",") if p.strip()]
-    if all("=" in p for p in parts):
-        return {p.split("=", 1)[0].strip(): float(p.split("=", 1)[1]) for p in parts}
-    values = [float(p) for p in parts]
-    if len(values) != len(factor_ids):
-        raise SystemExit(
-            f"--weights has {len(values)} positional values but {len(factor_ids)} factors were given"
+    if not parts:
+        raise ValueError("--weights is empty")
+    named = ["=" in p for p in parts]
+    if any(named) and not all(named):
+        raise ValueError(
+            "--weights mixes 'id=w' and positional values; use one format only"
         )
-    return dict(zip(factor_ids, values))
+    if all(named):
+        pairs = [p.split("=", 1) for p in parts]
+        try:
+            weights = {k.strip(): float(v) for k, v in pairs}
+        except ValueError as exc:
+            raise ValueError(f"--weights contains a non-numeric value: {exc}") from exc
+    else:
+        try:
+            values = [float(p) for p in parts]
+        except ValueError as exc:
+            raise ValueError(f"--weights contains a non-numeric value: {exc}") from exc
+        if len(values) != len(factor_ids):
+            raise ValueError(
+                f"--weights has {len(values)} positional values but "
+                f"{len(factor_ids)} factors were given"
+            )
+        weights = dict(zip(factor_ids, values))
+
+    unknown = sorted(set(weights) - set(factor_ids))
+    if unknown:
+        raise ValueError(
+            f"--weights references unknown factor id(s): {', '.join(unknown[:5])}"
+        )
+    for fid, value in weights.items():
+        if not math.isfinite(value):
+            raise ValueError(f"--weights for '{fid}' is not finite: {value}")
+    if weights and all(abs(v) <= 1e-12 for v in weights.values()):
+        raise ValueError("--weights are all zero; the ensemble would be undefined")
+    return weights
 
 
 def parse_args():
@@ -133,14 +168,17 @@ def parse_args():
              "Omit for in-sample runs (direction learned from --db-root).",
     )
     parser.add_argument("--data-root", type=str, default="data")
-    parser.add_argument("--commission", type=float, default=0.0004, help="Taker commission (fraction of trade value)")
-    parser.add_argument("--slippage", type=float, default=0.0005, help="Slippage (fraction of price)")
-    parser.add_argument("--funding", type=float, default=0.0001, help="Daily perpetual funding rate (fraction)")
+    # K-04: None means "not passed", so an explicit CLI flag can beat --config
+    # while an untouched flag falls back to config and then to the built-in
+    # default. Non-None defaults made that distinction impossible.
+    parser.add_argument("--commission", type=float, default=None, help="Taker commission (fraction of trade value)")
+    parser.add_argument("--slippage", type=float, default=None, help="Slippage (fraction of price)")
+    parser.add_argument("--funding", type=float, default=None, help="Daily perpetual funding rate (fraction)")
     parser.add_argument("--real-funding", action="store_true", help="Charge the real 8h funding history from crypto_streams instead of a constant grid")
-    parser.add_argument("--rebalance", type=int, default=5, help="Bars between rebalances")
-    parser.add_argument("--n-long", type=int, default=5, help="Number of long positions")
-    parser.add_argument("--n-short", type=int, default=5, help="Number of short positions")
-    parser.add_argument("--initial-cash", type=float, default=1_000_000.0)
+    parser.add_argument("--rebalance", type=int, default=None, help="Bars between rebalances")
+    parser.add_argument("--n-long", type=int, default=None, help="Number of long positions")
+    parser.add_argument("--n-short", type=int, default=None, help="Number of short positions")
+    parser.add_argument("--initial-cash", type=float, default=None)
     parser.add_argument(
         "--output",
         type=str,
@@ -172,10 +210,40 @@ def run_backtest_cmd(args):
     logger = logging.getLogger("FactorMinerBacktest")
 
     overrides: dict = {}
-    if args.config and os.path.exists(args.config):
-        with open(args.config, encoding="utf-8-sig") as f:
-            overrides = json.load(f)
-        logger.info("Loaded cost overrides from %s: %s", args.config, list(overrides))
+    if args.config:
+        if not os.path.exists(args.config):
+            logger.error("Cost config not found: %s", args.config)
+            return 1
+        try:
+            with open(args.config, encoding="utf-8-sig") as f:
+                overrides = json.load(f)
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.error("Cannot read cost config %s: %s", args.config, exc)
+            return 1
+        if not isinstance(overrides, dict):
+            logger.error("Cost config %s must be a JSON object", args.config)
+            return 1
+        logger.info("Loaded cost defaults from %s: %s", args.config, list(overrides))
+
+    # K-04: explicit CLI > --config > built-in default. The old
+    # ``overrides.get(key, args.x)`` let a stale config silently beat an
+    # explicit ``--commission``/``--rebalance`` flag.
+    def pick(cli_value, cfg_key: str, fallback):
+        if cli_value is not None:
+            return cli_value
+        return overrides.get(cfg_key, fallback)
+
+    # ``getattr`` keeps programmatic callers / older Namespace shapes working.
+    def arg(name):
+        return getattr(args, name, None)
+
+    initial_cash = pick(arg("initial_cash"), "initial_cash", 1_000_000.0)
+    commission_rate = pick(arg("commission"), "commission_rate", 0.0004)
+    slippage_rate = pick(arg("slippage"), "slippage_rate", 0.0005)
+    funding_rate = pick(arg("funding"), "funding_rate", 0.0001)
+    n_long = pick(arg("n_long"), "n_long", 5)
+    n_short = pick(arg("n_short"), "n_short", 5)
+    rebalance_every = pick(arg("rebalance"), "rebalance_every", 5)
 
     raw_factors = getattr(args, "factors", "") or ""
     factor_ids = [f.strip() for f in raw_factors.split(",") if f.strip()]
@@ -187,7 +255,14 @@ def run_backtest_cmd(args):
         logger.error("No factor ids provided and none found under %s", args.db_root)
         return 1
 
-    weights = _parse_weights(args.weights, factor_ids)
+    try:
+        weights = _parse_weights(args.weights, factor_ids)
+    except ValueError as exc:
+        logger.error("Invalid --weights: %s", exc)
+        return 2
+    if bool(args.start) != bool(args.end):
+        logger.error("--start and --end must be supplied together")
+        return 2
 
     # P0-b: ANY entry point that reads holdout returns must pass the single
     # ledger guard *before* computing anything. --orientation-db-root marks a
@@ -213,15 +288,16 @@ def run_backtest_cmd(args):
         trade_type=args.trade_type,
         start=args.start,
         end=args.end,
-        initial_cash=overrides.get("initial_cash", args.initial_cash),
-        commission_rate=overrides.get("commission_rate", args.commission),
-        slippage_rate=overrides.get("slippage_rate", args.slippage),
-        funding_rate=overrides.get("funding_rate", args.funding),
-        n_long=overrides.get("n_long", args.n_long),
-        n_short=overrides.get("n_short", args.n_short),
-        rebalance_every=overrides.get("rebalance_every", args.rebalance),
+        initial_cash=initial_cash,
+        commission_rate=commission_rate,
+        slippage_rate=slippage_rate,
+        funding_rate=funding_rate,
+        n_long=n_long,
+        n_short=n_short,
+        rebalance_every=rebalance_every,
         weights=weights,
         use_real_funding=bool(getattr(args, "real_funding", False)),
+        resolve_combinations=not bool(getattr(args, "no_expand_combinations", False)),
     )
     summary = out["summary"]
     result = out["result"]

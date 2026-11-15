@@ -70,8 +70,20 @@ def operator_set_hash() -> str:
 
 def _data_files(config: Dict[str, Any]) -> List[Path]:
     feeds = config.get("data_feeds", {}) or {}
+    # X-02: a relative Path("data") made the manifest's data fingerprint depend
+    # on the current working directory -- the same run launched from the repo
+    # root vs. from ``scripts/`` produced two different snapshots. Anchor to the
+    # project root unless the config explicitly names a data root.
+    configured_root = (
+        feeds.get("data_root")
+        or (config.get("storage") or {}).get("data_root")
+        or "data"
+    )
+    base = Path(configured_root)
+    if not base.is_absolute():
+        base = PROJECT_ROOT / base
     root = (
-        Path("data")
+        base
         / str(feeds.get("exchange", "binance"))
         / str(feeds.get("instrument_type", "futures"))
     )
@@ -131,6 +143,29 @@ def seed_everything(seed: Optional[int]) -> Optional[int]:
     return value
 
 
+def derive_rngs(config: Dict[str, Any], *, salt: str = "") -> tuple:
+    """G-05: per-miner RNGs derived from the run seed.
+
+    GP used the module-level ``random`` while RL mixed ``random`` with
+    ``np.random``; a single global seed only reproduced a trajectory if nothing
+    else in the process touched those globals in between. Each miner now owns a
+    private ``random.Random`` and ``numpy.random.Generator`` derived from
+    ``(seed, paradigm, salt)``. With no declared seed we fall back to the legacy
+    global modules so ad-hoc/library-only runs keep their old behaviour.
+    """
+    exp = (config or {}).get("experiment") or {}
+    seed = exp.get("seed")
+    if seed is None:
+        import numpy as np
+
+        return random, np.random
+    import numpy as np
+
+    identity = f"{int(seed)}:{(config or {}).get('paradigm', '')}:{salt}"
+    derived = int(hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16], 16)
+    return random.Random(derived), np.random.default_rng(derived % (2**32))
+
+
 def new_run_id(prefix: str = "run") -> str:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     return f"{prefix}_{stamp}_{os.urandom(3).hex()}"
@@ -148,6 +183,9 @@ def build_manifest(
     feeds = config.get("data_feeds", {}) or {}
     exp = config.get("experiment", {}) or {}
     seed = exp.get("seed")
+    # X-02: ``seed_applied`` used to be a tautology (``bool(seed is not None)``),
+    # i.e. it recorded that a seed was *declared*, not that any RNG was seeded.
+    applied = seed_everything(seed)
     manifest: Dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "run_id": run_id or new_run_id(),
@@ -158,7 +196,7 @@ def build_manifest(
         "operator_set_hash": operator_set_hash(),
         "data_snapshot": data_snapshot(config),
         "seed": seed,
-        "seed_applied": bool(seed is not None),
+        "seed_applied": applied is not None,
         "paradigm": config.get("paradigm"),
         "timeframe": feeds.get("timeframe"),
         "universe": {
@@ -216,6 +254,16 @@ def verify_manifest(manifest: Dict[str, Any], config: Dict[str, Any]) -> Dict[st
         "operator_set_hash": manifest.get("operator_set_hash"),
         "data_snapshot_hash": (manifest.get("data_snapshot") or {}).get("hash"),
     }
+    # X-02: fail closed. The old ``if observed.get(k)`` skipped the check when
+    # the stored manifest lacked (or had a falsy) hash, so a legacy/incomplete
+    # manifest was reported as reproducible and its stale factor values were
+    # reused even though code, operators or data had changed.
+    missing = [k for k in checks if not observed.get(k)]
     mismatches = {k: {"stored": observed[k], "current": checks[k]}
                   for k in checks if observed.get(k) and observed[k] != checks[k]}
-    return {"reproducible": not mismatches, "mismatches": mismatches, "current": checks}
+    return {
+        "reproducible": not mismatches and not missing,
+        "mismatches": mismatches,
+        "missing": missing,
+        "current": checks,
+    }

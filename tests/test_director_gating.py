@@ -141,6 +141,22 @@ class DirectorGatingTest(unittest.TestCase):
         statuses = [m.lifecycle_status for m in self.saved_meta]
         self.assertEqual(statuses, ["INSPECTED", "DISCOVERED_UNVERIFIED"])
 
+    def test_candidate_metrics_carries_lifecycle_status(self):
+        # P0-H3 regression: the promotion verdict must also land on
+        # cand.metrics so the pipeline report can count promotions
+        # (pipeline.py read None before this fix -> n_promoted=0 forever).
+        strong = _TestFactor({"hac_t": 3.5, "p_value": 0.001, "dsr": 0.97,
+                              "oos_consistent": True, "cost_adj_return": 0.05,
+                              "RankIC": 0.06, "RankIC_oos": 0.05,
+                              "oos_enabled": True})
+        weak = _TestFactor({"hac_t": 0.3, "p_value": 0.6, "dsr": 0.1,
+                            "oos_consistent": True, "cost_adj_return": -0.01,
+                            "RankIC": 0.01, "RankIC_oos": 0.005,
+                            "oos_enabled": True})
+        self.director._save_excellent_factors([strong, weak])
+        self.assertEqual(strong.metrics.get("lifecycle_status"), "INSPECTED")
+        self.assertEqual(weak.metrics.get("lifecycle_status"), "DISCOVERED_UNVERIFIED")
+
     def test_p_adj_written_and_trace_called(self):
         strong = _TestFactor({"hac_t": 3.5, "p_value": 0.001, "dsr": 0.97,
                               "oos_consistent": True, "cost_adj_return": 0.05,

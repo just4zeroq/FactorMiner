@@ -1166,15 +1166,33 @@ class DataDownloader:
         """
         try:
             df = pd.read_feather(file_path)
+            # D-08: feather files are written with the timestamp as a *column*
+            # and a default RangeIndex. ``df.index.min().strftime()`` therefore
+            # always raised AttributeError and list_downloaded_data returned an
+            # empty list; the UI could never show any downloaded file.
+            time_col = next(
+                (c for c in ("date", "datetime", "timestamp") if c in df.columns),
+                None,
+            )
+            if time_col is not None:
+                series = pd.to_datetime(df[time_col], errors="coerce").dropna()
+            elif isinstance(df.index, pd.DatetimeIndex):
+                series = df.index.to_series()
+            else:
+                series = pd.Series(dtype="datetime64[ns]")
+            if series.empty:
+                date_range = {'start': None, 'end': None}
+            else:
+                date_range = {
+                    'start': series.min().strftime('%Y-%m-%d %H:%M:%S'),
+                    'end': series.max().strftime('%Y-%m-%d %H:%M:%S'),
+                }
 
             return {
                 'success': True,
                 'shape': df.shape,
                 'columns': list(df.columns),
-                'date_range': {
-                    'start': df.index.min().strftime('%Y-%m-%d %H:%M:%S'),
-                    'end': df.index.max().strftime('%Y-%m-%d %H:%M:%S')
-                },
+                'date_range': date_range,
                 'data_points': len(df),
                 'file_size': Path(file_path).stat().st_size / 1024 / 1024,  # MB
                 'memory_usage': df.memory_usage(deep=True).sum() / 1024 / 1024  # MB

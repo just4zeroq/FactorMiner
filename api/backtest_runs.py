@@ -16,11 +16,13 @@ Artifacts per run::
 
 from __future__ import annotations
 
+import atexit
 import datetime
 import json
 import logging
 import os
 import random
+import re
 import threading
 import traceback
 from typing import Any, Optional
@@ -32,6 +34,12 @@ logger = logging.getLogger(__name__)
 
 BACKTEST_ROOT = os.path.join("user_workspace", "reports", "backtest_runs")
 MAX_EQUITY_POINTS = 1500
+# A-03: each backtest loads the full price library. Without a cap, N browser
+# clicks start N simulations and the single-worker API grinds to a halt.
+MAX_CONCURRENT_BACKTESTS = 2
+_slots = threading.BoundedSemaphore(MAX_CONCURRENT_BACKTESTS)
+_ORPHAN_STATES = {"queued", "running"}
+_SAFE_RUN_ID = re.compile(r"^bt-[A-Za-z0-9_-]+$")
 
 _lock = threading.Lock()
 _active: dict[str, threading.Thread] = {}
@@ -60,7 +68,11 @@ RUN_FIELDS = (
 
 
 def _run_dir(run_id: str) -> str:
-    return os.path.join(BACKTEST_ROOT, run_id)
+    # A-06: run_id goes straight into a filesystem path. Reject traversal /
+    # absolute paths before any read so the endpoint cannot probe arbitrary dirs.
+    if not _SAFE_RUN_ID.fullmatch(str(run_id)):
+        raise FileNotFoundError(f"Invalid backtest run id: {run_id!r}")
+    return os.path.join(BACKTEST_ROOT, str(run_id))
 
 
 def _write_json(path: str, payload: Any) -> None:
@@ -88,6 +100,59 @@ def _new_run_id() -> str:
 
 def _sanitize(payload: dict) -> dict:
     return {key: payload.get(key) for key in RUN_FIELDS if key in payload}
+
+
+def _interrupt(run_id: str, reason: str) -> None:
+    """Mark a run whose worker is gone as interrupted (never a phantom 'running')."""
+    path = os.path.join(BACKTEST_ROOT, run_id, "status.json")
+    status = _read_json(path)
+    if not status or status.get("status") in {"completed", "failed", "cancelled", "interrupted"}:
+        return
+    status.update({
+        "status": "interrupted",
+        "finished_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "error": reason,
+    })
+    try:
+        _write_json(path, status)
+    except Exception:  # pragma: no cover - disk full etc.
+        logger.warning("Could not mark backtest %s interrupted", run_id, exc_info=True)
+
+
+def recover_orphans() -> int:
+    """A-03: migrate ghost runs on read, like TaskStore does at API startup."""
+    if not os.path.isdir(BACKTEST_ROOT):
+        return 0
+    with _lock:
+        live = {rid for rid, th in _active.items() if th.is_alive()}
+    recovered = 0
+    for name in os.listdir(BACKTEST_ROOT):
+        if not _SAFE_RUN_ID.fullmatch(name) or name in live:
+            continue
+        status = _read_json(os.path.join(BACKTEST_ROOT, name, "status.json"))
+        if not status or status.get("status") not in _ORPHAN_STATES:
+            continue
+        # Grace window: ``start_run`` writes "queued" before the worker thread
+        # is registered; a concurrent list request must not interrupt it.
+        try:
+            created = datetime.datetime.fromisoformat(status.get("created_at") or "")
+            age = (datetime.datetime.now() - created).total_seconds()
+        except (ValueError, TypeError):
+            age = 1e9
+        if age < 15:
+            continue
+        _interrupt(name, "The API process exited before this backtest finished. Re-run it.")
+        recovered += 1
+    return recovered
+
+
+@atexit.register
+def _mark_active_interrupted() -> None:
+    """Daemon workers are killed at process exit without running ``finally``."""
+    with _lock:
+        ids = list(_active)
+    for run_id in ids:
+        _interrupt(run_id, "The API process shut down while this backtest was running.")
 
 
 def start_run(payload: dict) -> dict:
@@ -125,6 +190,9 @@ def _execute(run_id: str, request: dict) -> None:
     directory = _run_dir(run_id)
     status_path = os.path.join(directory, "status.json")
     status = _read_json(status_path) or {"run_id": run_id}
+    # A-03: bounded concurrency. The run stays ``queued`` until a slot opens,
+    # so the UI never shows N simultaneous "running" simulations.
+    _slots.acquire(blocking=True)
     status.update(
         {
             "status": "running",
@@ -205,6 +273,7 @@ def _execute(run_id: str, request: dict) -> None:
     finally:
         with _lock:
             _active.pop(run_id, None)
+        _slots.release()
         try:
             _write_json(status_path, status)
         except Exception:  # pragma: no cover - disk full etc.
@@ -213,6 +282,7 @@ def _execute(run_id: str, request: dict) -> None:
 
 def list_runs(limit: int = 30) -> list[dict]:
     """Newest-first run summaries, read straight from disk."""
+    recover_orphans()
     if not os.path.isdir(BACKTEST_ROOT):
         return []
     records = []
@@ -245,6 +315,7 @@ def list_runs(limit: int = 30) -> list[dict]:
 
 def get_run(run_id: str) -> dict:
     directory = _run_dir(run_id)
+    recover_orphans()
     status = _read_json(os.path.join(directory, "status.json"))
     if not status:
         raise FileNotFoundError(run_id)

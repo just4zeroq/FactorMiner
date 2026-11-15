@@ -1,6 +1,5 @@
 import copy
 import logging
-import random
 from typing import Any, Dict, List
 
 from core.miner.paradigms.base import BaseFactorMiner
@@ -99,7 +98,7 @@ class GPFactorMiner(BaseFactorMiner):
         if self._crypto_asts and self.crypto_seed_ratio > 0:
             n_seed = min(len(self._crypto_asts), int(round(n * self.crypto_seed_ratio)))
             if n_seed > 0:
-                picks = random.sample(self._crypto_asts, n_seed)
+                picks = self.rng.sample(self._crypto_asts, n_seed)
                 seeds = [FactorExpressionAST(ast_dict=a) for a in picks]
         n_random = max(0, n - len(seeds))
         randoms = [
@@ -115,18 +114,18 @@ class GPFactorMiner(BaseFactorMiner):
     # AST construction
     # ------------------------------------------------------------------ #
     def _random_terminal(self) -> Any:
-        if random.random() < self.const_prob:
+        if self.rng.random() < self.const_prob:
             # Ephemeral random constant terminal.
-            return round(random.uniform(-2.0, 2.0), 3)
-        return random.choice(self.terminals)
+            return round(self.rng.uniform(-2.0, 2.0), 3)
+        return self.rng.choice(self.terminals)
 
     def _random_ast(self, depth: int = 0) -> Any:
         if depth >= self.max_depth:
             return self._random_terminal()
-        op = random.choice(self.allowed_operators)
+        op = self.rng.choice(self.allowed_operators)
         spec = self.operator_specs[op]
         node: Dict[str, Any] = {"op": op}
-        node.update(sample_operator_params(op))
+        node.update(sample_operator_params(op, rng=self.rng))
         node["left"] = self._random_ast(depth + 1)
         if spec["arity"] == 2:
             node["right"] = self._random_ast(depth + 1)
@@ -160,7 +159,7 @@ class GPFactorMiner(BaseFactorMiner):
         return refs
 
     def _tournament(self) -> FactorExpressionAST:
-        contenders = random.sample(
+        contenders = self.rng.sample(
             self.state.population, min(self.tournament_k, len(self.state.population))
         )
         return max(contenders, key=self._adjusted_fitness)
@@ -169,11 +168,11 @@ class GPFactorMiner(BaseFactorMiner):
         child = copy.deepcopy(p1)
         if not isinstance(p2, dict):
             return child
-        p2_sub = random.choice(self._all_subtrees(p2))
+        p2_sub = self.rng.choice(self._all_subtrees(p2))
         targets = self._all_subtrees(child)
         if not targets:
             return child
-        tgt = random.choice(targets)
+        tgt = self.rng.choice(targets)
         tgt.clear()
         tgt.update(copy.deepcopy(p2_sub))
         return child
@@ -183,8 +182,8 @@ class GPFactorMiner(BaseFactorMiner):
         subs = self._all_subtrees(node)
         if not subs:
             return self._random_ast()
-        tgt = random.choice(subs)
-        if random.random() < 0.5:
+        tgt = self.rng.choice(subs)
+        if self.rng.random() < 0.5:
             # Regenerate the whole subtree.
             new_sub = self._random_ast()
             tgt.clear()
@@ -196,15 +195,15 @@ class GPFactorMiner(BaseFactorMiner):
         else:
             op = tgt.get("op")
             # Re-sample this operator's parameters (window / power / lag / ...).
-            tgt.update(sample_operator_params(op))
+            tgt.update(sample_operator_params(op, rng=self.rng))
             # Occasionally swap to another operator of the same arity.
-            if random.random() < 0.3:
-                new_op = random.choice(self.allowed_operators)
+            if self.rng.random() < 0.3:
+                new_op = self.rng.choice(self.allowed_operators)
                 if self.operator_specs[new_op]["arity"] == self.operator_specs[op]["arity"]:
                     tgt["op"] = new_op
                     for k in PARAM_KEYS:
                         tgt.pop(k, None)
-                    tgt.update(sample_operator_params(new_op))
+                    tgt.update(sample_operator_params(new_op, rng=self.rng))
         return node
 
     # ------------------------------------------------------------------ #
@@ -223,9 +222,9 @@ class GPFactorMiner(BaseFactorMiner):
             p1 = self._tournament()
             p2 = self._tournament()
             child_src = p1.get_source()
-            if random.random() < self.crossover_prob:
+            if self.rng.random() < self.crossover_prob:
                 child_src = self._crossover(p1.get_source(), p2.get_source())
-            if random.random() < self.mutation_prob:
+            if self.rng.random() < self.mutation_prob:
                 child_src = self._mutate(child_src)
             candidates.append(
                 FactorExpressionAST(

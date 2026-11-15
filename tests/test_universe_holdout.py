@@ -236,6 +236,9 @@ class TestSmallUniverseBacktest(unittest.TestCase):
                 start="2025-01-01", end="2025-03-01",
                 commission_rate=0.0004, slippage_rate=0.0005,
                 use_real_funding=True,
+                # Synthetic snapshot has no pre-registered metadata orientation;
+                # opt in explicitly to the legacy infer-from-evaluation path.
+                allow_inferred_orientation=True,
             )["summary"]
         self.assertEqual(summary["n_assets"], 6)
         self.assertEqual(summary["n_long"], 2)

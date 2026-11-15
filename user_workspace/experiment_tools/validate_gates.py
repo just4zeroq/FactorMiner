@@ -162,7 +162,9 @@ def audit_old_factors(n_trials: int = 1) -> pd.DataFrame:
             "RankIC_oos": float(abs(oos_rankic)) if pd.notna(oos_rankic) else 0.0,
             "oos_enabled": oos_panel is not None,
         }
-        gates = apply_promotion_gates([metrics])
+        # A4: declare the historical trial count so the single-factor call
+        # cannot collapse the BH family to one p-value.
+        gates = apply_promotion_gates([metrics], n_trials=max(1, int(n_trials)))
         g = gates[0]["gate"]
         rows.append({
             "factor_id": fid,

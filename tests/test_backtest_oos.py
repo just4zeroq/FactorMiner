@@ -58,15 +58,14 @@ class StrictOOSOrientationTests(unittest.TestCase):
         self.assertEqual(infer_orientation(oos_df), -1.0)
 
     def test_legacy_behaviour_uses_evaluation_root_for_direction(self):
-        signals = load_factor_signals(["f1"], db_root=self.oos_root)
+        signals = load_factor_signals(["f1"], db_root=self.oos_root, allow_inferred_orientation=True)
         self.assertEqual(set(signals["asset"]), {"A", "B"})
         self.assertTrue((signals["prediction"] < 0).all(),
                         "legacy mode should infer -1 from the held-out snapshot")
 
     def test_orientation_db_root_freezes_direction_without_changing_values(self):
         signals = load_factor_signals(
-            ["f1"], db_root=self.oos_root, orientation_db_root=self.is_root
-        )
+            ["f1"], db_root=self.oos_root, orientation_db_root=self.is_root, allow_inferred_orientation=True)
         # Values still come from the held-out root (both assets present)...
         self.assertEqual(set(signals["asset"]), {"A", "B"})
         # ...but the sign is frozen from the in-sample root (+1).
@@ -74,23 +73,40 @@ class StrictOOSOrientationTests(unittest.TestCase):
                         "strict OOS must use the in-sample direction, not the OOS one")
 
     def test_different_roots_produce_opposite_signals(self):
-        legacy = load_factor_signals(["f1"], db_root=self.oos_root)
+        legacy = load_factor_signals(["f1"], db_root=self.oos_root, allow_inferred_orientation=True)
         strict = load_factor_signals(
-            ["f1"], db_root=self.oos_root, orientation_db_root=self.is_root
-        )
+            ["f1"], db_root=self.oos_root, orientation_db_root=self.is_root, allow_inferred_orientation=True)
         merged = legacy.merge(strict, on=["timestamp", "asset"], suffixes=("_legacy", "_strict"))
         self.assertEqual(len(merged), len(legacy))
         self.assertTrue((merged["prediction_legacy"] * merged["prediction_strict"] < 0).all())
 
-    def test_missing_orientation_snapshot_falls_back_safely(self):
+    def test_missing_orientation_snapshot_excludes_factor(self):
+        """A3: no in-sample snapshot means NO direction, not a peek at OOS."""
         empty_root = os.path.join(self.tmp.name, "empty")
         os.makedirs(empty_root, exist_ok=True)
-        signals = load_factor_signals(
-            ["f1"], db_root=self.oos_root, orientation_db_root=empty_root
+        with self.assertRaises(ValueError):
+            load_factor_signals(
+                ["f1"], db_root=self.oos_root, orientation_db_root=empty_root
+            )
+
+    def test_default_refuses_orientation_from_evaluation_window(self):
+        """Without metadata or an in-sample root, the factor is excluded."""
+        with self.assertRaises(ValueError):
+            load_factor_signals(["f1"], db_root=self.oos_root)
+
+    def test_pre_registered_metadata_orientation_is_used(self):
+        from unittest.mock import patch
+
+        fake_meta = type("M", (), {"metrics": {"orientation": 1.0}})()
+        with patch(
+            "core.storage.factor_storage.LocalFactorStorage.get_metadata",
+            return_value=fake_meta,
+        ):
+            signals = load_factor_signals(["f1"], db_root=self.oos_root)
+        self.assertEqual(
+            signals.attrs["orientation_sources"]["f1"], "metadata:pre_registered"
         )
-        self.assertEqual(set(signals["asset"]), {"A", "B"})
-        self.assertTrue((signals["prediction"] < 0).all(),
-                        "should fall back to the evaluation snapshot direction")
+        self.assertTrue((signals["prediction"] > 0).all())
 
 
 if __name__ == "__main__":

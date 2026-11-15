@@ -27,7 +27,9 @@ MAX_PERSISTED_LOGS = 60
 MAX_PERSISTED_TASKS = 60
 MIN_FLUSH_INTERVAL = 5.0
 
-TERMINAL_STATUSES = {"completed", "completed_empty", "failed", "cancelled"}
+# A-03: ``interrupted`` is terminal too. Without it, ``request_cancel`` happily
+# reported ``cancelled=True`` for a ghost task whose worker died with the process.
+TERMINAL_STATUSES = {"completed", "completed_empty", "failed", "cancelled", "interrupted"}
 
 
 class TaskStore:
@@ -52,7 +54,26 @@ class TaskStore:
         for record in records:
             if not isinstance(record, dict) or not record.get("id"):
                 continue
-            if record.get("status") not in TERMINAL_STATUSES:
+            # A-08: hand-edited or truncated stores used to take down
+            # /api/tasks, /api/stats and /api/dashboard with KeyError.
+            record.setdefault("start_time", "")
+            record.setdefault("status", "interrupted")
+            record.setdefault("miner", "")
+            record.setdefault("config", "")
+            record.setdefault("logs", [])
+            record.setdefault("factors", [])
+            record.setdefault("metrics", {})
+            record.setdefault("progress", 0)
+            record.setdefault("current_task", 0)
+            record.setdefault("total_tasks", 0)
+            record.setdefault("cancel_requested", False)
+            if not isinstance(record["logs"], list):
+                record["logs"] = []
+            if not isinstance(record["factors"], list):
+                record["factors"] = []
+            if not isinstance(record["metrics"], dict):
+                record["metrics"] = {}
+            if record["status"] not in TERMINAL_STATUSES:
                 # The process that owned this run is gone; say so instead of
                 # showing a phantom "running" task forever.
                 record["status"] = "interrupted"
@@ -90,6 +111,13 @@ def _trim(task: dict) -> dict:
     logs = trimmed.get("logs") or []
     if isinstance(logs, list) and len(logs) > MAX_PERSISTED_LOGS:
         trimmed["logs"] = logs[-MAX_PERSISTED_LOGS:]
+    # A-08: factors/metrics grew without bound in tasks.json.
+    factors = trimmed.get("factors")
+    if isinstance(factors, list) and len(factors) > MAX_PERSISTED_LOGS:
+        trimmed["factors"] = factors[-MAX_PERSISTED_LOGS:]
+    metrics = trimmed.get("metrics")
+    if isinstance(metrics, dict) and len(metrics) > 200:
+        trimmed["metrics"] = dict(list(metrics.items())[:200])
     # The traceback of a failed run can be huge and is already in logs.
     if trimmed.get("error_msg") and len(str(trimmed["error_msg"])) > 4000:
         trimmed["error_msg"] = str(trimmed["error_msg"])[:4000] + "\n… (truncated)"

@@ -26,7 +26,9 @@ import json
 import logging
 import os
 import threading
-from dataclasses import dataclass, field, asdict
+import time
+from contextlib import contextmanager
+from dataclasses import dataclass, field, asdict, fields
 from datetime import datetime, date
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -34,6 +36,93 @@ from typing import Any, Dict, List, Optional
 from core.evaluation.annualisation import DEFAULT_ANNUALISATION
 
 logger = logging.getLogger(__name__)
+
+# E-04: persistence is shared across objects *and* processes (CLI + single-worker
+# API). An instance-level RLock cannot protect a read-modify-write cycle against
+# a second object, and a full-file rewrite can erase another writer's append.
+# Every mutation therefore runs under (a) a per-path in-process lock and (b) an
+# exclusive on-disk lock file, and re-reads the file immediately before deciding.
+_PATH_LOCKS: Dict[str, threading.RLock] = {}
+_PATH_LOCKS_GUARD = threading.Lock()
+_LOCK_TIMEOUT_S = 10.0
+_LOCK_STALE_S = 60.0
+
+
+def _path_lock(path: Optional[str]) -> threading.RLock:
+    key = os.path.abspath(path or "<memory>")
+    with _PATH_LOCKS_GUARD:
+        lock = _PATH_LOCKS.get(key)
+        if lock is None:
+            lock = threading.RLock()
+            _PATH_LOCKS[key] = lock
+        return lock
+
+
+@contextmanager
+def _file_lock(path: Optional[str]):
+    """Coarse cross-process exclusive lock using an atomic lock file.
+
+    ``O_CREAT|O_EXCL`` is atomic on both Windows and POSIX, so no platform
+    specific fcntl/msvcrt branch is needed. A stale lock (from a killed process)
+    is reclaimed after ``_LOCK_STALE_S``; acquisition is bounded so a wedged
+    peer fails loudly instead of hanging a mining run forever.
+    """
+    if not path:
+        yield
+        return
+    lock_path = f"{path}.lock"
+    parent = os.path.dirname(os.path.abspath(lock_path))
+    os.makedirs(parent, exist_ok=True)
+    deadline = time.monotonic() + _LOCK_TIMEOUT_S
+    fd = None
+    while fd is None:
+        try:
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, f"pid={os.getpid()} at={time.time()}".encode("ascii"))
+        except FileExistsError:
+            try:
+                age = time.time() - os.path.getmtime(lock_path)
+                if age > _LOCK_STALE_S:
+                    os.remove(lock_path)
+                    continue
+            except OSError:
+                pass
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"Could not acquire persistence lock {lock_path} within "
+                    f"{_LOCK_TIMEOUT_S:.0f}s; another writer may be stuck."
+                )
+            time.sleep(0.01)
+        except OSError:
+            # Filesystem without O_EXCL support: fall back to the in-process
+            # lock only, but never silently pretend we have cross-process safety.
+            logger.warning("Cross-process lock unavailable for %s", path)
+            yield
+            return
+    try:
+        yield
+    finally:
+        try:
+            os.close(fd)
+        finally:
+            try:
+                os.remove(lock_path)
+            except OSError:  # pragma: no cover - another writer reclaimed it
+                pass
+
+
+def _comparable_bound(value: str) -> str:
+    """Pad a ledger bound so ``YYYY-MM-DD`` and intraday strings compare safely."""
+    text = str(value).strip().replace(" ", "T")
+    if len(text) == 10:
+        return text + "T00:00:00"
+    return text
+
+
+def _dataclass_kwargs(cls, raw: Dict[str, Any]) -> Dict[str, Any]:
+    """Drop unknown keys instead of losing the whole record (forward compat)."""
+    known = {f.name for f in fields(cls)}
+    return {k: v for k, v in raw.items() if k in known}
 
 
 def default_workspace_path(filename: str) -> str:
@@ -85,20 +174,27 @@ class HoldoutLedger:
 
     def __init__(self, path: Optional[str] = None):
         self.path = path or default_workspace_path(".holdout_ledger.json")
-        self._lock = threading.RLock()
+        self._lock = _path_lock(self.path)
         self._reveals: List[_Reveal] = []
         self._load()
 
     # ---- persistence -------------------------------------------------------
     def _load(self) -> None:
+        """Re-read from disk; called under ``self._lock`` before every decision."""
         if self.path and os.path.exists(self.path):
             try:
                 with open(self.path, "r", encoding="utf-8") as fh:
                     raw = json.load(fh)
-                self._reveals = [_Reveal(**r) for r in raw]
-            except (json.JSONDecodeError, TypeError) as exc:
-                logger.warning("HoldoutLedger corrupt (%s); starting empty", exc)
-                self._reveals = []
+                self._reveals = [
+                    _Reveal(**_dataclass_kwargs(_Reveal, r)) for r in raw
+                ]
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                # Fail closed: a corrupt ledger must NOT be treated as an empty
+                # ledger, otherwise one-time holdout enforcement silently resets.
+                raise RuntimeError(
+                    f"Holdout ledger {self.path} is corrupt ({exc}); refusing to "
+                    "treat it as empty. Repair or restore the ledger from backup."
+                ) from exc
         else:
             self._reveals = []
 
@@ -106,7 +202,7 @@ class HoldoutLedger:
         if not self.path:
             return
         os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
-        tmp = self.path + ".tmp"
+        tmp = f"{self.path}.{os.getpid()}.{threading.get_ident()}.tmp"
         with open(tmp, "w", encoding="utf-8") as fh:
             json.dump([asdict(r) for r in self._reveals], fh, indent=2)
         os.replace(tmp, self.path)
@@ -118,13 +214,19 @@ class HoldoutLedger:
 
     def is_revealed(self, period_key: str) -> bool:
         with self._lock:
+            self._load()
             return any(r.period_key == period_key for r in self._reveals)
 
     def overlapping(self, start: str, end: str) -> List[_Reveal]:
         with self._lock:
+            self._load()
+            lo = _comparable_bound(start)
+            hi = _comparable_bound(end)
             return [
                 r for r in self._reveals
-                if self._overlaps(start, end, r.start, r.end)
+                if self._overlaps(
+                    lo, hi, _comparable_bound(r.start), _comparable_bound(r.end)
+                )
             ]
 
     # ---- mutation ----------------------------------------------------------
@@ -140,8 +242,11 @@ class HoldoutLedger:
 
         Pass ``force=True`` only from tests / explicit operator overrides.
         """
-        with self._lock:
-            if self.is_revealed(period_key) and not force:
+        with self._lock, _file_lock(self.path):
+            # E-04: refresh immediately before the decision. Two processes that
+            # both loaded an empty ledger must not both pass the overlap check.
+            self._load()
+            if any(r.period_key == period_key for r in self._reveals) and not force:
                 prior = next(
                     r for r in self._reveals if r.period_key == period_key
                 )
@@ -151,7 +256,10 @@ class HoldoutLedger:
                     f"only be revealed ONCE. Reusing it makes every subsequent "
                     f"result in-sample-by-leakage."
                 )
-            overlaps = self.overlapping(start, end)
+            overlaps = [r for r in self._reveals if self._overlaps(
+                _comparable_bound(start), _comparable_bound(end),
+                _comparable_bound(r.start), _comparable_bound(r.end),
+            )]
             if overlaps and not force:
                 detail = ", ".join(
                     f"{r.period_key}({r.start}..{r.end})" for r in overlaps
@@ -175,12 +283,13 @@ class HoldoutLedger:
 
     def reset(self) -> None:
         """Wipe the ledger (tests / fresh experiment)."""
-        with self._lock:
+        with self._lock, _file_lock(self.path):
             self._reveals = []
             self._save()
 
     def snapshot(self) -> List[Dict[str, str]]:
         with self._lock:
+            self._load()
             return [asdict(r) for r in self._reveals]
 
 
@@ -211,14 +320,22 @@ class ExperimentTrace:
         self.path = path or os.path.join(
             "user_workspace", ".experiment_trace.jsonl"
         )
-        self._lock = threading.RLock()
+        self._lock = _path_lock(self.path)
         self._records: List[TrialRecord] = []
         self._seen: set = set()
+        self._attempts = 0
         self._load()
 
     def _load(self) -> None:
-        self._records = []
-        self._seen = set()
+        """Append-only journal -> last record per signature wins.
+
+        E-04: the file used to be rewritten wholesale from one object's in-memory
+        snapshot, so a second writer erased everything the first one recorded.
+        Unknown keys are now dropped field-by-field instead of raising TypeError
+        and silently discarding the entire line.
+        """
+        by_signature: Dict[str, TrialRecord] = {}
+        attempts = 0
         if self.path and os.path.exists(self.path):
             with open(self.path, "r", encoding="utf-8") as fh:
                 for line in fh:
@@ -226,19 +343,29 @@ class ExperimentTrace:
                     if not line:
                         continue
                     try:
-                        rec = TrialRecord(**json.loads(line))
-                    except (json.JSONDecodeError, TypeError):
+                        rec = TrialRecord(
+                            **_dataclass_kwargs(TrialRecord, json.loads(line))
+                        )
+                    except (json.JSONDecodeError, TypeError, ValueError):
                         continue
-                    self._records.append(rec)
-                    self._seen.add(rec.signature)
+                    by_signature[rec.signature] = rec
+                    attempts += 1
+        self._records = list(by_signature.values())
+        self._seen = set(by_signature)
+        self._attempts = attempts
 
     def has_seen(self, signature: str) -> bool:
-        return signature in self._seen
+        with self._lock:
+            return signature in self._seen
 
     def record(self, rec: TrialRecord) -> None:
-        with self._lock:
+        with self._lock, _file_lock(self.path):
+            # Re-read under the cross-process lock: the decision and the append
+            # must be one atomic read-modify-write cycle.
+            self._load()
             if rec.signature in self._seen:
-                # Update in place rather than double-count (keeps num_trials honest).
+                # Keep the latest observation for a given hypothesis while the
+                # journal still records the repeat attempt (see num_attempts).
                 for i, existing in enumerate(self._records):
                     if existing.signature == rec.signature:
                         self._records[i] = rec
@@ -246,21 +373,43 @@ class ExperimentTrace:
             else:
                 self._records.append(rec)
                 self._seen.add(rec.signature)
-            self._save()
+            self._append(rec)
+            self._attempts += 1
 
-    def _save(self) -> None:
+    def _append(self, rec: TrialRecord) -> None:
         if not self.path:
             return
         os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
-        with open(self.path, "w", encoding="utf-8") as fh:
+        with open(self.path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(asdict(rec), ensure_ascii=False) + "\n")
+
+    def _save(self) -> None:
+        """Full rewrite, used only by ``reset`` (always under both locks)."""
+        if not self.path:
+            return
+        os.makedirs(os.path.dirname(os.path.abspath(self.path)), exist_ok=True)
+        tmp = f"{self.path}.{os.getpid()}.{threading.get_ident()}.tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
             for rec in self._records:
-                fh.write(json.dumps(asdict(rec)) + "\n")
+                fh.write(json.dumps(asdict(rec), ensure_ascii=False) + "\n")
+        os.replace(tmp, self.path)
 
     # ---- analytics ---------------------------------------------------------
     @property
     def num_trials(self) -> int:
-        """Total distinct candidates attempted — the multiple-testing denominator."""
+        """Distinct hypotheses — the conservative multiple-testing denominator."""
         return len(self._records)
+
+    @property
+    def num_attempts(self) -> int:
+        """Every evaluation ever attempted, including repeats.
+
+        E-04: the old in-place replacement silently erased repeat evaluations,
+        so re-running the same expression kept ``n_trials`` flat and the DSR /
+        BH denominator artificially small. The journal now keeps the attempts;
+        ``budget`` can pick the stricter of the two counts.
+        """
+        return self._attempts
 
     def num_significant(self, fdr: float = 0.05) -> int:
         return sum(1 for r in self._records if r.significant and r.meta.get("p_adj", 1.0) <= fdr)
@@ -270,9 +419,10 @@ class ExperimentTrace:
         return self.num_significant(fdr) / n if n else 0.0
 
     def reset(self) -> None:
-        with self._lock:
+        with self._lock, _file_lock(self.path):
             self._records = []
             self._seen = set()
+            self._attempts = 0
             self._save()
 
     def all(self) -> List[TrialRecord]:
@@ -294,7 +444,7 @@ class FdrLedger:
 
     def __init__(self, path: Optional[str] = None):
         self.path = path or os.path.join("user_workspace", ".fdr_ledger.jsonl")
-        self._lock = threading.RLock()
+        self._lock = _path_lock(self.path)
         self._entries: List[Dict[str, Any]] = []
         self._load()
 
@@ -341,7 +491,8 @@ class FdrLedger:
                 vals.append(val)
         if not vals:
             return 0
-        with self._lock:
+        with self._lock, _file_lock(self.path):
+            self._load()  # E-04: idempotency must see other writers' entries
             if run_id and any(e.get("run_id") == run_id for e in self._entries):
                 return 0
             entry = {

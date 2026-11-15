@@ -1,5 +1,4 @@
 import logging
-import random
 from typing import Any, Dict, List
 
 import numpy as np
@@ -103,27 +102,27 @@ class RLFactorMiner(BaseFactorMiner):
         actions_idx = []
         actions_probs = []
         for _ in range(self.traj_len):
-            a = int(np.random.choice(len(self.action_space), p=probs))
+            a = int(self.np_rng.choice(len(self.action_space), p=probs))
             actions_idx.append(a)
             actions_probs.append(probs.copy())
         return actions_idx, actions_probs
 
     def _build_ast(self, actions_idx):
         # Fold operators onto an accumulator to produce a valid nested AST.
-        acc = random.choice(self.terminals)
+        acc = self.rng.choice(self.terminals)
         for a in actions_idx:
             op = self.action_space[a]
             spec = self.operator_specs[op]
             node: Dict[str, Any] = {"op": op}
             if op in WINDOWED_OPERATORS:
-                node["window"] = random.choice(self.windows)
+                node["window"] = self.rng.choice(self.windows)
             if op in POWERED_OPERATORS:
-                node["p"] = random.choice(self.powers)
+                node["p"] = self.rng.choice(self.powers)
             if spec["arity"] == 1:
                 node["left"] = acc
             else:
                 node["left"] = acc
-                node["right"] = random.choice(self.terminals)
+                node["right"] = self.rng.choice(self.terminals)
             acc = node
         return acc
 

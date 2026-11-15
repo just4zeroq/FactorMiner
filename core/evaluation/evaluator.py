@@ -37,6 +37,10 @@ logger = logging.getLogger(__name__)
 # absent (out_of_sample auto-disables, shrinkage ~ 1 for large samples, etc.).
 DEFAULT_FITNESS_CFG = {
     "out_of_sample": None,        # None => auto-enable only if a test split exists
+    # A1: the mining loop must NEVER see the held-out split. OOS evaluation is
+    # only legitimate on a frozen shortlist at the end of a run (evaluate_on
+    # with explicit test_data). Set True only for that final, one-shot call.
+    "allow_oos_in_search": False,
     "oos_exponent": 0.5,          # weight on OOS IC vs in-sample IC (geometric blend)
     "shrinkage_k": 30.0,          # observation-count shrinkage prior
     "consistency_penalty": 0.3,   # multiplier when OOS sign disagrees with in-sample
@@ -50,6 +54,11 @@ DEFAULT_FITNESS_CFG = {
     "gate_cost_rate": DEFAULT_COST_RATE,
     "gate_ls_quantile": 0.2,      # top/bottom fraction of the long-short book
     "gate_rebalance_bars": 1,     # book is re-formed every N bars (trading horizon)
+    # P0-H1: when a factor has positive RankIC but its quantile long/short book
+    # loses money (net of cost), the search target is misaligned with the
+    # promotion gate. Multiply fitness by this floor so the director stops
+    # favouring un-tradeable factors.
+    "tradeable_floor": 0.1,
 }
 
 
@@ -100,6 +109,8 @@ class ParallelEvaluator:
         # Number of candidates that blew the budget this run (surfaced in reports).
         self.timed_out = 0
         self.gate_rebalance_bars = self._resolve_gate_rebalance_bars()
+        fitness_cfg = self.config.get("fitness", {}) or {}
+        self.allow_oos_in_search = bool(fitness_cfg.get("allow_oos_in_search", False))
 
     def _resolve_gate_rebalance_bars(self) -> int:
         """Trading frequency used by the return-denominated gate.
@@ -128,8 +139,22 @@ class ParallelEvaluator:
     # Public entry points
     # ------------------------------------------------------------------ #
     def evaluate(self, candidates: List[FactorExpression]) -> EvaluationFeedback:
-        """Evaluate candidates on the configured mining (in-sample) split,
-        plus the out-of-sample split when the data client exposes one."""
+        """Evaluate candidates on the mining (in-sample) split ONLY.
+
+        A1: the previous version called ``get_test_data()`` / ``get_test_returns()``
+        on EVERY generation and folded ``abs(RankIC_oos)`` into fitness, so the
+        held-out split was repeatedly used for search. The strict-holdout ledger
+        guards a different window and cannot stop this. OOS is now evaluated
+        exactly once, on a frozen shortlist, via :meth:`evaluate_final` (or
+        :meth:`evaluate_on` with explicit test data).
+        """
+        if not self.allow_oos_in_search:
+            return self.evaluate_on(
+                candidates,
+                self.data_client.get_data(),
+                self.data_client.get_returns(),
+            )
+
         test_data = None
         test_returns = None
         tgetter = getattr(self.data_client, "get_test_data", None)
@@ -146,6 +171,18 @@ class ParallelEvaluator:
             except Exception as exc:  # pragma: no cover - defensive
                 logger.warning("get_test_returns() failed: %s", exc)
                 test_returns = None
+        return self.evaluate_on(
+            candidates,
+            self.data_client.get_data(),
+            self.data_client.get_returns(),
+            test_data=test_data,
+            test_returns=test_returns,
+        )
+
+    def evaluate_final(self, candidates: List[FactorExpression]) -> EvaluationFeedback:
+        """One-shot OOS evaluation of a frozen shortlist (never used for search)."""
+        test_data = self.data_client.get_test_data()
+        test_returns = self.data_client.get_test_returns()
         return self.evaluate_on(
             candidates,
             self.data_client.get_data(),
@@ -192,7 +229,9 @@ class ParallelEvaluator:
                 # 标量评价
                 self._validate_metric_inputs(factor_values, returns)
                 # 强制计算基础指标 (in-sample)
-                in_metrics = self._calculate_built_in_metrics(factor_values, returns)
+                in_metrics = self._calculate_built_in_metrics(
+                    factor_values, returns, self.gate_rebalance_bars
+                )
 
                 # 尝试计算样本外指标
                 oos_metrics = self._compute_oos_metrics(expr, test_data, test_returns)
@@ -302,8 +341,17 @@ class ParallelEvaluator:
     # Metric helpers
     # ------------------------------------------------------------------ #
     @staticmethod
-    def _calculate_built_in_metrics(factor_values: Any, returns: Any) -> Dict:
-        """计算基础评估指标: IC, RankIC, Turnover"""
+    def _calculate_built_in_metrics(
+        factor_values: Any, returns: Any, rebalance_bars: int = 1
+    ) -> Dict:
+        """计算基础评估指标: IC, RankIC, Turnover
+
+        E-08: the tradeable book must use the SAME rebalance cadence and the
+        SAME orientation statistic as the promotion gate / verdict. Previously
+        fitness used a 1-bar book and the sign of pooled Spearman RankIC,
+        while the gate used the configured horizon and the mean of the IC time
+        series (two different statistics that can disagree in sign).
+        """
         metrics = {"IC": 0.0, "RankIC": 0.0, "Turnover": 0.0}
 
         if factor_values is None or returns is None:
@@ -318,6 +366,29 @@ class ParallelEvaluator:
                     metrics["IC"] = ic
                 if pd.notna(rank_ic):
                     metrics["RankIC"] = rank_ic
+                # P0-H1: score the quantile long/short net return with the same
+                # book construction the promotion gate uses, so the search target
+                # (fitness) is aligned with the gate target (tradeable return),
+                # not just raw |RankIC|. Orientation follows the sign of RankIC.
+                try:
+                    from core.evaluation.portfolio_eval import long_short_returns
+                    from core.config.defaults import DEFAULT_COST_RATE
+                    ic_ts = ic_series(factor_values, returns)
+                    ic_mean = float(np.nanmean(ic_ts)) if ic_ts.size else 0.0
+                    ls_orient = -1.0 if ic_mean < 0 else 1.0
+                    ls = long_short_returns(
+                        factor_values, returns,
+                        orientation=ls_orient,
+                        cost_rate=DEFAULT_COST_RATE,
+                        rebalance_bars=max(1, int(rebalance_bars)),
+                    )
+                    metrics["ls_cost_adj_return"] = float(ls.get("cost_adj_return", 0.0))
+                    metrics["ls_t"] = float(ls.get("ls_t", 0.0))
+                    metrics["ls_gross"] = float(ls.get("mean_return", 0.0))
+                except Exception:
+                    metrics["ls_cost_adj_return"] = 0.0
+                    metrics["ls_t"] = 0.0
+                    metrics["ls_gross"] = 0.0
             turnover = factor_values.diff().abs().mean().mean()
             if pd.notna(turnover):
                 metrics["Turnover"] = turnover
@@ -349,7 +420,9 @@ class ParallelEvaluator:
                 return None
             oos_values = expr.compute(test_data)
             self._validate_metric_inputs(oos_values, test_returns)
-            return self._calculate_built_in_metrics(oos_values, test_returns)
+            return self._calculate_built_in_metrics(
+                oos_values, test_returns, self.gate_rebalance_bars
+            )
         except Exception as exc:  # pragma: no cover - defensive
             logger.debug("OOS metric computation skipped: %s", exc)
             return None
@@ -396,6 +469,25 @@ class ParallelEvaluator:
         if factor_values.notna().to_numpy().sum() == 0:
             raise FactorOutputError("Factor output must contain at least one finite value")
 
+        # A5: constant / exploding factors must never reach the library. Three
+        # all-zero factors were stored and rank(method="first") turned them
+        # into alphabetical noise; 31/84 snapshots had std > 1e6 because
+        # _safe_divide replaced a zero denominator with 1e-9.
+        finite = factor_values.to_numpy(dtype=float, na_value=float("nan"))
+        finite = finite[np.isfinite(finite)]
+        if finite.size < 2:
+            raise FactorOutputError(
+                "Factor output needs at least two finite values to be evaluated"
+            )
+        if np.unique(finite).size < 2:
+            raise FactorOutputError(
+                "Factor output is constant: no cross-sectional dispersion"
+            )
+        if float(np.std(finite)) > 1e9 or float(np.max(np.abs(finite))) > 1e12:
+            raise FactorOutputError(
+                "Factor output magnitude is exploding (zero-denominator artefact?)"
+            )
+
     # ------------------------------------------------------------------ #
     # Fitness blend (the P0 upgrade)
     # ------------------------------------------------------------------ #
@@ -415,7 +507,7 @@ class ParallelEvaluator:
 
         # Effective sample size -> shrinkage (James-Stein style). For real-sized
         # datasets (thousands of bars) this is ~1.0 and only bites tiny samples.
-        n_obs = self._valid_pair_count(factor_values, returns)
+        n_obs = self._effective_obs(factor_values, returns)
         k = cfg["shrinkage_k"]
         shrink = float(np.sqrt(max(n_obs - k, 0) / max(n_obs, 1))) if n_obs > 0 else 0.0
 
@@ -469,7 +561,17 @@ class ParallelEvaluator:
             except Exception:
                 tp = 1.0
 
-        fitness_score = 100.0 * blended * cons_mult * shrink * tp * penalty
+        # P0-H1: penalise factors whose IC predicts the right direction but
+        # whose quantile long/short book loses money. Such a factor is not
+        # tradeable, so the search target must not reward it — otherwise the
+        # gate (which judges the tradeable return) keeps rejecting winners that
+        # fitness kept promoting.
+        ls_corr = float(in_metrics.get("ls_cost_adj_return", 0.0))
+        tradeable_mult = 1.0
+        if rankic_in > 0 and ls_corr <= 0:
+            tradeable_mult = float(cfg.get("tradeable_floor", 0.1))
+
+        fitness_score = 100.0 * blended * tradeable_mult * cons_mult * shrink * tp * penalty
 
         metrics = {
             **in_metrics,
@@ -580,7 +682,11 @@ class ParallelEvaluator:
                 else 0.0
             )
             dsr = deflated_sharpe_ratio(
-                sharpe=str_sharpe, n_obs=int(ls["n_obs"]), n_trials=1
+                sharpe=str_sharpe, n_obs=int(ls["n_obs"]), n_trials=1,
+                # P1-M9: pass the empirical net-return moments so DSR is not
+                # optimistic on fat-tailed / negatively-skewed books.
+                skewness=float(ls.get("net_skew", 0.0)),
+                kurtosis=float(ls.get("net_kurtosis", 3.0)),
             )
             verdict.update({
                 "hac_t": float(hac_t),
@@ -602,6 +708,10 @@ class ParallelEvaluator:
                 "ls_turnover": float(ls["turnover"]),
                 "ls_cost": float(ls["cost"]),
                 "ls_t": float(ls["ls_t"]),
+                # P1-M9: carry the net-return moments so the gate's DSR deflation
+                # (apply_promotion_gates) uses the same correction as this verdict.
+                "net_skew": float(ls.get("net_skew", 0.0)),
+                "net_kurtosis": float(ls.get("net_kurtosis", 3.0)),
             })
         except Exception as exc:  # pragma: no cover - defensive
             logger.debug("verdict skipped: %s", exc)
@@ -678,7 +788,10 @@ class ParallelEvaluator:
             "hac_t": hac_t,
             "p_value": pvalue_from_t(hac_t),
             "dsr": deflated_sharpe_ratio(
-                sharpe=sr, n_obs=int(tm["n_obs"]), n_trials=1
+                sharpe=sr, n_obs=int(tm["n_obs"]), n_trials=1,
+                # P1-M9: empirical net-return moments (see long_short_returns).
+                skewness=float(tm.get("net_skew", 0.0)),
+                kurtosis=float(tm.get("net_kurtosis", 3.0)),
             ),
             # No IC information ratio exists in the time series; the strategy
             # Sharpe is the risk-adjusted ratio that DSR deflates.
@@ -696,21 +809,55 @@ class ParallelEvaluator:
             "ls_cost": float(tm["cost"]),
             "ls_t": float(tm["ls_t"]),
             "ls_exposure": float(tm["exposure"]),
+            # P1-M9: net-return moments for the gate's DSR deflation.
+            "net_skew": float(tm.get("net_skew", 0.0)),
+            "net_kurtosis": float(tm.get("net_kurtosis", 3.0)),
         })
         return verdict
 
     @staticmethod
     def _coverage(factor_values: Any) -> float:
+        """Fraction of finite cells in the factor panel.
+
+        Counts valid cells individually (a missing return for one asset must
+        not void the whole timestamp). The previous `dropna()`-based version
+        dropped any row containing a single NaN, which on sparse crypto panels
+        (scattered listing gaps) collapsed a 0.85-coverage panel to ~0.04 and
+        silently zeroed the fitness of valid factors.
+        """
         try:
-            if hasattr(factor_values, "dropna"):
-                valid = int(factor_values.dropna().count().sum()) if hasattr(
-                    factor_values.dropna().count(), "sum"
-                ) else int(factor_values.dropna().count())
-                total = int(getattr(factor_values, "size", 0)) or 1
+            arr = None
+            if hasattr(factor_values, "to_numpy"):
+                arr = np.asarray(factor_values.to_numpy(), float)
+            elif isinstance(factor_values, (np.ndarray, list)):
+                arr = np.asarray(factor_values, float)
+            if arr is not None and arr.size > 0:
+                total = arr.size
+                valid = int(np.isfinite(arr).sum())
                 return valid / total if total > 0 else 1.0
         except Exception:
             pass
         return 1.0
+
+    @staticmethod
+    def _effective_obs(factor_values: Any, returns: Any = None) -> int:
+        """Independent time observations (T), not T*N finite cells.
+
+        HAC, DSR and ``ic_series`` all work on the T-length IC time series, so
+        shrinkage must share that sample size. Using the cell count made
+        ``shrink ~= 1`` forever in cross-asset mode and gave three statistics
+        three different effective sample sizes.
+        """
+        obj = factor_values
+        if isinstance(obj, dict):
+            obj = next((v for v in obj.values() if hasattr(v, "index")), None)
+        idx = getattr(obj, "index", None)
+        if idx is not None:
+            return int(len(idx))
+        try:
+            return int(np.asarray(obj).shape[0])
+        except Exception:
+            return 0
 
     @staticmethod
     def _valid_pair_count(factor_values: Any, returns: Any) -> int:

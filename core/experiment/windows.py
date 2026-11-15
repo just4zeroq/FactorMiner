@@ -137,7 +137,10 @@ def _file_dates(path: Path) -> List[pd.Timestamp]:
     if frame.empty or "date" not in frame.columns:
         return []
     dates = pd.to_datetime(frame["date"], errors="coerce").dropna()
-    return [pd.Timestamp(d).normalize() for d in dates.unique()]
+    # X-07: ``normalize()`` flattened 1h/15m/5m bars to the same midnight, so
+    # a module that advertises bar-space windows saw exactly one bar per day
+    # (window_bars=30 silently became ~30 days). Keep the real bar timestamp.
+    return [pd.Timestamp(d) for d in dates.unique()]
 
 
 def common_timeline(items: Iterable[Dict[str, Any]],

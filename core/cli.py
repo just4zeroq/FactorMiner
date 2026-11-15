@@ -19,13 +19,18 @@ def setup_parser():
     # walk-forward -> combine -> OOS recompute -> backtest -> report.
     exp_parser = subparsers.add_parser("experiment", help="Run a complete reproducible factor-mining experiment")
     exp_parser.add_argument("--config", type=str, required=True, help="Path to the JSON configuration file")
-    exp_parser.add_argument("--miner", type=str, default="GP", help="Paradigm / miner class name")
+    exp_parser.add_argument("--miner", type=str, default=None, help="Override the config's paradigm / miner class name")
     exp_parser.add_argument("--iterations", type=int, default=None, help="Override max_iterations")
     exp_parser.add_argument("--seed", type=int, default=None, help="Fix global RNG seed for reproducibility")
     exp_parser.add_argument("--resume", action="store_true", help="Skip stages already completed for this config")
     exp_parser.add_argument("--run-id", type=str, default=None, help="Explicit run id")
-    exp_parser.add_argument("--user-dir", type=str, default="user_workspace", help="User workspace with custom modules")
+    exp_parser.add_argument("--user-dir", type=str, default=None, help="Override the config's user workspace directory")
     exp_parser.add_argument("--output-root", type=str, default=None, help="Override the runs root (mainly for tests)")
+    exp_parser.add_argument("--holdout-mode", type=str, default=None,
+                            choices=["strict", "audit", "off"],
+                            help="Override evaluation.gates.holdout_mode")
+    exp_parser.add_argument("--allow-holdout-reuse", action="store_true",
+                            help="Permit recomputing an already-revealed window (audited)")
 
     # Download Subcommand
     dl_parser = subparsers.add_parser("download", help="Download historical market data")
@@ -72,14 +77,14 @@ def setup_parser():
     bt_parser.add_argument("--db-root", type=str, default="factor_db", help="Root holding the factor VALUE snapshots to evaluate")
     bt_parser.add_argument("--orientation-db-root", type=str, default=None, help="Root holding IN-SAMPLE snapshots used only to learn signal direction; for strict OOS point --db-root at held-out values and this at the in-sample library")
     bt_parser.add_argument("--data-root", type=str, default="data")
-    bt_parser.add_argument("--commission", type=float, default=0.0004, help="Taker commission (fraction of trade value)")
-    bt_parser.add_argument("--slippage", type=float, default=0.0005, help="Slippage (fraction of price)")
-    bt_parser.add_argument("--funding", type=float, default=0.0001, help="Daily perpetual funding rate (fraction)")
+    bt_parser.add_argument("--commission", type=float, default=None, help="Taker commission (fraction of trade value)")
+    bt_parser.add_argument("--slippage", type=float, default=None, help="Slippage (fraction of price)")
+    bt_parser.add_argument("--funding", type=float, default=None, help="Daily perpetual funding rate (fraction)")
     bt_parser.add_argument("--real-funding", action="store_true", help="Charge the real 8h funding history from crypto_streams instead of a constant grid")
-    bt_parser.add_argument("--rebalance", type=int, default=5, help="Bars between rebalances")
-    bt_parser.add_argument("--n-long", type=int, default=5, help="Number of long positions")
-    bt_parser.add_argument("--n-short", type=int, default=5, help="Number of short positions")
-    bt_parser.add_argument("--initial-cash", type=float, default=1_000_000.0)
+    bt_parser.add_argument("--rebalance", type=int, default=None, help="Bars between rebalances")
+    bt_parser.add_argument("--n-long", type=int, default=None, help="Number of long positions")
+    bt_parser.add_argument("--n-short", type=int, default=None, help="Number of short positions")
+    bt_parser.add_argument("--initial-cash", type=float, default=None)
     bt_parser.add_argument("--output", type=str, default=os.path.join("user_workspace", "reports", "backtest_run"), help="Directory to write result parquet + summary CSV")
     bt_parser.add_argument("--weights", type=str, default=None, help="Ensemble weights: 'id=w,id=w' or positional 'w,w,w'")
     bt_parser.add_argument("--no-expand-combinations", action="store_true", help="Treat a stored linear-combination factor as one opaque signal")

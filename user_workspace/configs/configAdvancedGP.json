@@ -6,7 +6,7 @@
 		"horizon_bars": 1,
 		"return_type": "simple"
 	},
-	"miner": "AdvancedSampleGP",
+	"paradigm": "AdvancedSampleGP",
 	"population_size": 20,
 	"max_iterations": 5,
 	"data_feeds": {

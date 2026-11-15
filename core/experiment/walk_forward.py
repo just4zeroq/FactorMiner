@@ -209,7 +209,16 @@ def walk_forward_validate(
     config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Expanding-window validation with an independent refit on every fold."""
-    cfg = {**DEFAULT_WF_CFG, **((config or {}).get("experiment", {}) or {}).get("walk_forward", {})}
+    wf_overrides = ((config or {}).get("experiment", {}) or {}).get("walk_forward", {}) or {}
+    cfg = {**DEFAULT_WF_CFG, **wf_overrides}
+    # X-04: the walk-forward book must charge exactly the same round-trip cost
+    # as the promotion gate. Default it from the canonical cost identity rather
+    # than from a second constant; an explicit walk_forward.cost_rate still wins.
+    if "cost_rate" not in wf_overrides:
+        from core.experiment.costs import resolve_cost_params
+        cfg["cost_rate"] = float(
+            resolve_cost_params(config or {})["gate_cost_rate"]
+        )
     horizon = int(((config or {}).get("target") or {}).get("horizon_bars", 1) or 1)
     f, r, index = _align(panels, returns)
     folds = build_folds(
@@ -241,6 +250,10 @@ def walk_forward_validate(
     ics = [x["rank_ic"] for x in results]
     nets = [x["net_return"] for x in results]
     return {
+        # X-07: zero folds used to be reported as a clean green validation with
+        # mean RankIC 0.0. Surface it as an explicit failure so the pipeline
+        # cannot record ``validated`` on an experiment that validated nothing.
+        "ok": bool(results),
         "n_folds": len(results),
         "refit_per_fold": True,
         "purge_bars": horizon,

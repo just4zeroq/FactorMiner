@@ -55,9 +55,10 @@ class ForwardReturnTarget:
         }
         if values["type"] != "forward_return":
             raise TargetConfigError("target.type must be 'forward_return'.")
-        if values["entry_price"] not in {"current_close", "next_open"}:
+        if values["entry_price"] not in {"current_close", "next_open", "next_close"}:
             raise TargetConfigError(
-                "target.entry_price must be 'current_close' or 'next_open'."
+                "target.entry_price must be 'current_close', 'next_open' or "
+                "'next_close'."
             )
         if values["exit_price"] != "close":
             raise TargetConfigError(
@@ -89,8 +90,15 @@ class ForwardReturnTarget:
         return replace(self, horizon_bars=horizon_bars)
 
     def definition(self) -> str:
-        entry = "close[t]" if self.entry_price == "current_close" else "open[t+1]"
-        exit_value = f"close[t+{self.horizon_bars}]"
+        if self.entry_price == "current_close":
+            entry = "close[t]"
+            exit_value = f"close[t+{self.horizon_bars}]"
+        elif self.entry_price == "next_open":
+            entry = "open[t+1]"
+            exit_value = f"close[t+{self.horizon_bars}]"
+        else:  # next_close: entry at the close of the bar AFTER the signal
+            entry = "close[t+1]"
+            exit_value = f"close[t+{1 + self.horizon_bars}]"
         ratio = f"{exit_value} / {entry}"
         return f"log({ratio})" if self.return_type == "log" else f"{ratio} - 1"
 
@@ -108,11 +116,15 @@ class ForwardReturnTarget:
             )
 
         close = pd.to_numeric(data["close"], errors="coerce")
-        exit_values = close.shift(-self.horizon_bars)
         if self.entry_price == "current_close":
             entry_values = close
-        else:
+            exit_values = close.shift(-self.horizon_bars)
+        elif self.entry_price == "next_open":
             entry_values = pd.to_numeric(data["open"], errors="coerce").shift(-1)
+            exit_values = close.shift(-self.horizon_bars)
+        else:  # next_close: align with the backtest's NEXT_BAR / CLOSE fill
+            entry_values = close.shift(-1)
+            exit_values = close.shift(-(1 + self.horizon_bars))
 
         ratio = exit_values.div(entry_values.replace(0.0, np.nan))
         returns = np.log(ratio) if self.return_type == "log" else ratio.sub(1.0)

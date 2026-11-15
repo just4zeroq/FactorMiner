@@ -35,9 +35,18 @@ from core.evaluation.annualisation import DEFAULT_ANNUALISATION
 # IC time-series helpers
 # --------------------------------------------------------------------------- #
 def _spearman_row(a: np.ndarray, b: np.ndarray) -> float:
-    """Spearman rho for one cross-section (ranks via argsort)."""
+    """Spearman rho for one cross-section (ranks via argsort).
+
+    NaN positions are excluded pairwise: a missing factor value or a missing
+    return must not pollute the ranks of the *other* asset. The naive
+    ``argsort`` implementation ranks NaN as the largest value, which silently
+    inflates IC on sparse panels (crypto listing gaps, etc.).
+    """
     a = np.asarray(a, float)
     b = np.asarray(b, float)
+    ok = np.isfinite(a) & np.isfinite(b)
+    a = a[ok]
+    b = b[ok]
     if len(a) < 3:
         return 0.0
     ar = a.argsort().argsort().astype(float)
@@ -243,6 +252,7 @@ def multiple_testing_bar(
     n_obs: int,
     n_trials: int,
     annualisation: float = DEFAULT_ANNUALISATION,
+    sigma_sr: Optional[float] = None,
 ) -> Dict[str, float]:
     """The Sharpe a strategy must beat given how many ideas were already tried.
 
@@ -264,7 +274,11 @@ def multiple_testing_bar(
             "bar_per_period_sharpe": float("nan"),
             "bar_annualised_sharpe": float("nan"),
         }
-    sigma = 1.0 / math.sqrt(max(n_obs - 1, 1))
+    sigma = (
+        float(sigma_sr)
+        if sigma_sr is not None and np.isfinite(sigma_sr) and float(sigma_sr) > 0
+        else 1.0 / math.sqrt(max(n_obs - 1, 1))
+    )
     bar = expected_max_sr(max(1, int(n_trials)), sigma=sigma)
     return {
         "n_trials": int(n_trials),
@@ -281,6 +295,7 @@ def deflated_sharpe_ratio(
     sr_benchmark: Optional[float] = None,
     skewness: float = 0.0,
     kurtosis: float = 3.0,
+    sigma_sr: Optional[float] = None,
 ) -> float:
     """Probability that the true SR exceeds the (multiple-testing-aware) benchmark.
 
@@ -294,13 +309,26 @@ def deflated_sharpe_ratio(
     if n_obs < 2:
         return 0.0
     if sr_benchmark is None:
-        sr_sigma = 1.0 / math.sqrt(max(n_obs - 1, 1))
+        # Bailey & Lopez de Prado's sigma is the CROSS-SECTIONAL dispersion of
+        # Sharpe ratios ACROSS TRIALS, not the sampling error of one SR
+        # (1/sqrt(T-1)). Callers that have the trial population must pass
+        # ``sigma_sr``; the legacy sampling-error proxy is kept only as an
+        # explicitly marked fallback so old single-factor runs still work.
+        sr_sigma = (
+            float(sigma_sr)
+            if sigma_sr is not None and np.isfinite(sigma_sr) and float(sigma_sr) > 0
+            else 1.0 / math.sqrt(max(n_obs - 1, 1))
+        )
         sr_benchmark = expected_max_sr(n_trials, sigma=sr_sigma)
-    denom = math.sqrt(
-        max(1e-9, 1.0 - skewness * sharpe + (kurtosis - 1.0) / 4.0 * sharpe ** 2)
-    )
-    if denom <= 0:
+
+    # E-01 confirmed bug: clamping the quadratic INSIDE the square root to
+    # 1e-9 made denom ~3.16e-5, so z -> +/-inf and DSR -> 1.0 on exactly the
+    # pathological (fat-tailed / implausible) returns that should be rejected.
+    # A non-positive variance term is not computable evidence; fail closed.
+    var_term = 1.0 - skewness * sharpe + (kurtosis - 1.0) / 4.0 * sharpe ** 2
+    if not np.isfinite(var_term) or var_term <= 1e-9:
         return 0.0
+    denom = math.sqrt(var_term)
     z = (sharpe - sr_benchmark) * math.sqrt(n_obs - 1) / denom
     return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
 
@@ -402,6 +430,23 @@ def apply_promotion_gates(
     "empirical_p"}``.
     """
     pvals = [float(m.get("p_value", 1.0)) for m in metrics_list]
+    # E-01: estimate the cross-trial Sharpe dispersion from the population
+    # actually being gated. Bailey-LdP's E[max SR] needs sigma ACROSS trials;
+    # a single-factor call (the old re-audit path) has no population, so it
+    # falls back to the legacy sampling-error proxy inside deflated_sharpe_ratio.
+    sr_population: List[float] = []
+    for m in metrics_list:
+        try:
+            v = float(m.get("sr", np.nan))
+        except (TypeError, ValueError):
+            continue
+        if np.isfinite(v):
+            sr_population.append(v)
+    sigma_sr = (
+        float(np.std(sr_population, ddof=1))
+        if len(sr_population) >= 3 and float(np.std(sr_population, ddof=1)) > 0
+        else None
+    )
     if family_p_values:
         family = np.sort(np.asarray(list(family_p_values), dtype=float))
         family = family[np.isfinite(family)]
@@ -414,6 +459,20 @@ def apply_promotion_gates(
                 padj.append(float(adj_sorted[idx]))
         else:
             padj = list(bh_fdr(pvals))
+    elif n_trials is not None and int(n_trials) > len(pvals):
+        # A4 safety net: callers that gate one factor at a time while declaring
+        # a large historical trial count must not collapse the BH family to 1.
+        # Pad with p=1.0 for the unobserved historical trials (conservative:
+        # it can only make the adjusted p-values larger).
+        finite_pvals = [float(p) for p in pvals if np.isfinite(p)]
+        family = np.sort(np.asarray(
+            finite_pvals + [1.0] * (int(n_trials) - len(finite_pvals)), dtype=float
+        ))
+        adj_sorted = bh_fdr(family)
+        padj = []
+        for p in pvals:
+            idx = min(int(np.searchsorted(family, p, side="left")), family.size - 1)
+            padj.append(float(adj_sorted[idx]))
     else:
         padj = list(bh_fdr(pvals))
     out: List[Dict[str, Any]] = []
@@ -437,6 +496,12 @@ def apply_promotion_gates(
                     sharpe=float(sharpe),
                     n_obs=int(obs),
                     n_trials=int(n_trials),
+                    # P1-M9: propagate the net-return skew/kurtosis computed by
+                    # portfolio_eval so the gate's deflation matches the
+                    # evaluator's (normal defaults are optimistic for fat tails).
+                    skewness=float(m.get("net_skew", 0.0) or 0.0),
+                    kurtosis=float(m.get("net_kurtosis", 3.0) or 3.0),
+                    sigma_sr=sigma_sr,
                 )
         gate_input = {
             "hac_t": float(m.get("hac_t", 0.0)),
@@ -449,7 +514,11 @@ def apply_promotion_gates(
             "oos_enabled": bool(m.get("oos_enabled", False)),
             "empirical_p": emp_p,
         }
-        gate = promotion_gates(gate_input, cfg)
+        # A4: re-audit callers may need per-factor gate config (e.g. factors
+        # without an OOS snapshot must not be failed by an OOS-only gate).
+        # Allow a per-candidate override while still batching the BH family.
+        local_cfg = {**(cfg or {}), **(m.get("_gate_cfg") or {})}
+        gate = promotion_gates(gate_input, local_cfg)
         status = "INSPECTED" if gate["pass"] else "DISCOVERED_UNVERIFIED"
         out.append({
             "p_adj": float(p),

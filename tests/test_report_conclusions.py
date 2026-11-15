@@ -154,8 +154,13 @@ class TestReauditConclusions(unittest.TestCase):
     def test_sensitivity_pass_count_is_not_hardcoded(self):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "report.md"
-            with patch.object(self.mod, "apply_promotion_gates",
-                              return_value=[{"status": "INSPECTED"}]):
+            # A4: the sensitivity sweep now batches the whole library in one
+            # call, so the mock must return one verdict per input.
+            def _all_pass(inputs, **kwargs):
+                return [{"status": "INSPECTED", "p_adj": 0.0, "dsr": 1.0}
+                        for _ in inputs]
+
+            with patch.object(self.mod, "apply_promotion_gates", side_effect=_all_pass):
                 sensitivity = self.mod._write_report(self._rows(), n_trials=10, path=str(out))
             text = out.read_text(encoding="utf-8")
         self.assertEqual(sensitivity[1], 3)

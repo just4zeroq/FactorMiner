@@ -375,7 +375,10 @@ class LLMGuardrailTests(unittest.TestCase):
             with mock.patch.object(
                 miner,
                 "_get_fallback_code",
-                return_value="factor = df['close'] - df['open']",
+                # A5: close-open is constant on this 3-row fixture and is now
+                # rejected as a non-informative factor; use a varying formula
+                # so the test still exercises the recorder's success path.
+                return_value="factor = df['close'] / df['open']",
             ):
                 miner.mine(1)
             events = [

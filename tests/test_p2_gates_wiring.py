@@ -99,17 +99,26 @@ class TestPortableBudget(unittest.TestCase):
         base, _, _ = budget.resolve(120, [0.4], [0.3], path=self.path)
         self.assertEqual(base, 120)
 
-    def test_snapshot_pvalues_used_only_when_local_ledger_empty(self):
+    def test_snapshot_pvalues_are_unioned_with_local_ledger(self):
+        # A4: the old `or` discarded the whole historical snapshot whenever a
+        # local ledger existed. The BH family must be the UNION of all sources.
         budget.sync(10, [0.9] * 5, path=self.path)
         _, family, _ = budget.resolve(10, [0.4], [0.3], path=self.path)
-        self.assertEqual(family[:2], [0.4, 0.3])
+        self.assertEqual(family[0], 0.4)
+        self.assertIn(0.9, family)
+        self.assertIn(0.3, family)
+        self.assertEqual(len(family), 7)
         _, family2, _ = budget.resolve(10, [], [0.3], path=self.path)
         self.assertEqual(len(family2), 6)
 
-    def test_corrupt_file_falls_back_to_empty(self):
+    def test_corrupt_file_is_flagged_and_sync_refuses_to_reset(self):
         with open(self.path, "w", encoding="utf-8") as fh:
             fh.write("not json")
-        self.assertEqual(budget.load(self.path)["n_trials"], 0)
+        loaded = budget.load(self.path)
+        self.assertEqual(loaded["n_trials"], 0)
+        self.assertTrue(loaded["corrupt"])
+        with self.assertRaises(budget.BudgetSnapshotError):
+            budget.sync(1, [0.5], path=self.path)
 
     def test_status_reports_path(self):
         s = budget.status(self.path)

@@ -13,13 +13,22 @@ def parse_args(argv=None):
         description="Run a complete, reproducible FactorMiner experiment"
     )
     p.add_argument("--config", required=True, help="Path to the JSON config")
-    p.add_argument("--miner", default="GP", help="Paradigm / miner class name")
+    # K-08: no default here. A non-None default silently overwrote the config's
+    # ``paradigm`` / ``user_dir`` even when the user never passed the flag, so a
+    # config declaring LLM/MyCustomNN was launched as GP with a mismatched
+    # operator_set_hash in the manifest.
+    p.add_argument("--miner", default=None, help="Override the config's paradigm / miner class name")
     p.add_argument("--iterations", type=int, default=None, help="Override max_iterations")
     p.add_argument("--seed", type=int, default=None, help="Fix global RNG seed for reproducibility")
     p.add_argument("--resume", action="store_true", help="Skip stages already completed for this config")
     p.add_argument("--run-id", default=None, help="Explicit run id (default: generated)")
-    p.add_argument("--user-dir", default="user_workspace", help="User workspace with custom modules")
+    p.add_argument("--user-dir", default=None, help="Override the config's user workspace directory")
     p.add_argument("--output-root", default=None, help="Override the runs root (mainly for tests)")
+    p.add_argument("--holdout-mode", default=None,
+                   choices=["strict", "audit", "off"],
+                   help="Override evaluation.gates.holdout_mode for this run")
+    p.add_argument("--allow-holdout-reuse", action="store_true",
+                   help="Permit recomputing an already-revealed window (audited)")
     return p.parse_args(argv)
 
 
@@ -35,13 +44,25 @@ def run_experiment_cmd(args):
         print(f"Cannot read config: {exc}", file=sys.stderr)
         sys.exit(1)
 
-    config["paradigm"] = args.miner
+    if getattr(args, "miner", None) is not None:
+        config["paradigm"] = args.miner
+    elif not config.get("paradigm"):
+        config["paradigm"] = "GP"
     if args.iterations is not None:
         config["max_iterations"] = int(args.iterations)
     exp = config.setdefault("experiment", {})
-    exp["user_dir"] = args.user_dir
+    if getattr(args, "user_dir", None) is not None:
+        exp["user_dir"] = args.user_dir
+    else:
+        exp.setdefault("user_dir", "user_workspace")
     if args.seed is not None:
         exp["seed"] = int(args.seed)
+    if getattr(args, "holdout_mode", None) or getattr(args, "allow_holdout_reuse", False):
+        gates = ((config.setdefault("evaluation", {})).setdefault("gates", {}))
+        if getattr(args, "holdout_mode", None):
+            gates["holdout_mode"] = args.holdout_mode
+        if getattr(args, "allow_holdout_reuse", False):
+            gates["allow_holdout_reuse"] = True
 
     from pathlib import Path
     from core.experiment.pipeline import run_experiment

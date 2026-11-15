@@ -45,6 +45,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
+import hashlib
 
 import pandas as pd
 
@@ -99,13 +100,61 @@ def resolve_mode(config: Optional[Dict] = None, explicit: Optional[str] = None) 
 
 
 def _normalise(value: Any) -> Optional[str]:
-    """To ``YYYY-MM-DD`` so ledger string comparison is well-defined."""
+    """Canonical, lexicographically comparable window bound.
+
+    E-02: the old implementation silently truncated unparseable garbage into
+    ``"garbage_st"`` and dropped every intraday/timezone component. Both feed
+    a *string* comparison in the ledger, so a junk value could pass an overlap
+    check and an intraday window could be recorded as a whole day. Date-only
+    inputs still produce ``YYYY-MM-DD`` (backward compatible with existing
+    ledger files); inputs carrying a time produce ``YYYY-MM-DDTHH:MM:SS`` in
+    UTC.
+    """
     if value is None or value == "":
         return None
+    if isinstance(value, str) and not value.strip():
+        return None
     try:
-        return pd.Timestamp(value).strftime("%Y-%m-%d")
-    except (ValueError, TypeError, OverflowError):
-        return str(value)[:10]
+        ts = pd.Timestamp(value)
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise ValueError(
+            f"Invalid holdout window bound {value!r}: {exc}. "
+            "Pass an explicit ISO date (YYYY-MM-DD) via --start/--end."
+        ) from exc
+    if pd.isna(ts):
+        raise ValueError(f"Invalid holdout window bound {value!r}: NaT")
+    if ts.tzinfo is not None:
+        ts = ts.tz_convert("UTC").tz_localize(None)
+    explicit_time = ":" in str(value) or any(
+        getattr(ts, attr, 0)
+        for attr in ("hour", "minute", "second", "microsecond", "nanosecond")
+    )
+    if explicit_time:
+        return ts.strftime("%Y-%m-%dT%H:%M:%S")
+    return ts.strftime("%Y-%m-%d")
+
+
+def _context_digest(config: Optional[Dict], context: Optional[Dict]) -> str:
+    """E-02: a reveal identity must include the research context.
+
+    Two final evaluations on the same calendar dates but different timeframe /
+    label horizon are *different* experiments; the old ``holdout_<lo>_<hi>``
+    key conflated them. The actual one-time enforcement still comes from the
+    overlap check, so this only makes the audit trail unambiguous.
+    """
+    feeds = (config or {}).get("data_feeds") or {}
+    target = (config or {}).get("target") or {}
+    merged = {
+        "timeframe": feeds.get("timeframe"),
+        "horizon_bars": target.get("horizon_bars"),
+        "entry_price": target.get("entry_price"),
+        **(context or {}),
+    }
+    merged = {k: v for k, v in merged.items() if v is not None}
+    if not merged:
+        return ""
+    blob = json.dumps(merged, sort_keys=True, default=str)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:8]
 
 
 def _append_jsonl(filename: str, record: Dict[str, Any]) -> None:
@@ -141,6 +190,7 @@ def guard(
     ledger_path: Optional[str] = None,
     source: str = "",
     note: str = "",
+    context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Check (and, for ``final``, register) access to one evaluation window.
 
@@ -151,19 +201,23 @@ def guard(
         raise ValueError(f"purpose must be one of {VALID_PURPOSES}, got {purpose!r}")
 
     resolved_mode = resolve_mode(config, mode)
+    norm_start = _normalise(start)
+    norm_end = _normalise(end)
     result: Dict[str, Any] = {
         "allowed": True,
         "mode": resolved_mode,
         "purpose": purpose,
         "source": source,
-        "start": _normalise(start),
-        "end": _normalise(end),
+        "start": norm_start,
+        "end": norm_end,
         "original_start": str(start) if start is not None else None,
         "original_end": str(end) if end is not None else None,
         "overlaps": [],
         "revealed": False,
         "override": False,
         "reason": "clean",
+        "bounded": norm_start is not None and norm_end is not None,
+        "context": _context_digest(config, context),
         "ledger_path": ledger_path or default_ledger_path(),
     }
     if resolved_mode == "off":
@@ -171,12 +225,18 @@ def guard(
         _log_access(result, "mode_off")
         return result
 
+    # E-02 / K-06: a *final* reveal must be fully bounded. The old code allowed
+    # a one-sided (or fully unbounded) final call and silently expanded it to
+    # 0000-01-01..9999-12-31, permanently burning the entire time axis.
+    if purpose == "final" and not result["bounded"]:
+        raise ValueError(
+            "A final holdout evaluation must declare BOTH --start and --end "
+            f"explicitly (got start={start!r}, end={end!r}). An unbounded or "
+            "one-sided window cannot be registered as a one-time reveal: it "
+            "would burn the whole timeline."
+        )
+
     if result["start"] is None and result["end"] is None:
-        if purpose == "final":
-            raise ValueError(
-                "A final holdout evaluation must declare --start/--end explicitly; "
-                "an unbounded window cannot be registered as a one-time reveal."
-            )
         result["reason"] = "unbounded"
         _log_access(result, "unbounded")
         logger.warning(
@@ -186,10 +246,14 @@ def guard(
         )
         return result
 
-    # Open-ended windows are treated as extending to infinity so a one-sided
-    # range cannot slip past an overlap check.
+    # Open-ended *explore* windows are still extended to infinity for the
+    # overlap check so a one-sided range cannot slip past a burned window.
     lo = result["start"] or "0000-01-01"
     hi = result["end"] or "9999-12-31"
+    if pd.Timestamp(lo) > pd.Timestamp(hi):
+        raise ValueError(
+            f"Holdout window start {lo} is after end {hi}; check --start/--end."
+        )
     ledger = HoldoutLedger(ledger_path or default_ledger_path())
     burned = ledger.overlapping(lo, hi)
     result["overlaps"] = [
@@ -250,7 +314,8 @@ def guard(
 
     if purpose == "final":
         spec = load_window_spec()
-        period_key = f"holdout_{lo}_{hi}"
+        digest = result["context"]
+        period_key = f"holdout_{lo}_{hi}" + (f"_{digest}" if digest else "")
         label = spec.get("label")
         if spec.get("start") and lo < _normalise(spec["start"]):
             logger.warning(

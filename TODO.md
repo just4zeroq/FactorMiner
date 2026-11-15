@@ -106,6 +106,24 @@
 - [x] **修复后基线**: `pytest -q` → 447 passed / 1 skipped / 56 subtests（净增 16 个回归测试），无失败，无回退。
 - [ ] **遗留（架构债，非缺陷，建议后续排期）**: `director.py`/`evaluator.py` 上帝文件拆分；嵌套配置 `deepmerge`（C4 浅合并陷阱）；账本 `jsonl` 并发文件锁（C6）；`resume` 仅 stage 级（F8）。
 
+### 3g. **量化专家复查 — P0/P1 修复（均已执行）**
+**优先级**: 高（直接决定「0 晋升」结论是否可信）
+**说明**: 以量化研究员视角重审「因子挖掘本身的统计与执行正确性」，报告 `docs/reviews/quant_code_review.md`（§7 为修复状态表）。
+
+- [x] **P0 H3 `n_promoted` 恒为 0**: `director.py` 把 gate 结论同时写入 `cand.metrics["lifecycle_status"]`，`pipeline.py:70` 不再读到 `None`。
+- [x] **P0 M1 `ic_series` NaN 秩污染**: `_spearman_row` 对 NaN 做联合有限掩码（真实面板 IC 0.049→0.055 级别的偏差已消除）。
+- [x] **P0 M2 `_coverage` 整行删除**: 改为逐单元格 `isfinite` 计数，散射缺失面板不再从 0.85 崩到 0.04。
+- [x] **P0 H1 搜索目标≠闸门目标**: fitness 纳入 `ls_cost_adj_return`（与 gate 同一 `long_short_returns` 口径），「RankIC>0 但多空净收益≤0」乘 `tradeable_floor=0.1`，搜索不再偏好「IC 好看、尾部不可交易」的因子。
+- [x] **P1 M6 名人堂被丢弃**: `_finalize_linear` 返回 `[combined] + candidates`，全部候选进闸门/入库（此前 ~96/100 被静默丢弃）。
+- [x] **P1 M3 再平衡口径**: pipeline 回测传 `rebalance_every=gate_rebalance_bars`（默认 1），与闸门同源。
+- [x] **P1 M9 DSR 高阶矩**: `portfolio_eval` 输出 `net_skew/net_kurtosis`，evaluator 与闸门 DSR 均传入，负偏/肥尾不再被当成正态。
+- [x] **P1 M5 标签入场时点**: 新增 `next_close`（entry `close[t+1]`，exit `close[t+1+H]`），对齐回测 NEXT_BAR CLOSE 成交；`configExperiment.json` 已启用。
+- [x] **P1 M8 AlphaPool shift 错配**: `weight_fit_shift` 默认 21→0，对齐 1-bar label。
+- [x] **P2 M7 OOS 重算无 warmup**: `_oos_warm_panel` 预热计算后切回真实测试窗口；`test_warmup_bars=120`。
+- [x] **修复后基线**: `pytest -q` → 463 passed / 1 skipped / 56 subtests（净增 16 个回归测试），无回退。
+- [ ] **遗留 M4（闸门成本不含资金费）**: 需把 `funding_rate` 面板穿入 `_build_verdict`，属数据接入改造，单独排期。
+- [ ] **遗留 H2（`test_period` 双用）**: 需三段式切分或明确「正向 OOS 证据」只来自滚动 holdout 账本，属实验设计决策。
+
 ### 4. **Factor Inspector 审查台** (Phase II 完成)
 **优先级**: 高
 **说明**: Inspector 已从静态演示升级为基于 `factor_db` 的真实因子目录、异构逻辑白盒详情、数据快照 Tearsheet 与批量审查工作流。

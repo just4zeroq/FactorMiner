@@ -252,7 +252,17 @@ def run_plan(
 
         try:
             result["trimmed_rows"] = trim_after(str(path), until)
-            fresh = {item["safe_symbol"]: item for item in scan_data_root(data_root)}
+            # T-04: mirror plan_updates' filters. Stream files share the same
+            # safe_symbol as OHLCV; without this filter a funding update could
+            # mask a failed OHLCV download and the script would exit 0.
+            fresh = {
+                item["safe_symbol"]: item
+                for item in scan_data_root(data_root)
+                if not item.get("stream")
+                and item["exchange"] == universe["exchange"]
+                and item["trade_type"] == record["trade_type"]
+                and item["timeframe"] == record["timeframe"]
+            }
             current = fresh.get(record["safe_symbol"])
             if current is None:
                 result.update({"status": "failed", "error": "file missing after download"})

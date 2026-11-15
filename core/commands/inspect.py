@@ -44,28 +44,55 @@ def run_inspector(args):
         load_user_modules(args.user_dir)
 
     base_config = {}
-    if args.config and os.path.exists(args.config):
-        with open(args.config, "r", encoding="utf-8-sig") as f:
-            try:
+    if args.config:
+        # K-04 / S-08: a missing or corrupt --config silently fell back to the
+        # engine's hard-coded BTC/USDT 5m defaults and produced a report that had
+        # nothing to do with the requested configuration. Fail loudly instead.
+        if not os.path.exists(args.config):
+            logger.error("Base config not found: %s", args.config)
+            return 1
+        try:
+            with open(args.config, "r", encoding="utf-8-sig") as f:
                 base_config = json.load(f)
-            except Exception as e:
-                logger.warning("Failed to load base config %s: %s", args.config, e)
+        except Exception as e:
+            logger.error("Failed to load base config %s: %s", args.config, e)
+            return 1
+        if not isinstance(base_config, dict):
+            logger.error("Base config %s must be a JSON object", args.config)
+            return 1
 
     # 2. 解析 CLI 命令行参数覆盖
     pairs_list = [p.strip() for p in args.pairs.split(",")] if args.pairs else None
+    # K-06: a one-sided window used to collapse to ``periods=None`` and take the
+    # guard's "unbounded: warning only" branch -- a complete bypass of the
+    # one-time holdout ledger. Require both bounds, or neither.
+    if bool(args.start) != bool(args.end):
+        logger.error(
+            "Both --start and --end must be supplied together (got start=%r, "
+            "end=%r). A one-sided window cannot be checked against burned "
+            "holdout periods.", args.start, args.end,
+        )
+        return 2
     periods = [[args.start, args.end]] if (args.start and args.end) else None
 
     # P0-b: the inspector reads realised returns too, so it must not be a
     # back door around the one-time holdout ledger.
-    holdout_guard.guard_periods(
-        periods,
-        purpose="explore",
-        config=base_config,
-        mode=getattr(args, "holdout_mode", None),
-        allow_reuse=getattr(args, "allow_holdout_reuse", False),
-        source="cli:inspect",
-        note=f"factor={args.factor or args.ast or args.code or 'inline'}",
-    )
+    try:
+        holdout_guard.guard_periods(
+            periods,
+            purpose="explore",
+            config=base_config,
+            mode=getattr(args, "holdout_mode", None),
+            allow_reuse=getattr(args, "allow_holdout_reuse", False),
+            source="cli:inspect",
+            note=f"factor={args.factor or args.ast or args.code or 'inline'}",
+        )
+    except holdout_guard.HoldoutReuseError as e:
+        logger.error("Holdout guard blocked this inspection: %s", e)
+        return 1
+    except ValueError as e:
+        logger.error("Invalid inspection window: %s", e)
+        return 2
 
     # 3. 运行引擎
     engine = FactorInspectorEngine(base_config=base_config)
@@ -80,9 +107,10 @@ def run_inspector(args):
         )
     except Exception as e:
         logger.error("Inspection failed: %s", e, exc_info=True)
-        sys.exit(1)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
     args = parse_args()
-    run_inspector(args)
+    sys.exit(run_inspector(args))

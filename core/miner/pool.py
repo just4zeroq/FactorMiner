@@ -79,7 +79,12 @@ class AlphaPool:
         self,
         capacity: int = 10,
         mutual_ic_max: float = 0.99,
-        weight_fit_shift: int = 21,
+        # P1-M8: default 0 so the pooled weights predict the *native* label
+        # horizon. AlphaForge's 21-step guard assumes a 21-bar (monthly) label;
+        # with a 1-bar forward_return it made the pool fit returns the factors
+        # were never asked to predict (a horizon mismatch that inflated the
+        # pooled IC). Callers can still override for longer horizons.
+        weight_fit_shift: int = 0,
         reg_lambda: float = 5.0,
         min_obs: int = 200,
         weight_norm: str = "l1",

@@ -30,6 +30,7 @@ import logging
 import os
 from typing import Dict, Iterable, Mapping, Optional, Sequence
 
+import numpy as np
 import pandas as pd
 import polars as pl
 from ml4t.backtest import BacktestConfig, DataFeed, Engine, Strategy
@@ -118,19 +119,25 @@ class CrossSectionalFactorStrategy(Strategy):
         self.held = target
 
 
-def infer_orientation(values: pd.DataFrame) -> float:
+def infer_orientation(values: pd.DataFrame, strict: bool = False) -> Optional[float]:
     """Return +1 if higher factor value predicts higher forward return, else -1.
 
     Uses a Spearman rank correlation on the stored snapshot so the engine does
     not depend on metadata IC fields (which may be stale or corrupted).
+
+    A3: with ``strict=True`` an unreliable estimate returns ``None`` instead of
+    silently defaulting to -1. Callers must then exclude the factor rather than
+    trading an arbitrary direction learned from the evaluation window.
     """
     sub = values.dropna(subset=["factor", "forward_return"])
     if len(sub) < 10:
+        if strict:
+            return None
         logger.warning("Too few rows to infer orientation; defaulting to -1 (long low factor)")
         return -1.0
     corr = sub["factor"].corr(sub["forward_return"], method="spearman")
     if pd.isna(corr) or corr == 0:
-        return -1.0
+        return None if strict else -1.0
     return 1.0 if corr > 0 else -1.0
 
 
@@ -207,6 +214,7 @@ def load_factor_signals(
     orientation_db_root: Optional[str] = None,
     weights: Optional[Mapping[str, float] | Sequence[float]] = None,
     resolve_combinations: bool = True,
+    allow_inferred_orientation: bool = False,
 ) -> pd.DataFrame:
     """Ensemble factor value snapshots into a per-(timestamp, asset) signal.
 
@@ -243,7 +251,13 @@ def load_factor_signals(
 
     frames: list[pd.DataFrame] = []
     orientations: dict[str, float] = {}
+    orientation_sources: dict[str, str] = {}
     used_ids: list[str] = []
+    # B4: members of an expanded linear combination already carry their
+    # direction in the fitted weight. Orienting them a second time cancels it.
+    combination_members = {
+        m for combo in expanded.values() for m in combo.get("members", [])
+    }
     for fid in factor_ids:
         df = storage.load_factor_values(fid)
         if df is None or df.empty:
@@ -253,16 +267,55 @@ def load_factor_signals(
         df = df[keep].copy()
         df["factor_id"] = fid
 
-        # Learn the predictive sign from the designated orientation snapshot.
-        # Using the evaluation window here would be look-ahead leakage.
-        orient_df = df if orient_storage is storage else orient_storage.load_factor_values(fid)
-        if orient_df is None or orient_df.empty:
-            logger.warning(
-                "No orientation snapshot for %s in %s; falling back to evaluation snapshot",
-                fid, orientation_db_root,
-            )
-            orient_df = df
-        orientations[fid] = infer_orientation(orient_df)
+        sign: Optional[float] = None
+        if fid in combination_members:
+            sign = 1.0
+            orientation_sources[fid] = "combination_weight"
+        elif orientation_db_root and orientation_db_root != db_root:
+            # The ONLY legitimate place to learn a sign from a snapshot: an
+            # explicitly supplied in-sample library. Never fall back to the
+            # evaluation window (that is the A3 look-ahead).
+            orient_df = orient_storage.load_factor_values(fid)
+            if orient_df is None or orient_df.empty:
+                logger.warning(
+                    "No in-sample orientation snapshot for %s in %s; excluding factor",
+                    fid, orientation_db_root,
+                )
+                continue
+            sign = infer_orientation(orient_df, strict=True)
+            orientation_sources[fid] = f"in_sample_db:{orientation_db_root}"
+        else:
+            # A3: use the orientation PRE-REGISTERED at evaluation time and
+            # stored in metadata. It was computed on the in-sample split.
+            meta = storage.get_metadata(fid)
+            registered = None
+            if meta is not None:
+                try:
+                    raw = (getattr(meta, "metrics", {}) or {}).get("orientation")
+                    registered = float(raw) if raw is not None else None
+                except (TypeError, ValueError):
+                    registered = None
+            if registered is not None and abs(registered) > 0 and np.isfinite(registered):
+                sign = 1.0 if registered > 0 else -1.0
+                orientation_sources[fid] = "metadata:pre_registered"
+            elif allow_inferred_orientation:
+                sign = infer_orientation(df, strict=True)
+                orientation_sources[fid] = "inferred_from_evaluation_window(LEAKY)"
+                logger.warning(
+                    "A3: inferring orientation for %s FROM the evaluation window; "
+                    "strict_oos is false and the result is optimistically biased",
+                    fid,
+                )
+            else:
+                logger.warning(
+                    "A3: no pre-registered orientation for %s; excluding factor "
+                    "instead of guessing a sign. Pass orientation_db_root or "
+                    "allow_inferred_orientation=True explicitly.", fid,
+                )
+        if sign is None:
+            logger.warning("A3: unreliable/absent orientation for %s; excluding", fid)
+            continue
+        orientations[fid] = float(sign)
         frames.append(df)
         used_ids.append(fid)
 
@@ -270,7 +323,12 @@ def load_factor_signals(
         raise ValueError("No usable factor value snapshots found for the given ids")
 
     long = pd.concat(frames, ignore_index=True)
-    long["rank"] = long.groupby(["timestamp", "factor_id"])["factor"].rank(method="first")
+    # A5: a factor with no cross-sectional dispersion on a timestamp carries
+    # no information. ``rank(method="first")`` turned all-equal panels into
+    # alphabetical noise that still produced a "significant" backtest.
+    spread = long.groupby(["timestamp", "factor_id"])["factor"].transform("nunique")
+    long = long[spread > 1].copy()
+    long["rank"] = long.groupby(["timestamp", "factor_id"])["factor"].rank(method="average")
     long["oriented"] = long["factor_id"].map(orientations) * long["rank"]
     long["weight"] = long["factor_id"].map(weight_map).fillna(0.0)
     long["weighted"] = long["oriented"] * long["weight"]
@@ -286,6 +344,7 @@ def load_factor_signals(
     }
     combined.attrs["expanded_combinations"] = expanded
     combined.attrs["requested_ids"] = requested_ids
+    combined.attrs["orientation_sources"] = orientation_sources
     logger.info(
         "Built ensemble signal from %d factors; weights=%s; orientations=%s",
         len(used_ids),
@@ -501,6 +560,8 @@ def run_backtest(
     min_assets: Optional[int] = None,
     weights: Optional[Mapping[str, float] | Sequence[float]] = None,
     use_real_funding: bool = False,
+    allow_inferred_orientation: bool = False,
+    resolve_combinations: bool = True,
 ) -> dict:
     """Run a full cross-sectional factor backtest.
 
@@ -518,9 +579,12 @@ def run_backtest(
         db_root=db_root,
         orientation_db_root=orientation_db_root,
         weights=weights,
+        allow_inferred_orientation=allow_inferred_orientation,
+        resolve_combinations=resolve_combinations,
     )
     effective_weights = signals.attrs.get("effective_weights", {})
     expanded = signals.attrs.get("expanded_combinations", {})
+    orientation_sources = signals.attrs.get("orientation_sources", {})
     lo_all = str(signals["timestamp"].min().date())
     hi_all = str(signals["timestamp"].max().date())
 
@@ -589,6 +653,14 @@ def run_backtest(
         "scope": f"{s_lo.date()}..{s_hi.date()}",
         "signal_db_root": db_root,
         "orientation_db_root": orientation_db_root or db_root,
+        "orientation_sources": orientation_sources,
+        "orientation_window": (
+            "in_sample_db" if orientation_db_root and orientation_db_root != db_root
+            else ("pre_registered_metadata" if orientation_sources and all(
+                s == "metadata:pre_registered" or s == "combination_weight"
+                for s in orientation_sources.values()
+            ) else "evaluation_window_LEAKY")
+        ),
         "strict_oos": bool(orientation_db_root and orientation_db_root != db_root),
         "n_factors": len(factor_ids),
         "n_assets": int(prices["asset"].nunique()),
